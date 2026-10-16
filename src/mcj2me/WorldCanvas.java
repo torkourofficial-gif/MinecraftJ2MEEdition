@@ -448,7 +448,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private int addCube(short[] positions, short[] texCoords, int[] indices, int[] stripLengths, int vertex, int strip, int x, int y, int z, int tx, int ty) {
-        vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x, y+1, z, x, y+1, z+1, x+1, y+1, z, x+1, y+1, z+1, tx, ty);
+        // The cut end of a log uses the log-top atlas tile, not bark.
+        int topX = (tx == 4 && ty == 1) ? 5 : tx;
+        int topY = (tx == 4 && ty == 1) ? 1 : ty;
+        vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x, y+1, z, x, y+1, z+1, x+1, y+1, z, x+1, y+1, z+1, topX, topY);
         vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x, y, z+1, x, y+1, z+1, x+1, y, z+1, x+1, y+1, z+1, tx, ty);
         vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x+1, y, z, x+1, y+1, z, x, y, z, x, y+1, z, tx, ty);
         vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x, y, z, x, y+1, z, x, y, z+1, x, y+1, z+1, tx, ty);
