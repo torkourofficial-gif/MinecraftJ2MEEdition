@@ -331,7 +331,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         buffer.setPositions(vertexArray, 1.0f, null);
         buffer.setTexCoords(0, texArray, 1.0f / 256.0f, null);
         TriangleStripArray triangles = new TriangleStripArray(indices, stripLengths);
-        return new Mesh(buffer, triangles, new Appearance[] { groundAppearance });
+        return new Mesh(buffer, triangles, groundAppearance);
     }
 
     private int addQuad(short[] positions, short[] texCoords, int[] indices,
