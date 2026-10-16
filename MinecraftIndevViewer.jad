@@ -1,0 +1,7 @@
+MIDlet-1: Minecraft Indev Viewer, , mcj2me.IndevViewerMIDlet
+MIDlet-Name: Minecraft Indev Viewer
+MIDlet-Vendor: Toemsoxd
+MIDlet-Version: 0.1.0
+MIDlet-Description: Procedural Minecraft Indev spectator terrain viewer
+MicroEdition-Configuration: CLDC-1.1
+MicroEdition-Profile: MIDP-2.0

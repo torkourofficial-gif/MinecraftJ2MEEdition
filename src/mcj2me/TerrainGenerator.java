@@ -1,0 +1,60 @@
+package mcj2me;
+
+/**
+ * Small deterministic height-map generator. No world-sized block array is
+ * needed: each column stores only its surface height.
+ */
+final class TerrainGenerator {
+    static final int SIZE = 128;
+    static final int HEIGHT = 64;
+    private final short[][] heights = new short[SIZE][SIZE];
+
+    TerrainGenerator() {
+        for (int x = 0; x < SIZE; x++) {
+            for (int z = 0; z < SIZE; z++) {
+                int broad = valueNoise(x, z, 32);
+                int medium = valueNoise(x, z, 12);
+                int fine = valueNoise(x, z, 4);
+                int h = 27 + broad * 12 / 1024
+                           + medium * 5 / 1024
+                           + fine * 2 / 1024;
+                if (h < 8) h = 8;
+                if (h > HEIGHT - 8) h = HEIGHT - 8;
+                heights[x][z] = (short) h;
+            }
+        }
+    }
+
+    int getHeight(int x, int z) {
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) {
+            return 0;
+        }
+        return heights[x][z];
+    }
+
+    private int valueNoise(int x, int z, int scale) {
+        int gx = x / scale;
+        int gz = z / scale;
+        int fx = (x % scale) * 256 / scale;
+        int fz = (z % scale) * 256 / scale;
+
+        // Smooth interpolation in fixed-point arithmetic (0..256).
+        fx = (fx * fx * (768 - 2 * fx)) >> 16;
+        fz = (fz * fz * (768 - 2 * fz)) >> 16;
+
+        int a = hash(gx, gz);
+        int b = hash(gx + 1, gz);
+        int c = hash(gx, gz + 1);
+        int d = hash(gx + 1, gz + 1);
+        int top = a + ((b - a) * fx >> 8);
+        int bottom = c + ((d - c) * fx >> 8);
+        return top + ((bottom - top) * fz >> 8);
+    }
+
+    private int hash(int x, int z) {
+        int n = x * 374761393 + z * 668265263 + 0x51ED270B;
+        n = (n ^ (n >>> 13)) * 1274126177;
+        n ^= n >>> 16;
+        return (n & 2047) - 1024;
+    }
+}
