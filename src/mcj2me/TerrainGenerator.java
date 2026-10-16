@@ -7,6 +7,7 @@ package mcj2me;
 final class TerrainGenerator {
     static final int SIZE = 128;
     static final int HEIGHT = 64;
+    static final int WATER_LEVEL = 25;
     private final short[][] heights = new short[SIZE][SIZE];
     private final byte[][] topTypes = new byte[SIZE][SIZE];
 
@@ -16,9 +17,18 @@ final class TerrainGenerator {
                 int broad = valueNoise(x, z, 32);
                 int medium = valueNoise(x, z, 12);
                 int fine = valueNoise(x, z, 4);
+                int lakeNoise = valueNoise(x, z, 40);
                 int h = 27 + broad * 12 / 1024
                            + medium * 5 / 1024
                            + fine * 2 / 1024;
+
+                // Carve broad, gently varying basins below the waterline.
+                // This makes lakes a deliberate part of the generated terrain,
+                // rather than relying on naturally low columns appearing nearby.
+                if (lakeNoise < -120) {
+                    int depth = (-120 - lakeNoise) * 12 / 904;
+                    h -= depth;
+                }
                 if (h < 8) h = 8;
                 if (h > HEIGHT - 8) h = HEIGHT - 8;
                 heights[x][z] = (short) h;
@@ -31,6 +41,15 @@ final class TerrainGenerator {
             return 0;
         }
         return heights[x][z];
+    }
+
+    boolean isWaterAt(int x, int z) {
+        return x >= 0 && z >= 0 && x < SIZE && z < SIZE
+            && heights[x][z] < WATER_LEVEL;
+    }
+
+    int getWaterLevel() {
+        return WATER_LEVEL;
     }
 
     // Bilinear interpolation smooths the camera's ground height between columns.
