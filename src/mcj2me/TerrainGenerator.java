@@ -10,6 +10,7 @@ final class TerrainGenerator {
     static final int WATER_LEVEL = 25;
     private final short[][] heights = new short[SIZE][SIZE];
     private final byte[][] topTypes = new byte[SIZE][SIZE];
+    private final boolean[][] waterBasins = new boolean[SIZE][SIZE];
 
     TerrainGenerator() {
         for (int x = 0; x < SIZE; x++) {
@@ -22,16 +23,19 @@ final class TerrainGenerator {
                            + medium * 5 / 1024
                            + fine * 2 / 1024;
 
-                // Carve broad, gently varying basins below the waterline.
-                // This makes lakes a deliberate part of the generated terrain,
-                // rather than relying on naturally low columns appearing nearby.
-                if (lakeNoise < -120) {
-                    int depth = (-120 - lakeNoise) * 12 / 904;
+                // Lakes are explicit carved basins, not "every low column is
+                // water". A stricter noise threshold keeps them separated and
+                // leaves a raised shoreline around each depression.
+                boolean basin = lakeNoise < -430;
+                if (basin) {
+                    int depth = 8 + ((-430 - lakeNoise) * 14 / 594);
                     h -= depth;
+                    if (h >= WATER_LEVEL) h = WATER_LEVEL - 1;
                 }
-                if (h < 8) h = 8;
+                if (h < 3) h = 3;
                 if (h > HEIGHT - 8) h = HEIGHT - 8;
                 heights[x][z] = (short) h;
+                waterBasins[x][z] = basin && h < WATER_LEVEL;
             }
         }
     }
@@ -45,7 +49,7 @@ final class TerrainGenerator {
 
     boolean isWaterAt(int x, int z) {
         return x >= 0 && z >= 0 && x < SIZE && z < SIZE
-            && heights[x][z] < WATER_LEVEL;
+            && waterBasins[x][z] && heights[x][z] < WATER_LEVEL;
     }
 
     int getWaterLevel() {
