@@ -1,8 +1,7 @@
 # Minecraft J2ME Edition — Indev terrain prototype
 
 Procedural 128 × 128 terrain using Java ME MIDP 2.0, CLDC 1.1 and M3G
-(JSR-184). This milestone adds terrain-following movement, decorative trees,
-surface-column block editing, a hotbar and a lightweight break-particle effect.
+(JSR-184). This milestone adds acceleration/friction-based movement, jumping with gravity, smoother terrain following, decorative trees with wood/leaf textures, per-block side texture tiling, surface-column block editing, a hotbar and a lightweight break-particle effect.
 It is still height-map based, not a complete voxel engine.
 
 ## Requirements
@@ -21,7 +20,7 @@ It is still height-map based, not a complete voxel engine.
 - **3:** place selected block on the targeted column
 - **7 / 9:** cycle hotbar slot
 - **W / A / S / D:** movement in desktop emulators
-- **Fire / center:** tilt camera down slightly
+- **Fire / center:** jump (hold no extra key; press again after landing)
 
 Block editing currently changes the top of a terrain column; side-face mining,
 caves, persistence, mobs and survival are not implemented. Trees are decorative.
