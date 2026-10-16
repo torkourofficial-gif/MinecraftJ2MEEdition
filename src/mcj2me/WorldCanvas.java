@@ -387,12 +387,12 @@ final class WorldCanvas extends Canvas implements Runnable {
                 }
                 if (terrain.isTreeAt(x, z)) {
                     int base = h + 1, th = terrain.getTreeHeight(x, z), y;
-                    for (y = 0; y < th; y++) vertex = addCube(positions, texCoords, indices, stripLengths, vertex, strip++, x, base + y, z, 4, 0);
+                    for (y = 0; y < th; y++) { vertex = addCube(positions, texCoords, indices, stripLengths, vertex, strip, x, base + y, z, 4, 0); strip += 6; }
                     int crown = base + th - 1;
                     for (y = crown - 1; y <= crown + 1; y++) { int radius = (y == crown + 1) ? 1 : 2, lx, lz;
                         for (lx = x - radius; lx <= x + radius; lx++) for (lz = z - radius; lz <= z + radius; lz++) {
                             if (lx == x && lz == z && y <= crown) continue;
-                            vertex = addCube(positions, texCoords, indices, stripLengths, vertex, strip++, lx, y, lz, 4, 1);
+                            vertex = addCube(positions, texCoords, indices, stripLengths, vertex, strip, lx, y, lz, 4, 1); strip += 6;
                         }
                     }
                 }
