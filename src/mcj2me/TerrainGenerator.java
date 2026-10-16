@@ -18,26 +18,55 @@ final class TerrainGenerator {
                 int broad = valueNoise(x, z, 32);
                 int medium = valueNoise(x, z, 12);
                 int fine = valueNoise(x, z, 4);
-                int lakeNoise = valueNoise(x, z, 40);
                 int h = 27 + broad * 12 / 1024
                            + medium * 5 / 1024
                            + fine * 2 / 1024;
 
-                // Lakes are explicit carved basins, not "every low column is
-                // water". A stricter noise threshold keeps them separated and
-                // leaves a raised shoreline around each depression.
-                boolean basin = lakeNoise < -430;
-                if (basin) {
-                    int depth = 8 + ((-430 - lakeNoise) * 14 / 594);
-                    h -= depth;
-                    if (h >= WATER_LEVEL) h = WATER_LEVEL - 1;
-                }
+                // Generate a small number of large, deterministic basin bowls.
+                // Candidate lakes are distributed on a coarse grid; some cells
+                // are skipped so land remains between lakes. Their sloped rims
+                // stay above the waterline while the broad inner bowl is filled.
+                int depth = basinDepthAt(x, z);
+                if (depth > 0) h -= depth;
                 if (h < 3) h = 3;
                 if (h > HEIGHT - 8) h = HEIGHT - 8;
                 heights[x][z] = (short) h;
-                waterBasins[x][z] = basin && h < WATER_LEVEL;
+                waterBasins[x][z] = depth >= 3 && h < WATER_LEVEL;
             }
         }
+    }
+
+    /**
+     * Bowl-shaped depressions on a coarse grid create broad lakes with
+     * sloping shorelines. The result is deterministic and uses no extra
+     * world-sized temporary arrays.
+     */
+    private int basinDepthAt(int x, int z) {
+        int cellX = x / 48;
+        int cellZ = z / 48;
+        int bestDepth = 0;
+        for (int gx = cellX - 1; gx <= cellX + 1; gx++) {
+            for (int gz = cellZ - 1; gz <= cellZ + 1; gz++) {
+                if (gx < 0 || gz < 0 || gx > 2 || gz > 2) continue;
+                int seed = hash(gx * 17 + 31, gz * 23 - 19);
+                // Omit some grid cells to avoid turning the map into one ocean.
+                if ((seed & 3) == 0) continue;
+                int centerX = gx * 48 + 24 + ((seed >> 3) % 7);
+                int centerZ = gz * 48 + 24 + ((seed >> 6) % 7);
+                if (centerX < 8) centerX = 8;
+                if (centerZ < 8) centerZ = 8;
+                int radius = 19 + ((seed >>> 9) & 7);
+                int dx = x - centerX;
+                int dz = z - centerZ;
+                int distanceSquared = dx * dx + dz * dz;
+                int radiusSquared = radius * radius;
+                if (distanceSquared >= radiusSquared) continue;
+                int distance = (int) Math.sqrt(distanceSquared);
+                int depth = (radius - distance) * 20 / radius;
+                if (depth > bestDepth) bestDepth = depth;
+            }
+        }
+        return bestDepth;
     }
 
     int getHeight(int x, int z) {
