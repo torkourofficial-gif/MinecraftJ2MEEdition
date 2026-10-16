@@ -33,6 +33,20 @@ final class TerrainGenerator {
         return heights[x][z];
     }
 
+    // Bilinear interpolation smooths the camera's ground height between columns.
+    float getHeightSmooth(float x, float z) {
+        if (x < 0.0f) x = 0.0f;
+        if (z < 0.0f) z = 0.0f;
+        if (x > SIZE - 1.001f) x = SIZE - 1.001f;
+        if (z > SIZE - 1.001f) z = SIZE - 1.001f;
+        int x0 = (int) x, z0 = (int) z;
+        int x1 = x0 + 1, z1 = z0 + 1;
+        float fx = x - x0, fz = z - z0;
+        float a = getHeight(x0, z0) * (1.0f - fx) + getHeight(x1, z0) * fx;
+        float b = getHeight(x0, z1) * (1.0f - fx) + getHeight(x1, z1) * fx;
+        return a * (1.0f - fz) + b * fz;
+    }
+
     int getTopType(int x, int z) { if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return 0; return topTypes[x][z]; }
     void setTopType(int x, int z, int type) { if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return; if (type < 0 || type > 2) type = 0; topTypes[x][z] = (byte) type; }
     void setHeight(int x, int z, int height) { if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return; if (height < 1) height = 1; if (height > HEIGHT - 3) height = HEIGHT - 3; heights[x][z] = (short) height; }
