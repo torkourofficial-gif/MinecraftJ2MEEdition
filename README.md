@@ -2,7 +2,7 @@
 
 Procedural 128 × 128 terrain using Java ME MIDP 2.0, CLDC 1.1 and M3G
 (JSR-184). This milestone adds acceleration/friction-based movement, jumping with gravity, smoother terrain following, decorative trees with wood/leaf textures, per-block side texture tiling, surface-column block editing, a hotbar, animated translucent water, water-entry splash particles and slower movement in water.
-It is still height-map based, not a complete voxel engine.
+It is still height-map based, not a complete voxel engine. Movement uses square column collision with one-block stepping and blocks movement through taller terrain columns; block editing still changes only column tops.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ It is still height-map based, not a complete voxel engine.
 
 - **2 / 8:** forward / backward
 - **4 / 6:** strafe left / right
-- **D-pad left / right:** turn; **up / down:** look
+- **D-pad left / right:** turn; **up / down:** look (nearly vertical, ±88°)
 - **1:** break targeted surface block
 - **3:** place selected block on the targeted column
 - **7 / 9:** cycle hotbar slot
