@@ -25,6 +25,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean paused;
     private boolean forward, backward, strafeLeft, strafeRight;
     private boolean lookUp, lookDown, turnLeft, turnRight;
+    private static final int[] BLOCK_TYPES = {0, 2, 1};
+    private static final String[] BLOCK_NAMES = {"GRASS", "DIRT", "STONE"};
+    private final int[] inventory = {64, 64, 64};
+    private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
     private float cameraX = 64.0f;
     private float cameraY;
     private float cameraZ = 105.0f;
@@ -41,8 +45,6 @@ final class WorldCanvas extends Canvas implements Runnable {
             setupScene();
         } catch (OutOfMemoryError e) {
             errorMessage = "Not enough Java heap for M3G.";
-        } catch (LinkageError e) {
-            errorMessage = "M3G API loading failed: " + e.toString();
         } catch (Exception e) {
             errorMessage = "M3G setup failed: " + e.toString();
         }
@@ -57,7 +59,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         terrainGroup = new Group();
         camera = new Camera();
 
-        Image atlas = Image.createImage("/textures.png");
+        Image atlas = Image.createImage("/mcj2me/textures.png");
         Image2D image2D = new Image2D(Image2D.RGBA, atlas);
         Texture2D texture = new Texture2D(image2D);
         texture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
@@ -79,7 +81,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         ambient.setColor(0xFFFFFF);
         world.addChild(ambient);
 
-        cameraY = terrain.getHeight(64, 105) + 15.0f;
+        cameraY = terrain.getHeight(64, 105) + 1.65f;
         camera.setPerspective(70.0f, 1.0f, 0.1f, 180.0f);
         world.addChild(camera);
         world.setActiveCamera(camera);
@@ -150,11 +152,16 @@ final class WorldCanvas extends Canvas implements Runnable {
             g.setColor(0xFFFFFF);
             g.drawString("M3G render error", 4, 4, Graphics.TOP | Graphics.LEFT);
             g.drawString(e.toString(), 4, 24, Graphics.TOP | Graphics.LEFT);
-        } finally {
-            if (targetBound) {
-                graphics3D.releaseTarget();
-            }
-        }
+        } finally { if (targetBound) graphics3D.releaseTarget(); }
+        drawHud(g);
+    }
+    private void drawHud(Graphics g) {
+        int w = getWidth(), h = getHeight(); g.setColor(0x101820); g.fillRect(3, 3, Math.min(w - 6, 112), 15);
+        g.setColor(0xFFFFFF); g.drawString("MC J2ME", 7, 4, Graphics.TOP | Graphics.LEFT);
+        int sy = h - 23;
+        for (int i = 0; i < 3; i++) { int sx = 4 + i * 54; g.setColor(i == selectedSlot ? 0xE8D070 : 0x303840); g.fillRect(sx, sy, 50, 19); g.setColor(0x101820); g.drawRect(sx, sy, 49, 18); g.setColor(0xFFFFFF); g.drawString(BLOCK_NAMES[i] + " " + inventory[i], sx + 2, sy + 2, Graphics.TOP | Graphics.LEFT); }
+        int cx = w / 2, cy = h / 2; g.setColor(0xFFFFFF); g.drawLine(cx - 3, cy, cx + 3, cy); g.drawLine(cx, cy - 3, cx, cy + 3);
+        if (particleTicks > 0) { g.setColor(0xB5A06A); for (int p = 0; p < 8; p++) { int px = cx + (((p * 17 + particleTicks * 7) % 19) - 9), py = cy + (((p * 11 + particleTicks * 5) % 17) - 8), size = 2 + (particleTicks & 1); g.fillRect(px, py, size, size); } }
     }
 
     protected synchronized void keyPressed(int keyCode) {
@@ -163,9 +170,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         // Numeric keypad movement for emulators/phones without a QWERTY keyboard.
         // Check digits first because some MIDP implementations map 2/4/6/8
         // to directional game actions as well.
-        if (keyCode == '8') {
+        if (keyCode == '2') {
             forward = true;
-        } else if (keyCode == '2') {
+        } else if (keyCode == '8') {
             backward = true;
         } else if (keyCode == '4') {
             strafeLeft = true;
@@ -185,6 +192,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (keyCode == 'a' || keyCode == 'A') strafeLeft = true;
         if (keyCode == 'd' || keyCode == 'D') strafeRight = true;
 
+        if (keyCode == '1' && actionCooldown == 0) { breakBlock(); actionCooldown = 4; }
+        else if (keyCode == '3' && actionCooldown == 0) { placeBlock(); actionCooldown = 4; }
+        else if (keyCode == '7') { selectedSlot--; if (selectedSlot < 0) selectedSlot = 2; }
+        else if (keyCode == '9') { selectedSlot++; if (selectedSlot > 2) selectedSlot = 0; }
         if (action == FIRE) {
             pitch -= 2.0f;
             if (pitch < -75.0f) pitch = -75.0f;
@@ -195,9 +206,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     protected synchronized void keyReleased(int keyCode) {
         int action = getGameAction(keyCode);
 
-        if (keyCode == '8') {
+        if (keyCode == '2') {
             forward = false;
-        } else if (keyCode == '2') {
+        } else if (keyCode == '8') {
             backward = false;
         } else if (keyCode == '4') {
             strafeLeft = false;
@@ -266,13 +277,10 @@ final class WorldCanvas extends Canvas implements Runnable {
             positionChanged = true;
         }
 
-        if (cameraX < 1.0f) cameraX = 1.0f;
-        if (cameraZ < 1.0f) cameraZ = 1.0f;
-        if (cameraX > 127.0f) cameraX = 127.0f;
-        if (cameraZ > 127.0f) cameraZ = 127.0f;
-        if (cameraY < 2.0f) cameraY = 2.0f;
-        if (cameraY > 63.0f) cameraY = 63.0f;
-
+        if (cameraX < 1.0f) cameraX = 1.0f; if (cameraZ < 1.0f) cameraZ = 1.0f;
+        if (cameraX > 126.0f) cameraX = 126.0f; if (cameraZ > 126.0f) cameraZ = 126.0f;
+        if (positionChanged) cameraY = terrain.getHeight((int) cameraX, (int) cameraZ) + 1.65f;
+        if (actionCooldown > 0) actionCooldown--; if (particleTicks > 0) particleTicks--;
         if (changed) updateCamera();
         if (positionChanged) updateChunks();
     }
@@ -333,6 +341,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 if (h > terrain.getHeight(x + 1, z)) quads++;
                 if (h > terrain.getHeight(x, z - 1)) quads++;
                 if (h > terrain.getHeight(x, z + 1)) quads++;
+                if (terrain.isTreeAt(x, z)) quads += (terrain.getTreeHeight(x, z) + 57) * 6;
             }
         }
 
@@ -347,9 +356,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         for (x = startX; x < startX + CHUNK; x++) {
             for (z = startZ; z < startZ + CHUNK; z++) {
                 h = terrain.getHeight(x, z);
+                int topType = terrain.getTopType(x, z);
                 vertex = addQuad(positions, texCoords, indices, stripLengths,
                     vertex, strip++, x, h, z, x, h, z + 1,
-                    x + 1, h, z, x + 1, h, z + 1, 0, 0);
+                    x + 1, h, z, x + 1, h, z + 1, BLOCK_TYPES[topType], 0);
 
                 int neighbor = terrain.getHeight(x - 1, z);
                 if (h > neighbor) {
@@ -375,6 +385,17 @@ final class WorldCanvas extends Canvas implements Runnable {
                         vertex, strip++, x + 1, neighbor, z + 1, x + 1, h, z + 1,
                         x, neighbor, z + 1, x, h, z + 1, 3, 0);
                 }
+                if (terrain.isTreeAt(x, z)) {
+                    int base = h + 1, th = terrain.getTreeHeight(x, z), y;
+                    for (y = 0; y < th; y++) vertex = addCube(positions, texCoords, indices, stripLengths, vertex, strip++, x, base + y, z, 4, 0);
+                    int crown = base + th - 1;
+                    for (y = crown - 1; y <= crown + 1; y++) { int radius = (y == crown + 1) ? 1 : 2, lx, lz;
+                        for (lx = x - radius; lx <= x + radius; lx++) for (lz = z - radius; lz <= z + radius; lz++) {
+                            if (lx == x && lz == z && y <= crown) continue;
+                            vertex = addCube(positions, texCoords, indices, stripLengths, vertex, strip++, lx, y, lz, 4, 1);
+                        }
+                    }
+                }
             }
         }
 
@@ -387,6 +408,29 @@ final class WorldCanvas extends Canvas implements Runnable {
         buffer.setTexCoords(0, texArray, 1.0f / 256.0f, null);
         TriangleStripArray triangles = new TriangleStripArray(indices, stripLengths);
         return new Mesh(buffer, triangles, groundAppearance);
+    }
+
+    private int addCube(short[] positions, short[] texCoords, int[] indices, int[] stripLengths, int vertex, int strip, int x, int y, int z, int tx, int ty) {
+        vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x, y+1, z, x, y+1, z+1, x+1, y+1, z, x+1, y+1, z+1, tx, ty);
+        vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x, y, z+1, x, y+1, z+1, x+1, y, z+1, x+1, y+1, z+1, tx, ty);
+        vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x+1, y, z, x+1, y+1, z, x, y, z, x, y+1, z, tx, ty);
+        vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x, y, z, x, y+1, z, x, y, z+1, x, y+1, z+1, tx, ty);
+        vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x+1, y, z+1, x+1, y+1, z+1, x+1, y, z, x+1, y+1, z, tx, ty);
+        vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x, y, z, x, y+1, z, x+1, y, z, x+1, y+1, z, tx, ty);
+        return vertex;
+    }
+    private void breakBlock() {
+        int[] hit=raycastSurface(); if(hit==null)return; int x=hit[0],z=hit[1],h=terrain.getHeight(hit[0],hit[1]); if(h<=1)return;
+        int type=terrain.getTopType(x,z); if(type>=0&&type<inventory.length)inventory[type]++; terrain.setHeight(x,z,h-1); terrain.setTopType(x,z,1);
+        particleTicks=8; loadedCenterX=-99; updateChunks(); cameraY=terrain.getHeight((int)cameraX,(int)cameraZ)+1.65f; updateCamera();
+    }
+    private void placeBlock() {
+        if(inventory[selectedSlot]<=0)return; int[] hit=raycastSurface(); if(hit==null)return; int x=hit[0],z=hit[1],h=terrain.getHeight(hit[0],hit[1]); if(h>=TerrainGenerator.HEIGHT-3)return;
+        terrain.setHeight(x,z,h+1); terrain.setTopType(x,z,selectedSlot); inventory[selectedSlot]--; loadedCenterX=-99; updateChunks(); cameraY=terrain.getHeight((int)cameraX,(int)cameraZ)+1.65f; updateCamera();
+    }
+    private int[] raycastSurface() {
+        double yr=Math.PI*pitch/180.0,xr=Math.PI*yaw/180.0; float dx=(float)(Math.sin(xr)*Math.cos(yr)),dz=(float)(-Math.cos(xr)*Math.cos(yr)),dy=(float)Math.sin(yr);
+        for(float d=0.5f;d<=5.0f;d+=0.15f){int x=(int)(cameraX+dx*d),z=(int)(cameraZ+dz*d);if(x<1||z<1||x>=TerrainGenerator.SIZE-1||z>=TerrainGenerator.SIZE-1)continue;float y=cameraY+dy*d;int surface=terrain.getHeight(x,z);if(y<=surface+0.25f&&y>=surface-1.0f)return new int[]{x,z};}return null;
     }
 
     private int addQuad(short[] positions, short[] texCoords, int[] indices,
@@ -420,8 +464,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         int right = (tileX + 1) * 16 - 1;
         int top = tileY * 16 + 1;
         int bottom = (tileY + 1) * 16 - 1;
-        int u = (corner == 0 || corner == 2) ? left : right;
-        int v = (corner == 0 || corner == 1) ? bottom : top;
+        int u, v;
+        if (tileX == 3 || tileX == 4) { u = (corner == 0 || corner == 1) ? left : right; v = (corner == 0 || corner == 2) ? bottom : top; }
+        else { u = (corner == 0 || corner == 2) ? left : right; v = (corner == 0 || corner == 1) ? bottom : top; }
         int t = vertex * 2;
         texCoords[t] = (short) u;
         texCoords[t + 1] = (short) v;
