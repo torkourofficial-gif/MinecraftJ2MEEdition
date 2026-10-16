@@ -24,7 +24,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean running;
     private boolean paused;
     private boolean forward, backward, strafeLeft, strafeRight;
-    private boolean rise, descend, turnLeft, turnRight;
+    private boolean lookUp, lookDown, turnLeft, turnRight;
     private float cameraX = 64.0f;
     private float cameraY;
     private float cameraZ = 105.0f;
@@ -159,17 +159,32 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     protected synchronized void keyPressed(int keyCode) {
         int action = getGameAction(keyCode);
-        if (action == UP) forward = true;
-        if (action == DOWN) backward = true;
-        if (action == LEFT) turnLeft = true;
-        if (action == RIGHT) turnRight = true;
 
+        // Numeric keypad movement for emulators/phones without a QWERTY keyboard.
+        // Check digits first because some MIDP implementations map 2/4/6/8
+        // to directional game actions as well.
+        if (keyCode == '2') {
+            forward = true;
+        } else if (keyCode == '8') {
+            backward = true;
+        } else if (keyCode == '4') {
+            strafeLeft = true;
+        } else if (keyCode == '6') {
+            strafeRight = true;
+        } else {
+            // D-pad controls the camera: left/right turn, up/down look.
+            if (action == UP) lookUp = true;
+            if (action == DOWN) lookDown = true;
+            if (action == LEFT) turnLeft = true;
+            if (action == RIGHT) turnRight = true;
+        }
+
+        // Keep letter controls available for desktop emulators.
         if (keyCode == 'w' || keyCode == 'W') forward = true;
         if (keyCode == 's' || keyCode == 'S') backward = true;
         if (keyCode == 'a' || keyCode == 'A') strafeLeft = true;
         if (keyCode == 'd' || keyCode == 'D') strafeRight = true;
-        if (keyCode == 'q' || keyCode == 'Q') descend = true;
-        if (keyCode == 'e' || keyCode == 'E') rise = true;
+
         if (action == FIRE) {
             pitch -= 2.0f;
             if (pitch < -75.0f) pitch = -75.0f;
@@ -179,27 +194,49 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     protected synchronized void keyReleased(int keyCode) {
         int action = getGameAction(keyCode);
-        if (action == UP) forward = false;
-        if (action == DOWN) backward = false;
-        if (action == LEFT) turnLeft = false;
-        if (action == RIGHT) turnRight = false;
+
+        if (keyCode == '2') {
+            forward = false;
+        } else if (keyCode == '8') {
+            backward = false;
+        } else if (keyCode == '4') {
+            strafeLeft = false;
+        } else if (keyCode == '6') {
+            strafeRight = false;
+        } else {
+            if (action == UP) lookUp = false;
+            if (action == DOWN) lookDown = false;
+            if (action == LEFT) turnLeft = false;
+            if (action == RIGHT) turnRight = false;
+        }
+
         if (keyCode == 'w' || keyCode == 'W') forward = false;
         if (keyCode == 's' || keyCode == 'S') backward = false;
         if (keyCode == 'a' || keyCode == 'A') strafeLeft = false;
         if (keyCode == 'd' || keyCode == 'D') strafeRight = false;
-        if (keyCode == 'q' || keyCode == 'Q') descend = false;
-        if (keyCode == 'e' || keyCode == 'E') rise = false;
     }
 
     private synchronized void clearKeys() {
         forward = backward = strafeLeft = strafeRight = false;
-        rise = descend = turnLeft = turnRight = false;
+        lookUp = lookDown = turnLeft = turnRight = false;
     }
 
     private void updateMovement() {
         boolean changed = false;
+        boolean positionChanged = false;
+
         if (turnLeft) { yaw -= TURN_SPEED; changed = true; }
         if (turnRight) { yaw += TURN_SPEED; changed = true; }
+        if (lookUp) {
+            pitch += TURN_SPEED;
+            if (pitch > 75.0f) pitch = 75.0f;
+            changed = true;
+        }
+        if (lookDown) {
+            pitch -= TURN_SPEED;
+            if (pitch < -75.0f) pitch = -75.0f;
+            changed = true;
+        }
 
         float radians = (float) (yaw * Math.PI / 180.0);
         float forwardX = (float) Math.sin(radians);
@@ -208,24 +245,26 @@ final class WorldCanvas extends Canvas implements Runnable {
             cameraX += forwardX * MOVE_SPEED;
             cameraZ += forwardZ * MOVE_SPEED;
             changed = true;
+            positionChanged = true;
         }
         if (backward) {
             cameraX -= forwardX * MOVE_SPEED;
             cameraZ -= forwardZ * MOVE_SPEED;
             changed = true;
+            positionChanged = true;
         }
         if (strafeLeft) {
             cameraX -= (float) Math.cos(radians) * MOVE_SPEED;
             cameraZ -= (float) Math.sin(radians) * MOVE_SPEED;
             changed = true;
+            positionChanged = true;
         }
         if (strafeRight) {
             cameraX += (float) Math.cos(radians) * MOVE_SPEED;
             cameraZ += (float) Math.sin(radians) * MOVE_SPEED;
             changed = true;
+            positionChanged = true;
         }
-        if (rise) { cameraY += MOVE_SPEED; changed = true; }
-        if (descend) { cameraY -= MOVE_SPEED; changed = true; }
 
         if (cameraX < 1.0f) cameraX = 1.0f;
         if (cameraZ < 1.0f) cameraZ = 1.0f;
@@ -234,18 +273,20 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (cameraY < 2.0f) cameraY = 2.0f;
         if (cameraY > 63.0f) cameraY = 63.0f;
 
-        if (changed) {
-            updateCamera();
-            updateChunks();
-        }
+        if (changed) updateCamera();
+        if (positionChanged) updateChunks();
     }
 
     private void updateCamera() {
         Transform transform = new Transform();
         transform.setIdentity();
+
+        // Translate first in the transform product so the camera position
+        // is not rotated around the world origin when yaw/pitch change.
+        transform.postTranslate(cameraX, cameraY, cameraZ);
         transform.postRotate(yaw, 0.0f, 1.0f, 0.0f);
         transform.postRotate(pitch, 1.0f, 0.0f, 0.0f);
-        transform.postTranslate(cameraX, cameraY, cameraZ);
+
         camera.setTransform(transform);
     }
 
