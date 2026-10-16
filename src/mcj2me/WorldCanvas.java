@@ -14,12 +14,21 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final float GRAVITY = 0.035f;
     private static final float JUMP_SPEED = 0.38f;
     private static final float TURN_SPEED = 3.0f;
+    private static final int WATER_LEVEL = 25;
+    private static final float WATER_ALPHA = 0.66f;
 
     private final IndevViewerMIDlet midlet;
     private final TerrainGenerator terrain = new TerrainGenerator();
     private Graphics3D graphics3D;
     private World world;
     private Group terrainGroup;
+    private Group waterGroup;
+    private Texture2D waterTexture;
+    private Appearance waterAppearance;
+    private Mesh[][] activeWaterChunks = new Mesh[8][8];
+    private float waterPhase = 0.0f;
+    private int splashTicks = 0;
+    private boolean wasInWater = false;
     private Camera camera;
 
     private Appearance groundAppearance;
@@ -63,6 +72,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         graphics3D = Graphics3D.getInstance();
         world = new World();
         terrainGroup = new Group();
+        waterGroup = new Group();
         camera = new Camera();
 
         Image atlas = Image.createImage("/mcj2me/textures.png");
@@ -78,6 +88,27 @@ final class WorldCanvas extends Canvas implements Runnable {
         polygonMode.setShading(PolygonMode.SHADE_FLAT);
         groundAppearance.setPolygonMode(polygonMode);
 
+        // Extract the classic still-water tile from the existing atlas, tint it
+        // with partial alpha, then repeat/scroll it independently for animation.
+        int[] waterPixels = new int[16 * 16];
+        atlas.getRGB(waterPixels, 0, 16, 14 * 16, 12 * 16, 16, 16);
+        for (int wi = 0; wi < waterPixels.length; wi++) {
+            waterPixels[wi] = (waterPixels[wi] & 0x00FFFFFF) | 0xA8000000;
+        }
+        Image waterImage = Image.createRGBImage(waterPixels, 16, 16, true);
+        Image2D waterImage2D = new Image2D(Image2D.RGBA, waterImage);
+        waterTexture = new Texture2D(waterImage2D);
+        waterTexture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
+        waterTexture.setWrapping(Texture2D.WRAP_REPEAT, Texture2D.WRAP_REPEAT);
+        waterAppearance = new Appearance();
+        waterAppearance.setTexture(0, waterTexture);
+        waterAppearance.setPolygonMode(polygonMode);
+        CompositingMode waterBlend = new CompositingMode();
+        waterBlend.setBlending(CompositingMode.ALPHA);
+        waterBlend.setDepthWriteEnable(false);
+        waterBlend.setAlphaWriteEnable(false);
+        waterAppearance.setCompositingMode(waterBlend);
+
         Background background = new Background();
         background.setColor(0x87BFEA);
         world.setBackground(background);
@@ -92,6 +123,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         world.addChild(camera);
         world.setActiveCamera(camera);
         world.addChild(terrainGroup);
+        world.addChild(waterGroup);
         updateCamera();
         updateChunks();
     }
@@ -122,6 +154,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         while (running) {
             if (!paused) {
                 updateMovement();
+                animateWater();
                 repaint();
                 serviceRepaints();
             }
@@ -167,6 +200,14 @@ final class WorldCanvas extends Canvas implements Runnable {
         int sy = h - 23;
         for (int i = 0; i < 3; i++) { int sx = 4 + i * 54; g.setColor(i == selectedSlot ? 0xE8D070 : 0x303840); g.fillRect(sx, sy, 50, 19); g.setColor(0x101820); g.drawRect(sx, sy, 49, 18); g.setColor(0xFFFFFF); g.drawString(BLOCK_NAMES[i] + " " + inventory[i], sx + 2, sy + 2, Graphics.TOP | Graphics.LEFT); }
         int cx = w / 2, cy = h / 2; g.setColor(0xFFFFFF); g.drawLine(cx - 3, cy, cx + 3, cy); g.drawLine(cx, cy - 3, cx, cy + 3);
+        if (splashTicks > 0) {
+            g.setColor(0xBDEBFF);
+            for (int b = 0; b < 5; b++) {
+                int bx = cx + ((b * 13 + splashTicks * 3) % 23) - 11;
+                int by = cy + ((b * 7 + splashTicks * 4) % 19) - 9;
+                g.drawArc(bx, by, 2 + (splashTicks % 3), 2 + (splashTicks % 3), 0, 360);
+            }
+        }
         if (particleTicks > 0) { g.setColor(0xB5A06A); for (int p = 0; p < 8; p++) { int px = cx + (((p * 17 + particleTicks * 7) % 19) - 9), py = cy + (((p * 11 + particleTicks * 5) % 17) - 8), size = 2 + (particleTicks & 1); g.fillRect(px, py, size, size); } }
     }
 
@@ -293,6 +334,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (cameraZ > 126.0f) { cameraZ = 126.0f; velocityZ = 0.0f; }
 
         float groundY = terrain.getHeightSmooth(cameraX, cameraZ) + 1.65f;
+        boolean inWater = terrain.getHeight((int) cameraX, (int) cameraZ) < WATER_LEVEL
+                          && cameraY < WATER_LEVEL + 1.0f;
+        if (inWater && !wasInWater) splashTicks = 10;
+        wasInWater = inWater;
+        if (splashTicks > 0) splashTicks--;
         if (airborne) {
             cameraY += verticalVelocity;
             verticalVelocity -= GRAVITY;
@@ -340,6 +386,11 @@ final class WorldCanvas extends Canvas implements Runnable {
                     terrainGroup.removeChild(old);
                     activeChunks[x][z] = null;
                 }
+                Mesh oldWater = activeWaterChunks[x][z];
+                if (oldWater != null) {
+                    waterGroup.removeChild(oldWater);
+                    activeWaterChunks[x][z] = null;
+                }
             }
         }
 
@@ -351,11 +402,89 @@ final class WorldCanvas extends Canvas implements Runnable {
                         activeChunks[cx][cz] = mesh;
                         terrainGroup.addChild(mesh);
                     }
+                    Mesh waterMesh = buildWaterChunk(cx, cz);
+                    if (waterMesh != null) {
+                        activeWaterChunks[cx][cz] = waterMesh;
+                        waterGroup.addChild(waterMesh);
+                    }
                 }
             }
         }
         loadedCenterX = centerX;
         loadedCenterZ = centerZ;
+    }
+
+    private Mesh buildWaterChunk(int chunkX, int chunkZ) {
+        int startX = chunkX * CHUNK;
+        int startZ = chunkZ * CHUNK;
+        int quads = 0;
+        int x, z;
+        for (x = startX; x < startX + CHUNK; x++) {
+            for (z = startZ; z < startZ + CHUNK; z++) {
+                if (terrain.getHeight(x, z) < WATER_LEVEL) quads++;
+            }
+        }
+        if (quads == 0) return null;
+
+        int vertexCount = quads * 4;
+        short[] positions = new short[vertexCount * 3];
+        short[] texCoords = new short[vertexCount * 2];
+        int[] indices = new int[vertexCount];
+        int[] stripLengths = new int[quads];
+        int vertex = 0, strip = 0;
+        for (x = startX; x < startX + CHUNK; x++) {
+            for (z = startZ; z < startZ + CHUNK; z++) {
+                if (terrain.getHeight(x, z) >= WATER_LEVEL) continue;
+                vertex = addWaterQuad(positions, texCoords, indices, stripLengths,
+                    vertex, strip++, x, WATER_LEVEL, z,
+                    x, WATER_LEVEL, z + 1,
+                    x + 1, WATER_LEVEL, z,
+                    x + 1, WATER_LEVEL, z + 1);
+            }
+        }
+
+        VertexArray vertexArray = new VertexArray(vertexCount, 3, 2);
+        vertexArray.set(0, vertexCount, positions);
+        VertexArray texArray = new VertexArray(vertexCount, 2, 2);
+        texArray.set(0, vertexCount, texCoords);
+        VertexBuffer buffer = new VertexBuffer();
+        buffer.setPositions(vertexArray, 1.0f, null);
+        buffer.setTexCoords(0, texArray, 1.0f, null);
+        TriangleStripArray triangles = new TriangleStripArray(indices, stripLengths);
+        return new Mesh(buffer, triangles, waterAppearance);
+    }
+
+    private int addWaterQuad(short[] positions, short[] texCoords, int[] indices,
+                             int[] stripLengths, int vertex, int strip,
+                             int x0, int y0, int z0, int x1, int y1, int z1,
+                             int x2, int y2, int z2, int x3, int y3, int z3) {
+        vertex = addWaterVertex(positions, texCoords, indices, vertex, x0, y0, z0, 0, 0);
+        vertex = addWaterVertex(positions, texCoords, indices, vertex, x1, y1, z1, 0, 1);
+        vertex = addWaterVertex(positions, texCoords, indices, vertex, x2, y2, z2, 1, 0);
+        vertex = addWaterVertex(positions, texCoords, indices, vertex, x3, y3, z3, 1, 1);
+        stripLengths[strip] = 4;
+        return vertex;
+    }
+
+    private int addWaterVertex(short[] positions, short[] texCoords, int[] indices,
+                               int vertex, int x, int y, int z, int u, int v) {
+        int p = vertex * 3;
+        positions[p] = (short) x;
+        positions[p + 1] = (short) y;
+        positions[p + 2] = (short) z;
+        indices[vertex] = vertex;
+        int t = vertex * 2;
+        texCoords[t] = (short) u;
+        texCoords[t + 1] = (short) v;
+        return vertex + 1;
+    }
+
+    private void animateWater() {
+        waterPhase += 0.012f;
+        if (waterPhase >= 1.0f) waterPhase -= 1.0f;
+        // Texture2D is Transformable in M3G; repeating coordinates make this
+        // a cheap scrolling-water animation without rebuilding terrain meshes.
+        waterTexture.setTranslation(waterPhase, waterPhase * 0.65f, 0.0f);
     }
 
     private Mesh buildChunk(int chunkX, int chunkZ) {
