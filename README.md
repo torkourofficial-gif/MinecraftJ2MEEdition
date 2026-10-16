@@ -22,7 +22,7 @@ It is still height-map based, not a complete voxel engine.
 - **W / A / S / D:** movement in desktop emulators
 - **Fire / center:** jump (press again after landing)
 
-Water appears in low terrain at height 25. Its texture scrolls, the surface is translucent, entering it triggers a small splash, and movement slows while submerged.
+Water appears in deliberately carved low basins at height 25. The terrain generator exposes a shared waterline and water-column check; the texture scrolls, the surface is translucent, entering it triggers a small splash, and movement slows while submerged.
 
 Block editing currently changes the top of a terrain column; side-face mining,
 caves, persistence, mobs and survival are not implemented. Trees are decorative.
