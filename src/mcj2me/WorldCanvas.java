@@ -14,7 +14,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final float GRAVITY = 0.035f;
     private static final float JUMP_SPEED = 0.38f;
     private static final float TURN_SPEED = 3.0f;
-    private static final int WATER_LEVEL = 25;
+    private static final int WATER_LEVEL = TerrainGenerator.WATER_LEVEL;
     private static final float WATER_ALPHA = 0.66f;
 
     private final IndevViewerMIDlet midlet;
@@ -344,7 +344,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (cameraZ > 126.0f) { cameraZ = 126.0f; velocityZ = 0.0f; }
 
         float groundY = terrain.getHeightSmooth(cameraX, cameraZ) + 1.65f;
-        boolean inWater = terrain.getHeight((int) cameraX, (int) cameraZ) < WATER_LEVEL
+        boolean inWater = terrain.isWaterAt((int) cameraX, (int) cameraZ)
                           && cameraY < WATER_LEVEL + 1.0f;
         if (inWater && !wasInWater) splashTicks = 10;
         wasInWater = inWater;
@@ -431,7 +431,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         int x, z;
         for (x = startX; x < startX + CHUNK; x++) {
             for (z = startZ; z < startZ + CHUNK; z++) {
-                if (terrain.getHeight(x, z) < WATER_LEVEL) quads++;
+                if (terrain.isWaterAt(x, z)) quads++;
             }
         }
         if (quads == 0) return null;
@@ -444,7 +444,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         int vertex = 0, strip = 0;
         for (x = startX; x < startX + CHUNK; x++) {
             for (z = startZ; z < startZ + CHUNK; z++) {
-                if (terrain.getHeight(x, z) >= WATER_LEVEL) continue;
+                if (!terrain.isWaterAt(x, z)) continue;
                 vertex = addWaterQuad(positions, texCoords, indices, stripLengths,
                     vertex, strip++, x, WATER_LEVEL, z,
                     x, WATER_LEVEL, z + 1,
