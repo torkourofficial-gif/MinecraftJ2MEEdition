@@ -16,7 +16,6 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final float TURN_SPEED = 3.0f;
     private static final int WATER_LEVEL = TerrainGenerator.WATER_LEVEL;
     private static final float WATER_ALPHA = 0.66f;
-    private static final int WATER_SWIM_SPEED = 1;
 
     private final IndevViewerMIDlet midlet;
     private final TerrainGenerator terrain = new TerrainGenerator();
@@ -41,6 +40,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean paused;
     private boolean forward, backward, strafeLeft, strafeRight;
     private boolean lookUp, lookDown, turnLeft, turnRight;
+    private boolean jumpHeld;
     private static final int[] BLOCK_TYPES = {0, 2, 1};
     private static final String[] BLOCK_NAMES = {"GRASS", "DIRT", "STONE"};
     private final int[] inventory = {64, 64, 64};
@@ -275,17 +275,21 @@ final class WorldCanvas extends Canvas implements Runnable {
         else if (keyCode == '9') { selectedSlot++; if (selectedSlot > 2) selectedSlot = 0; }
         // In water, Fire/center is the swim-up control and can be held/re-tapped
         // while already airborne. On land it remains the normal jump button.
-        if (action == FIRE && isSwimming()) {
-            verticalVelocity = 0.20f;
-            airborne = true;
-        } else if (action == FIRE && !airborne) {
-            verticalVelocity = JUMP_SPEED;
-            airborne = true;
+        if (action == FIRE) {
+            jumpHeld = true;
+            if (isSwimming()) {
+                verticalVelocity = 0.20f;
+                airborne = true;
+            } else if (!airborne) {
+                verticalVelocity = JUMP_SPEED;
+                airborne = true;
+            }
         }
     }
 
     protected synchronized void keyReleased(int keyCode) {
         int action = getGameAction(keyCode);
+        if (action == FIRE) jumpHeld = false;
 
         if (keyCode == '2') {
             forward = false;
@@ -311,6 +315,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private synchronized void clearKeys() {
         forward = backward = strafeLeft = strafeRight = false;
         lookUp = lookDown = turnLeft = turnRight = false;
+        jumpHeld = false;
     }
 
     private void updateMovement() {
@@ -397,19 +402,16 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (splashTicks > 0) splashTicks--;
 
         if (inWater) {
-            // Lightweight swimming: reduced gravity and a gentle buoyancy force.
-            // Fire/center adds a stronger upward impulse; without input, the
-            // camera floats slowly rather than being snapped to the lake floor.
+            // Reduced gravity and buoyancy while submerged. Holding Fire/center
+            // continuously strokes upward; the camera can cross the surface
+            // instead of being clamped just beneath it.
             if (!airborne) airborne = true;
+            if (jumpHeld) verticalVelocity += 0.035f;
             cameraY += verticalVelocity;
             verticalVelocity -= GRAVITY * 0.18f;
-            verticalVelocity += 0.006f;
+            verticalVelocity += 0.004f;
             if (verticalVelocity < -0.045f) verticalVelocity = -0.045f;
-            if (verticalVelocity > 0.22f) verticalVelocity = 0.22f;
-            if (cameraY > WATER_LEVEL + 0.35f) {
-                cameraY = WATER_LEVEL + 0.35f;
-                if (verticalVelocity > 0.0f) verticalVelocity = 0.0f;
-            }
+            if (verticalVelocity > 0.24f) verticalVelocity = 0.24f;
             changed = true;
         } else if (airborne) {
             cameraY += verticalVelocity;
