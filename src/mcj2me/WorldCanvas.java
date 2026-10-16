@@ -231,7 +231,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         transform.setIdentity();
         transform.postRotate(yaw, 0.0f, 1.0f, 0.0f);
         transform.postRotate(pitch, 1.0f, 0.0f, 0.0f);
-        transform.setTranslation(cameraX, cameraY, cameraZ);
+        transform.postTranslate(cameraX, cameraY, cameraZ);
         camera.setTransform(transform);
     }
 
