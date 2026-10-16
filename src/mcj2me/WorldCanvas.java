@@ -287,12 +287,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (turnRight) { yaw += TURN_SPEED; changed = true; }
         if (lookUp) {
             pitch += TURN_SPEED;
-            if (pitch > 75.0f) pitch = 75.0f;
+            if (pitch > 88.0f) pitch = 88.0f;
             changed = true;
         }
         if (lookDown) {
             pitch -= TURN_SPEED;
-            if (pitch < -75.0f) pitch = -75.0f;
+            if (pitch < -88.0f) pitch = -88.0f;
             changed = true;
         }
 
@@ -331,19 +331,33 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (Math.abs(velocityX) < 0.003f) velocityX = 0.0f;
         if (Math.abs(velocityZ) < 0.003f) velocityZ = 0.0f;
 
+        // Resolve horizontal movement axis-by-axis against the height-map's
+        // block columns. The player may step up one block, but cannot slide
+        // through taller square walls or diagonally clip through their corners.
         if (velocityX != 0.0f || velocityZ != 0.0f) {
-            cameraX += velocityX;
-            cameraZ += velocityZ;
-            positionChanged = true;
-            changed = true;
+            float oldX = cameraX;
+            float oldZ = cameraZ;
+            float nextX = clampWorldX(cameraX + velocityX);
+            float nextZ = clampWorldZ(cameraZ + velocityZ);
+
+            if (canOccupy(nextX, oldZ)) {
+                cameraX = nextX;
+            } else {
+                velocityX = 0.0f;
+            }
+            if (canOccupy(cameraX, nextZ)) {
+                cameraZ = nextZ;
+            } else {
+                velocityZ = 0.0f;
+            }
+
+            if (cameraX != oldX || cameraZ != oldZ) {
+                positionChanged = true;
+                changed = true;
+            }
         }
 
-        if (cameraX < 1.0f) { cameraX = 1.0f; velocityX = 0.0f; }
-        if (cameraZ < 1.0f) { cameraZ = 1.0f; velocityZ = 0.0f; }
-        if (cameraX > 126.0f) { cameraX = 126.0f; velocityX = 0.0f; }
-        if (cameraZ > 126.0f) { cameraZ = 126.0f; velocityZ = 0.0f; }
-
-        float groundY = terrain.getHeightSmooth(cameraX, cameraZ) + 1.65f;
+        float groundY = terrain.getHeight((int) cameraX, (int) cameraZ) + 1.65f;
         boolean inWater = terrain.isWaterAt((int) cameraX, (int) cameraZ)
                           && cameraY < WATER_LEVEL + 1.0f;
         if (inWater && !wasInWater) splashTicks = 10;
@@ -369,6 +383,50 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (particleTicks > 0) particleTicks--;
         if (changed) updateCamera();
         if (positionChanged) updateChunks();
+    }
+
+    private float clampWorldX(float x) {
+        if (x < 1.0f) return 1.0f;
+        if (x > 126.0f) return 126.0f;
+        return x;
+    }
+
+    private float clampWorldZ(float z) {
+        if (z < 1.0f) return 1.0f;
+        if (z > 126.0f) return 126.0f;
+        return z;
+    }
+
+    /**
+     * Square horizontal collision against terrain columns and tree trunks.
+     * The camera/player can climb a single block, but not penetrate a taller
+     * column. A small square footprint keeps collision consistent on keypad
+     * movement and prevents diagonal corner clipping.
+     */
+    private boolean canOccupy(float x, float z) {
+        if (x < 1.0f || z < 1.0f || x > 126.0f || z > 126.0f) return false;
+
+        float feetY = cameraY - 1.65f;
+        int minX = (int) Math.floor(x - 0.20f);
+        int maxX = (int) Math.floor(x + 0.20f);
+        int minZ = (int) Math.floor(z - 0.20f);
+        int maxZ = (int) Math.floor(z + 0.20f);
+
+        for (int bx = minX; bx <= maxX; bx++) {
+            for (int bz = minZ; bz <= maxZ; bz++) {
+                int surface = terrain.getHeight(bx, bz);
+                if (surface > feetY + 1.01f) return false;
+
+                // Trunks occupy a full square block at the player's level.
+                if (terrain.isTreeAt(bx, bz)) {
+                    int treeBase = terrain.getHeight(bx, bz);
+                    if (feetY < treeBase + terrain.getTreeHeight(bx, bz)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
     }
 
     private void updateCamera() {
