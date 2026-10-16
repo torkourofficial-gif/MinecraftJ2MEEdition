@@ -305,6 +305,16 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (strafeLeft) { inputX -= (float) Math.cos(radians); inputZ -= (float) Math.sin(radians); }
         if (strafeRight) { inputX += (float) Math.cos(radians); inputZ += (float) Math.sin(radians); }
 
+        // Water slows horizontal movement, giving a lightweight swimming feel.
+        boolean currentlyWet = terrain.getHeight((int) cameraX, (int) cameraZ) < WATER_LEVEL
+                               && cameraY < WATER_LEVEL + 1.0f;
+        if (currentlyWet) {
+            velocityX *= 0.88f;
+            velocityZ *= 0.88f;
+            inputX *= 0.62f;
+            inputZ *= 0.62f;
+        }
+
         // Normalize diagonal input so it isn't faster, then accelerate and coast.
         float inputLength = (float) Math.sqrt(inputX * inputX + inputZ * inputZ);
         if (inputLength > 0.0f) {
