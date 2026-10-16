@@ -8,7 +8,11 @@ import javax.microedition.m3g.*;
 final class WorldCanvas extends Canvas implements Runnable {
     private static final int CHUNK = 16;
     private static final int RADIUS = 1;
-    private static final float MOVE_SPEED = 0.75f;
+    private static final float MOVE_SPEED = 0.20f;
+    private static final float MOVE_ACCEL = 0.035f;
+    private static final float FRICTION = 0.78f;
+    private static final float GRAVITY = 0.035f;
+    private static final float JUMP_SPEED = 0.38f;
     private static final float TURN_SPEED = 3.0f;
 
     private final IndevViewerMIDlet midlet;
@@ -31,6 +35,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
     private float cameraX = 64.0f;
     private float cameraY;
+    private float velocityX, velocityZ, verticalVelocity;
+    private boolean airborne;
     private float cameraZ = 105.0f;
     private float yaw = 0.0f;
     private float pitch = -28.0f;
@@ -81,7 +87,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         ambient.setColor(0xFFFFFF);
         world.addChild(ambient);
 
-        cameraY = terrain.getHeight(64, 105) + 1.65f;
+        cameraY = terrain.getHeightSmooth(64.0f, 105.0f) + 1.65f;
         camera.setPerspective(70.0f, 1.0f, 0.1f, 180.0f);
         world.addChild(camera);
         world.setActiveCamera(camera);
@@ -196,10 +202,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         else if (keyCode == '3' && actionCooldown == 0) { placeBlock(); actionCooldown = 4; }
         else if (keyCode == '7') { selectedSlot--; if (selectedSlot < 0) selectedSlot = 2; }
         else if (keyCode == '9') { selectedSlot++; if (selectedSlot > 2) selectedSlot = 0; }
-        if (action == FIRE) {
-            pitch -= 2.0f;
-            if (pitch < -75.0f) pitch = -75.0f;
-            updateCamera();
+        // Fire/center jumps, like the jump button in Minecraft.
+        if (action == FIRE && !airborne) {
+            verticalVelocity = JUMP_SPEED;
+            airborne = true;
         }
     }
 
@@ -252,35 +258,59 @@ final class WorldCanvas extends Canvas implements Runnable {
         float radians = (float) (yaw * Math.PI / 180.0);
         float forwardX = (float) Math.sin(radians);
         float forwardZ = -(float) Math.cos(radians);
-        if (forward) {
-            cameraX += forwardX * MOVE_SPEED;
-            cameraZ += forwardZ * MOVE_SPEED;
+        float inputX = 0.0f, inputZ = 0.0f;
+        if (forward) { inputX += forwardX; inputZ += forwardZ; }
+        if (backward) { inputX -= forwardX; inputZ -= forwardZ; }
+        if (strafeLeft) { inputX -= (float) Math.cos(radians); inputZ -= (float) Math.sin(radians); }
+        if (strafeRight) { inputX += (float) Math.cos(radians); inputZ += (float) Math.sin(radians); }
+
+        // Normalize diagonal input so it isn't faster, then accelerate and coast.
+        float inputLength = (float) Math.sqrt(inputX * inputX + inputZ * inputZ);
+        if (inputLength > 0.0f) {
+            inputX /= inputLength; inputZ /= inputLength;
+            velocityX += inputX * MOVE_ACCEL;
+            velocityZ += inputZ * MOVE_ACCEL;
             changed = true;
-            positionChanged = true;
+        } else {
+            velocityX *= FRICTION;
+            velocityZ *= FRICTION;
         }
-        if (backward) {
-            cameraX -= forwardX * MOVE_SPEED;
-            cameraZ -= forwardZ * MOVE_SPEED;
-            changed = true;
+        float speed = (float) Math.sqrt(velocityX * velocityX + velocityZ * velocityZ);
+        if (speed > MOVE_SPEED) { velocityX = velocityX * MOVE_SPEED / speed; velocityZ = velocityZ * MOVE_SPEED / speed; }
+        if (Math.abs(velocityX) < 0.003f) velocityX = 0.0f;
+        if (Math.abs(velocityZ) < 0.003f) velocityZ = 0.0f;
+
+        if (velocityX != 0.0f || velocityZ != 0.0f) {
+            cameraX += velocityX;
+            cameraZ += velocityZ;
             positionChanged = true;
-        }
-        if (strafeLeft) {
-            cameraX -= (float) Math.cos(radians) * MOVE_SPEED;
-            cameraZ -= (float) Math.sin(radians) * MOVE_SPEED;
             changed = true;
-            positionChanged = true;
-        }
-        if (strafeRight) {
-            cameraX += (float) Math.cos(radians) * MOVE_SPEED;
-            cameraZ += (float) Math.sin(radians) * MOVE_SPEED;
-            changed = true;
-            positionChanged = true;
         }
 
-        if (cameraX < 1.0f) cameraX = 1.0f; if (cameraZ < 1.0f) cameraZ = 1.0f;
-        if (cameraX > 126.0f) cameraX = 126.0f; if (cameraZ > 126.0f) cameraZ = 126.0f;
-        if (positionChanged) cameraY = terrain.getHeight((int) cameraX, (int) cameraZ) + 1.65f;
-        if (actionCooldown > 0) actionCooldown--; if (particleTicks > 0) particleTicks--;
+        if (cameraX < 1.0f) { cameraX = 1.0f; velocityX = 0.0f; }
+        if (cameraZ < 1.0f) { cameraZ = 1.0f; velocityZ = 0.0f; }
+        if (cameraX > 126.0f) { cameraX = 126.0f; velocityX = 0.0f; }
+        if (cameraZ > 126.0f) { cameraZ = 126.0f; velocityZ = 0.0f; }
+
+        float groundY = terrain.getHeightSmooth(cameraX, cameraZ) + 1.65f;
+        if (airborne) {
+            cameraY += verticalVelocity;
+            verticalVelocity -= GRAVITY;
+            if (cameraY <= groundY) {
+                cameraY = groundY;
+                verticalVelocity = 0.0f;
+                airborne = false;
+            }
+            changed = true;
+        } else {
+            // Ease over height-map steps instead of snapping the camera instantly.
+            if (cameraY < groundY) cameraY = Math.min(groundY, cameraY + 0.28f);
+            else if (cameraY > groundY) cameraY = Math.max(groundY, cameraY - 0.28f);
+            if (Math.abs(cameraY - groundY) > 0.01f) changed = true;
+        }
+
+        if (actionCooldown > 0) actionCooldown--;
+        if (particleTicks > 0) particleTicks--;
         if (changed) updateCamera();
         if (positionChanged) updateChunks();
     }
@@ -362,37 +392,37 @@ final class WorldCanvas extends Canvas implements Runnable {
                     x + 1, h, z, x + 1, h, z + 1, BLOCK_TYPES[topType], 0);
 
                 int neighbor = terrain.getHeight(x - 1, z);
-                if (h > neighbor) {
+                for (int sy = neighbor; sy < h; sy++) {
                     vertex = addQuad(positions, texCoords, indices, stripLengths,
-                        vertex, strip++, x, neighbor, z + 1, x, h, z + 1,
-                        x, neighbor, z, x, h, z, 3, 0);
+                        vertex, strip++, x, sy, z + 1, x, sy + 1, z + 1,
+                        x, sy, z, x, sy + 1, z, 3, 0);
                 }
                 neighbor = terrain.getHeight(x + 1, z);
-                if (h > neighbor) {
+                for (int sy = neighbor; sy < h; sy++) {
                     vertex = addQuad(positions, texCoords, indices, stripLengths,
-                        vertex, strip++, x + 1, neighbor, z, x + 1, h, z,
-                        x + 1, neighbor, z + 1, x + 1, h, z + 1, 3, 0);
+                        vertex, strip++, x + 1, sy, z, x + 1, sy + 1, z,
+                        x + 1, sy, z + 1, x + 1, sy + 1, z + 1, 3, 0);
                 }
                 neighbor = terrain.getHeight(x, z - 1);
-                if (h > neighbor) {
+                for (int sy = neighbor; sy < h; sy++) {
                     vertex = addQuad(positions, texCoords, indices, stripLengths,
-                        vertex, strip++, x, neighbor, z, x, h, z,
-                        x + 1, neighbor, z, x + 1, h, z, 3, 0);
+                        vertex, strip++, x, sy, z, x, sy + 1, z,
+                        x + 1, sy, z, x + 1, sy + 1, z, 3, 0);
                 }
                 neighbor = terrain.getHeight(x, z + 1);
-                if (h > neighbor) {
+                for (int sy = neighbor; sy < h; sy++) {
                     vertex = addQuad(positions, texCoords, indices, stripLengths,
-                        vertex, strip++, x + 1, neighbor, z + 1, x + 1, h, z + 1,
-                        x, neighbor, z + 1, x, h, z + 1, 3, 0);
+                        vertex, strip++, x + 1, sy, z + 1, x + 1, sy + 1, z + 1,
+                        x, sy, z + 1, x, sy + 1, z + 1, 3, 0);
                 }
                 if (terrain.isTreeAt(x, z)) {
                     int base = h, th = terrain.getTreeHeight(x, z), y;
-                    for (y = 0; y < th; y++) { vertex = addCube(positions, texCoords, indices, stripLengths, vertex, strip, x, base + y, z, 4, 0); strip += 6; }
+                    for (y = 0; y < th; y++) { vertex = addCube(positions, texCoords, indices, stripLengths, vertex, strip, x, base + y, z, 4, 1); strip += 6; }
                     int crown = base + th - 1;
                     for (y = crown - 1; y <= crown + 1; y++) { int radius = (y == crown + 1) ? 1 : 2, lx, lz;
                         for (lx = x - radius; lx <= x + radius; lx++) for (lz = z - radius; lz <= z + radius; lz++) {
                             if (lx == x && lz == z && y <= crown) continue;
-                            vertex = addCube(positions, texCoords, indices, stripLengths, vertex, strip, lx, y, lz, 4, 1); strip += 6;
+                            vertex = addCube(positions, texCoords, indices, stripLengths, vertex, strip, lx, y, lz, 4, 3); strip += 6;
                         }
                     }
                 }
