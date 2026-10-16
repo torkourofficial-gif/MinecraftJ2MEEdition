@@ -292,7 +292,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         // Translate first in the transform product so the camera position
         // is not rotated around the world origin when yaw/pitch change.
         transform.postTranslate(cameraX, cameraY, cameraZ);
-        transform.postRotate(yaw, 0.0f, 1.0f, 0.0f);
+        transform.postRotate(-yaw, 0.0f, 1.0f, 0.0f);
         transform.postRotate(pitch, 1.0f, 0.0f, 0.0f);
 
         camera.setTransform(transform);
