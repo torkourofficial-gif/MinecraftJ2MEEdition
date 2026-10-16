@@ -367,10 +367,10 @@ final class WorldCanvas extends Canvas implements Runnable {
             for (z = startZ; z < startZ + CHUNK; z++) {
                 h = terrain.getHeight(x, z);
                 quads++;
-                if (h > terrain.getHeight(x - 1, z)) quads++;
-                if (h > terrain.getHeight(x + 1, z)) quads++;
-                if (h > terrain.getHeight(x, z - 1)) quads++;
-                if (h > terrain.getHeight(x, z + 1)) quads++;
+                int nh = terrain.getHeight(x - 1, z); if (h > nh) quads += h - nh;
+                nh = terrain.getHeight(x + 1, z); if (h > nh) quads += h - nh;
+                nh = terrain.getHeight(x, z - 1); if (h > nh) quads += h - nh;
+                nh = terrain.getHeight(x, z + 1); if (h > nh) quads += h - nh;
                 if (terrain.isTreeAt(x, z)) quads += (terrain.getTreeHeight(x, z) + 57) * 6;
             }
         }
@@ -395,25 +395,25 @@ final class WorldCanvas extends Canvas implements Runnable {
                 for (int sy = neighbor; sy < h; sy++) {
                     vertex = addQuad(positions, texCoords, indices, stripLengths,
                         vertex, strip++, x, sy, z + 1, x, sy + 1, z + 1,
-                        x, sy, z, x, sy + 1, z, 3, 0);
+                        x, sy, z, x, sy + 1, z, sideTile(terrain.getTopType(x, z), sy, h), 0);
                 }
                 neighbor = terrain.getHeight(x + 1, z);
                 for (int sy = neighbor; sy < h; sy++) {
                     vertex = addQuad(positions, texCoords, indices, stripLengths,
                         vertex, strip++, x + 1, sy, z, x + 1, sy + 1, z,
-                        x + 1, sy, z + 1, x + 1, sy + 1, z + 1, 3, 0);
+                        x + 1, sy, z + 1, x + 1, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), sy, h), 0);
                 }
                 neighbor = terrain.getHeight(x, z - 1);
                 for (int sy = neighbor; sy < h; sy++) {
                     vertex = addQuad(positions, texCoords, indices, stripLengths,
                         vertex, strip++, x, sy, z, x, sy + 1, z,
-                        x + 1, sy, z, x + 1, sy + 1, z, 3, 0);
+                        x + 1, sy, z, x + 1, sy + 1, z, sideTile(terrain.getTopType(x, z), sy, h), 0);
                 }
                 neighbor = terrain.getHeight(x, z + 1);
                 for (int sy = neighbor; sy < h; sy++) {
                     vertex = addQuad(positions, texCoords, indices, stripLengths,
                         vertex, strip++, x + 1, sy, z + 1, x + 1, sy + 1, z + 1,
-                        x, sy, z + 1, x, sy + 1, z + 1, 3, 0);
+                        x, sy, z + 1, x, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), sy, h), 0);
                 }
                 if (terrain.isTreeAt(x, z)) {
                     int base = h, th = terrain.getTreeHeight(x, z), y;
@@ -438,6 +438,13 @@ final class WorldCanvas extends Canvas implements Runnable {
         buffer.setTexCoords(0, texArray, 1.0f / 256.0f, null);
         TriangleStripArray triangles = new TriangleStripArray(indices, stripLengths);
         return new Mesh(buffer, triangles, groundAppearance);
+    }
+
+
+    private int sideTile(int topType, int y, int height) {
+        if (topType == 2) return 1; // stone
+        if (topType == 1) return 2; // dirt
+        return y == height - 1 ? 3 : 2; // grass lip, dirt below
     }
 
     private int addCube(short[] positions, short[] texCoords, int[] indices, int[] stripLengths, int vertex, int strip, int x, int y, int z, int tx, int ty) {
