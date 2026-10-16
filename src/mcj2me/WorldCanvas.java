@@ -329,7 +329,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         texArray.set(0, vertexCount, texCoords);
         VertexBuffer buffer = new VertexBuffer();
         buffer.setPositions(vertexArray, 1.0f, null);
-        buffer.setTexCoords(0, texArray, 1.0f / 4096.0f, null);
+        buffer.setTexCoords(0, texArray, 1.0f / 256.0f, null);
         TriangleStripArray triangles = new TriangleStripArray(indices, stripLengths);
         return new Mesh(buffer, triangles, new Appearance[] { groundAppearance });
     }
@@ -361,10 +361,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         indices[vertex] = vertex;
 
         // Slight inset avoids sampling adjacent tiles at atlas boundaries.
-        int left = tileX * 256 + 8;
-        int right = (tileX + 1) * 256 - 8;
-        int top = tileY * 256 + 8;
-        int bottom = (tileY + 1) * 256 - 8;
+        int left = tileX * 16 + 1;
+        int right = (tileX + 1) * 16 - 1;
+        int top = tileY * 16 + 1;
+        int bottom = (tileY + 1) * 16 - 1;
         int u = (corner == 0 || corner == 2) ? left : right;
         int v = (corner == 0 || corner == 1) ? bottom : top;
         int t = vertex * 2;
