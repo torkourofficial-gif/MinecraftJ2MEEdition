@@ -163,9 +163,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         // Numeric keypad movement for emulators/phones without a QWERTY keyboard.
         // Check digits first because some MIDP implementations map 2/4/6/8
         // to directional game actions as well.
-        if (keyCode == '2') {
+        if (keyCode == '8') {
             forward = true;
-        } else if (keyCode == '8') {
+        } else if (keyCode == '2') {
             backward = true;
         } else if (keyCode == '4') {
             strafeLeft = true;
@@ -195,9 +195,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     protected synchronized void keyReleased(int keyCode) {
         int action = getGameAction(keyCode);
 
-        if (keyCode == '2') {
+        if (keyCode == '8') {
             forward = false;
-        } else if (keyCode == '8') {
+        } else if (keyCode == '2') {
             backward = false;
         } else if (keyCode == '4') {
             strafeLeft = false;
