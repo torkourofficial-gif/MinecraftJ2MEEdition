@@ -16,6 +16,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final float TURN_SPEED = 3.0f;
     private static final int WATER_LEVEL = TerrainGenerator.WATER_LEVEL;
     private static final float WATER_ALPHA = 0.66f;
+    private static final int WATER_SWIM_SPEED = 1;
 
     private final IndevViewerMIDlet midlet;
     private final TerrainGenerator terrain = new TerrainGenerator();
@@ -25,6 +26,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Group waterGroup;
     private Texture2D waterTexture;
     private Appearance waterAppearance;
+    private Image underwaterOverlay;
+    private int overlayWidth = -1, overlayHeight = -1;
     private Mesh[][] activeWaterChunks = new Mesh[8][8];
     private float waterPhase = 0.0f;
     private int splashTicks = 0;
@@ -192,8 +195,35 @@ final class WorldCanvas extends Canvas implements Runnable {
             g.drawString("M3G render error", 4, 4, Graphics.TOP | Graphics.LEFT);
             g.drawString(e.toString(), 4, 24, Graphics.TOP | Graphics.LEFT);
         } finally { if (targetBound) graphics3D.releaseTarget(); }
+        drawUnderwaterOverlay(g);
         drawHud(g);
     }
+
+    // MIDP Graphics has no setAlpha, so use a cached ARGB image for the blue
+    // underwater tint. The overlay follows the camera, not the player's feet.
+    private void drawUnderwaterOverlay(Graphics g) {
+        if (!isCameraUnderwater()) return;
+        int w = getWidth(), h = getHeight();
+        if (underwaterOverlay == null || overlayWidth != w || overlayHeight != h) {
+            int[] pixels = new int[w * h];
+            for (int i = 0; i < pixels.length; i++) pixels[i] = 0x554080D8;
+            underwaterOverlay = Image.createRGBImage(pixels, w, h, true);
+            overlayWidth = w;
+            overlayHeight = h;
+        }
+        g.drawImage(underwaterOverlay, 0, 0, Graphics.TOP | Graphics.LEFT);
+    }
+
+    private boolean isCameraUnderwater() {
+        return terrain.isWaterAt((int) cameraX, (int) cameraZ)
+            && cameraY < WATER_LEVEL;
+    }
+
+    private boolean isSwimming() {
+        return terrain.isWaterAt((int) cameraX, (int) cameraZ)
+            && cameraY < WATER_LEVEL + 1.0f;
+    }
+
     private void drawHud(Graphics g) {
         int w = getWidth(), h = getHeight(); g.setColor(0x101820); g.fillRect(3, 3, Math.min(w - 6, 112), 15);
         g.setColor(0xFFFFFF); g.drawString("MC J2ME", 7, 4, Graphics.TOP | Graphics.LEFT);
@@ -243,8 +273,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         else if (keyCode == '3' && actionCooldown == 0) { placeBlock(); actionCooldown = 4; }
         else if (keyCode == '7') { selectedSlot--; if (selectedSlot < 0) selectedSlot = 2; }
         else if (keyCode == '9') { selectedSlot++; if (selectedSlot > 2) selectedSlot = 0; }
-        // Fire/center jumps, like the jump button in Minecraft.
-        if (action == FIRE && !airborne) {
+        // In water, Fire/center is the swim-up control and can be held/re-tapped
+        // while already airborne. On land it remains the normal jump button.
+        if (action == FIRE && isSwimming()) {
+            verticalVelocity = 0.20f;
+            airborne = true;
+        } else if (action == FIRE && !airborne) {
             verticalVelocity = JUMP_SPEED;
             airborne = true;
         }
@@ -306,8 +340,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (strafeRight) { inputX += (float) Math.cos(radians); inputZ += (float) Math.sin(radians); }
 
         // Water slows horizontal movement, giving a lightweight swimming feel.
-        boolean currentlyWet = terrain.isWaterAt((int) cameraX, (int) cameraZ)
-                               && cameraY < WATER_LEVEL + 1.0f;
+        boolean currentlyWet = isSwimming();
         if (currentlyWet) {
             velocityX *= 0.88f;
             velocityZ *= 0.88f;
@@ -358,12 +391,27 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
 
         float groundY = terrain.getHeight((int) cameraX, (int) cameraZ) + 1.65f;
-        boolean inWater = terrain.isWaterAt((int) cameraX, (int) cameraZ)
-                          && cameraY < WATER_LEVEL + 1.0f;
+        boolean inWater = isSwimming();
         if (inWater && !wasInWater) splashTicks = 10;
         wasInWater = inWater;
         if (splashTicks > 0) splashTicks--;
-        if (airborne) {
+
+        if (inWater) {
+            // Lightweight swimming: reduced gravity and a gentle buoyancy force.
+            // Fire/center adds a stronger upward impulse; without input, the
+            // camera floats slowly rather than being snapped to the lake floor.
+            if (!airborne) airborne = true;
+            cameraY += verticalVelocity;
+            verticalVelocity -= GRAVITY * 0.18f;
+            verticalVelocity += 0.006f;
+            if (verticalVelocity < -0.045f) verticalVelocity = -0.045f;
+            if (verticalVelocity > 0.22f) verticalVelocity = 0.22f;
+            if (cameraY > WATER_LEVEL + 0.35f) {
+                cameraY = WATER_LEVEL + 0.35f;
+                if (verticalVelocity > 0.0f) verticalVelocity = 0.0f;
+            }
+            changed = true;
+        } else if (airborne) {
             cameraY += verticalVelocity;
             verticalVelocity -= GRAVITY;
             if (cameraY <= groundY) {
