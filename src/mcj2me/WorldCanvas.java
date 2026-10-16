@@ -13,10 +13,10 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     private final IndevViewerMIDlet midlet;
     private final TerrainGenerator terrain = new TerrainGenerator();
-    private final Graphics3D graphics3D = Graphics3D.getInstance();
-    private final World world = new World();
-    private final Group terrainGroup = new Group();
-    private final Camera camera = new Camera();
+    private Graphics3D graphics3D;
+    private World world;
+    private Group terrainGroup;
+    private Camera camera;
 
     private Appearance groundAppearance;
     private Mesh[][] activeChunks = new Mesh[8][8];
@@ -39,14 +39,24 @@ final class WorldCanvas extends Canvas implements Runnable {
         setFullScreenMode(true);
         try {
             setupScene();
-        } catch (Exception e) {
-            errorMessage = "M3G setup failed: " + e.toString();
         } catch (OutOfMemoryError e) {
             errorMessage = "Not enough Java heap for M3G.";
+        } catch (LinkageError e) {
+            errorMessage = "M3G API loading failed: " + e.toString();
+        } catch (Exception e) {
+            errorMessage = "M3G setup failed: " + e.toString();
         }
     }
 
     private void setupScene() throws Exception {
+        // Initialize M3G objects inside the guarded setup path so API/linkage
+        // failures can be reported by the constructor instead of escaping
+        // from field initializers.
+        graphics3D = Graphics3D.getInstance();
+        world = new World();
+        terrainGroup = new Group();
+        camera = new Camera();
+
         Image atlas = Image.createImage("/textures.png");
         Image2D image2D = new Image2D(Image2D.RGBA, atlas);
         Texture2D texture = new Texture2D(image2D);
@@ -126,20 +136,24 @@ final class WorldCanvas extends Canvas implements Runnable {
                          Graphics.TOP | Graphics.LEFT);
             return;
         }
+        boolean targetBound = false;
         try {
             camera.setPerspective(70.0f,
                 (float) getWidth() / (float) Math.max(1, getHeight()),
                 0.1f, 180.0f);
             graphics3D.bindTarget(g);
+            targetBound = true;
             graphics3D.render(world);
-            graphics3D.releaseTarget();
         } catch (Exception e) {
-            try { graphics3D.releaseTarget(); } catch (Exception ignored) {}
             g.setColor(0x101820);
             g.fillRect(0, 0, getWidth(), getHeight());
             g.setColor(0xFFFFFF);
             g.drawString("M3G render error", 4, 4, Graphics.TOP | Graphics.LEFT);
             g.drawString(e.toString(), 4, 24, Graphics.TOP | Graphics.LEFT);
+        } finally {
+            if (targetBound) {
+                graphics3D.releaseTarget();
+            }
         }
     }
 
