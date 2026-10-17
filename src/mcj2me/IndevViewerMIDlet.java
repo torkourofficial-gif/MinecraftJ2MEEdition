@@ -118,6 +118,12 @@ public final class IndevViewerMIDlet extends MIDlet {
     private WorldSelectScreen worldSelectScreen;
     private WorldLoadingCanvas loadingCanvas;
 
+    private void saveWorld(WorldCanvas canvas) {
+        if (canvas == null || canvas.getWorldId() <= 0 || canvas.hasSetupError()) return;
+        try { WorldStore.saveState(canvas.getWorldId(), canvas.saveTerrainState()); }
+        catch (Exception ignored) { /* Keep the current session playable if storage is full. */ }
+    }
+
     public void startApp() {
         loadControls();
         if (worldCanvas!=null) {
@@ -135,10 +141,10 @@ public final class IndevViewerMIDlet extends MIDlet {
         worldSelectScreen.show();
     }
 
-    void startGame(String worldName, int seed) {
+    void startGame(String worldName, int seed, int worldId) {
         if (titleScreen != null) titleScreen.stop();
         if (worldCanvas != null) { worldCanvas.stop(); worldCanvas = null; }
-        loadingCanvas = new WorldLoadingCanvas(this, worldName, seed);
+        loadingCanvas = new WorldLoadingCanvas(this, worldName, seed, worldId);
         Display.getDisplay(this).setCurrent(loadingCanvas);
         loadingCanvas.start();
     }
@@ -167,6 +173,7 @@ public final class IndevViewerMIDlet extends MIDlet {
         Display.getDisplay(this).setCurrent(alert, titleScreen);
     }
     void showPauseMenu() {
+        saveWorld(worldCanvas);
         if (titleScreen==null) titleScreen=new TitleScreen(this);
         titleScreen.showPauseMenu();
         Display.getDisplay(this).setCurrent(titleScreen);
@@ -181,6 +188,7 @@ public final class IndevViewerMIDlet extends MIDlet {
         if (worldCanvas!=null) worldCanvas.resume();
     }
     void returnToMainMenu() {
+        saveWorld(worldCanvas);
         if (worldCanvas!=null) worldCanvas.stop();
         if (titleScreen==null) titleScreen=new TitleScreen(this);
         titleScreen.showMainMenu();
@@ -188,16 +196,19 @@ public final class IndevViewerMIDlet extends MIDlet {
         titleScreen.start();
     }
     public void quitGame() {
+        saveWorld(worldCanvas);
         if (titleScreen!=null) titleScreen.stop();
         if (worldCanvas!=null) worldCanvas.stop();
         if (loadingCanvas!=null) loadingCanvas.stopLoading();
         notifyDestroyed();
     }
     public void pauseApp() {
+        saveWorld(worldCanvas);
         if (titleScreen!=null) titleScreen.stop();
         if (worldCanvas!=null) worldCanvas.pause();
     }
     public void destroyApp(boolean unconditional) {
+        saveWorld(worldCanvas);
         if (titleScreen!=null) titleScreen.stop();
         if (worldCanvas!=null) worldCanvas.stop();
         if (loadingCanvas!=null) loadingCanvas.stopLoading();
