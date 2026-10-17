@@ -570,6 +570,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         transform.postRotate(pitch, 1.0f, 0.0f, 0.0f);
 
         camera.setTransform(transform);
+        // Keep the cloud quad near the camera to preserve vertex precision.
+        // Snap to a coarse grid so this repositioning is invisible in motion.
+        cloudGroup.setTranslation(
+            ((int) cameraX / 64) * 64,
+            0.0f,
+            ((int) cameraZ / 64) * 64);
     }
 
     private synchronized void updateChunks() {
@@ -627,20 +633,34 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private Mesh buildHorizonSea() {
-        // The plane is intentionally far larger than the 128x128 playable map.
+        // Four strips form a ring outside the finite 0..127 world. There is
+        // deliberately NO water quad over the playable map, so the horizon
+        // plane cannot intersect valleys or make the whole world look flooded.
+        short edge = (short) (TerrainGenerator.SIZE - 1);
+        short far = 1024;
+        short y = (short) WATER_LEVEL;
         short[] positions = {
-            -1024, WATER_LEVEL, -1024,
-            -1024, WATER_LEVEL, 1024,
-             1024, WATER_LEVEL, -1024,
-             1024, WATER_LEVEL, 1024
+            // north, z < 0
+            0, y, -far, 0, y, 0, edge, y, -far, edge, y, 0,
+            // south, z > world edge
+            0, y, edge, 0, y, far, edge, y, edge, edge, y, far,
+            // west, x < 0
+            -far, y, 0, -far, y, edge, 0, y, 0, 0, y, edge,
+            // east, x > world edge
+            edge, y, 0, edge, y, edge, far, y, 0, far, y, edge
         };
-        short[] texCoords = {0, 0, 0, 1, 1, 0, 1, 1};
-        int[] indices = {0, 1, 2, 3};
-        int[] stripLengths = {4};
-        VertexArray positionArray = new VertexArray(4, 3, 2);
-        positionArray.set(0, 4, positions);
-        VertexArray texArray = new VertexArray(4, 2, 2);
-        texArray.set(0, 4, texCoords);
+        short[] texCoords = {
+            0,0, 0,1, 1,0, 1,1,
+            0,0, 0,1, 1,0, 1,1,
+            0,0, 0,1, 1,0, 1,1,
+            0,0, 0,1, 1,0, 1,1
+        };
+        int[] indices = {0,1,2,3, 4,5,6,7, 8,9,10,11, 12,13,14,15};
+        int[] stripLengths = {4,4,4,4};
+        VertexArray positionArray = new VertexArray(16, 3, 2);
+        positionArray.set(0, 16, positions);
+        VertexArray texArray = new VertexArray(16, 2, 2);
+        texArray.set(0, 16, texCoords);
         VertexBuffer buffer = new VertexBuffer();
         buffer.setPositions(positionArray, 1.0f, null);
         buffer.setTexCoords(0, texArray, 512.0f, null);
@@ -771,10 +791,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         // at 1/8 UV scale, making cloud masses many blocks wide instead of tiny
         // pixel-art speckles. Moving cloudGroup animates it without warping UVs.
         short[] positions = {
-            -1024, 50, -1024,
-            -1024, 50, 1024,
-             1024, 50, -1024,
-             1024, 50, 1024
+            -256, 50, -256,
+            -256, 50, 256,
+             256, 50, -256,
+             256, 50, 256
         };
         short[] texCoords = {0, 0, 0, 1, 1, 0, 1, 1};
         int[] indices = {0, 1, 2, 3};
@@ -793,11 +813,11 @@ final class WorldCanvas extends Canvas implements Runnable {
     private void animateWater() {
         waterPhase += 0.012f;
         if (waterPhase >= 1.0f) waterPhase -= 1.0f;
-        cloudPhase += 0.025f;
-        if (cloudPhase >= 64.0f) cloudPhase -= 64.0f;
-        // Translate the complete rigid cloud mesh. The mesh vertices and UVs
-        // stay fixed, so animation cannot stretch or shear the cloud pattern.
-        cloudGroup.setTranslation(-cloudPhase, 0.0f, 0.0f);
+        cloudPhase += 0.0008f;
+        if (cloudPhase >= 1.0f) cloudPhase -= 1.0f;
+        // Scroll the texture, not the vertices. The cloud mesh follows the
+        // camera in coarse 64-unit steps, avoiding huge-coordinate jitter.
+        cloudTexture.setTranslation(cloudPhase, 0.0f, 0.0f);
         // Texture2D is Transformable in M3G; repeating coordinates make this
         // a cheap scrolling-water animation without rebuilding terrain meshes.
         waterTexture.setTranslation(waterPhase, waterPhase * 0.65f, 0.0f);
