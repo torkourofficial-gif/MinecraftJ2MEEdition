@@ -194,10 +194,17 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         groundAppearance = new Appearance();
         groundAppearance.setTexture(0, texture);
-        PolygonMode polygonMode = new PolygonMode();
-        polygonMode.setCulling(PolygonMode.CULL_NONE);
-        polygonMode.setShading(PolygonMode.SHADE_FLAT);
-        groundAppearance.setPolygonMode(polygonMode);
+        // Opaque terrain faces are wound outward, so discard back faces.
+        // Transparent water/clouds keep two-sided rendering below because the
+        // camera can see them from underneath.
+        PolygonMode terrainPolygonMode = new PolygonMode();
+        terrainPolygonMode.setCulling(PolygonMode.CULL_BACK);
+        terrainPolygonMode.setShading(PolygonMode.SHADE_FLAT);
+        groundAppearance.setPolygonMode(terrainPolygonMode);
+
+        PolygonMode transparentPolygonMode = new PolygonMode();
+        transparentPolygonMode.setCulling(PolygonMode.CULL_NONE);
+        transparentPolygonMode.setShading(PolygonMode.SHADE_FLAT);
 
         // Extract the classic still-water tile from the existing atlas, tint it
         // with partial alpha, then repeat/scroll it independently for animation.
@@ -213,7 +220,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         waterTexture.setWrapping(Texture2D.WRAP_REPEAT, Texture2D.WRAP_REPEAT);
         waterAppearance = new Appearance();
         waterAppearance.setTexture(0, waterTexture);
-        waterAppearance.setPolygonMode(polygonMode);
+        waterAppearance.setPolygonMode(transparentPolygonMode);
         CompositingMode waterBlend = new CompositingMode();
         waterBlend.setBlending(CompositingMode.ALPHA);
         waterBlend.setDepthWriteEnable(false);
@@ -224,7 +231,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         cloudTexture.setWrapping(Texture2D.WRAP_REPEAT, Texture2D.WRAP_REPEAT);
         Appearance cloudAppearance = new Appearance();
         cloudAppearance.setTexture(0, cloudTexture);
-        cloudAppearance.setPolygonMode(polygonMode);
+        cloudAppearance.setPolygonMode(transparentPolygonMode);
         CompositingMode cloudBlend = new CompositingMode();
         cloudBlend.setBlending(CompositingMode.ALPHA);
         cloudBlend.setDepthWriteEnable(false);
