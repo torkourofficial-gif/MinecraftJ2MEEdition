@@ -2007,8 +2007,11 @@ final class WorldCanvas extends Canvas implements Runnable {
             float dx = x + 0.5f - decorationX[i];
             float dy = y + 0.5f - (decorationY[i] + 0.7f);
             float dz = z + 0.5f - decorationZ[i];
-            float distance = (float)Math.sqrt(dx * dx + dy * dy + dz * dz);
-            if (distance < 7.0f) {
+            // Most faces are outside the torch radius. Avoid the relatively
+            // expensive square root unless this torch can affect the face.
+            float distanceSquared = dx * dx + dy * dy + dz * dz;
+            if (distanceSquared < 49.0f) {
+                float distance = (float)Math.sqrt(distanceSquared);
                 int amount = (int)((7.0f - distance) * 28.0f);
                 if (amount > glow) glow = amount;
             }
