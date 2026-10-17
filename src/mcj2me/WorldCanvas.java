@@ -423,9 +423,7 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         if (keyCode == '#') {
             inventoryOpen = true;
-            forward = backward = strafeLeft = strafeRight = false;
-            lookUp = lookDown = turnLeft = turnRight = false;
-            jumpHeld = false;
+            clearKeys();
             repaint();
             return;
         }
@@ -447,54 +445,41 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (row > 2) row = 2;
             inventoryCursor = row * 9 + col;
             if (action == FIRE || keyCode == '5' || keyCode == ' ') {
-                if (inventoryCursor < BLOCK_NAMES.length && inventoryCursor != TerrainGenerator.BLOCK_BEDROCK) selectedSlot = inventoryCursor;
+                if (inventoryCursor < BLOCK_NAMES.length && inventoryCursor != TerrainGenerator.BLOCK_BEDROCK)
+                    selectedSlot = inventoryCursor;
             }
             repaint();
             return;
         }
 
-        // Numeric keypad movement for emulators/phones without a QWERTY keyboard.
-        // Check digits first because some MIDP implementations map 2/4/6/8
-        // to directional game actions as well.
-        if (keyCode == '2') {
-            forward = true;
-        } else if (keyCode == '8') {
-            backward = true;
-        } else if (keyCode == '4') {
-            strafeLeft = true;
-        } else if (keyCode == '6') {
-            strafeRight = true;
-        } else {
-            // D-pad controls the camera: left/right turn, up/down look.
-            if (action == UP) lookUp = true;
-            if (action == DOWN) lookDown = true;
-            if (action == LEFT) turnLeft = true;
-            if (action == RIGHT) turnRight = true;
-        }
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_FORWARD,keyCode,action)) forward=true;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_BACKWARD,keyCode,action)) backward=true;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_STRAFE_LEFT,keyCode,action)) strafeLeft=true;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_STRAFE_RIGHT,keyCode,action)) strafeRight=true;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_LOOK_UP,keyCode,action)) lookUp=true;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_LOOK_DOWN,keyCode,action)) lookDown=true;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_TURN_LEFT,keyCode,action)) turnLeft=true;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_TURN_RIGHT,keyCode,action)) turnRight=true;
 
-        // Keep letter controls available for desktop emulators.
-        if (keyCode == 'w' || keyCode == 'W') forward = true;
-        if (keyCode == 's' || keyCode == 'S') backward = true;
-        if (keyCode == 'a' || keyCode == 'A') strafeLeft = true;
-        if (keyCode == 'd' || keyCode == 'D') strafeRight = true;
-
-        if (keyCode == '1' && actionCooldown == 0) {
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_BREAK,keyCode,action)
+                && actionCooldown == 0) {
             if (!attackMobs()) breakBlock();
             actionCooldown = 4;
-        }
-        else if (keyCode == '3' && actionCooldown == 0) { placeBlock(); actionCooldown = 4; }
-        else if (keyCode == '*' || keyCode == 42) {
+        } else if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_PLACE,keyCode,action)
+                && actionCooldown == 0) {
+            placeBlock();
+            actionCooldown = 4;
+        } else if (keyCode == '*' || keyCode == 42) {
+            cycleSelectedBlock(1);
+        } else if (keyCode == '7') {
+            cycleSelectedBlock(-1);
+        } else if (keyCode == '9') {
             cycleSelectedBlock(1);
         }
-        else if (keyCode == '7') { cycleSelectedBlock(-1); }
-        else if (keyCode == '9') { cycleSelectedBlock(1); }
-        // In water, Fire/center is the swim-up control and can be held/re-tapped
-        // while already airborne. On land it remains the normal jump button.
-        if (action == FIRE || keyCode == '5' || keyCode == ' ') {
+
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_JUMP,keyCode,action)) {
             jumpHeld = true;
             if (isSwimming()) {
-                // Give the player an immediate upward stroke, then let held
-                // jump keep accelerating toward and through the water surface.
                 verticalVelocity = Math.max(verticalVelocity, 0.24f);
                 airborne = true;
             } else if (!airborne) {
@@ -516,27 +501,16 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     protected synchronized void keyReleased(int keyCode) {
         int action = getGameAction(keyCode);
-        if (action == FIRE || keyCode == '5' || keyCode == ' ') jumpHeld = false;
-
-        if (keyCode == '2') {
-            forward = false;
-        } else if (keyCode == '8') {
-            backward = false;
-        } else if (keyCode == '4') {
-            strafeLeft = false;
-        } else if (keyCode == '6') {
-            strafeRight = false;
-        } else {
-            if (action == UP) lookUp = false;
-            if (action == DOWN) lookDown = false;
-            if (action == LEFT) turnLeft = false;
-            if (action == RIGHT) turnRight = false;
-        }
-
-        if (keyCode == 'w' || keyCode == 'W') forward = false;
-        if (keyCode == 's' || keyCode == 'S') backward = false;
-        if (keyCode == 'a' || keyCode == 'A') strafeLeft = false;
-        if (keyCode == 'd' || keyCode == 'D') strafeRight = false;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_JUMP,keyCode,action))
+            jumpHeld = false;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_FORWARD,keyCode,action)) forward=false;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_BACKWARD,keyCode,action)) backward=false;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_STRAFE_LEFT,keyCode,action)) strafeLeft=false;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_STRAFE_RIGHT,keyCode,action)) strafeRight=false;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_LOOK_UP,keyCode,action)) lookUp=false;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_LOOK_DOWN,keyCode,action)) lookDown=false;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_TURN_LEFT,keyCode,action)) turnLeft=false;
+        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_TURN_RIGHT,keyCode,action)) turnRight=false;
     }
 
     private synchronized void clearKeys() {
