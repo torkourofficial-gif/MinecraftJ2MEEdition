@@ -279,8 +279,9 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
         }
         int cx = w / 2, cy = h / 2;
-        g.drawRegion(guiImage, 0, 96, 16, 16, 0, cx - 8, cy - 8,
-            Graphics.TOP | Graphics.LEFT);
+        g.setColor(0xFFFFFF);
+        g.drawLine(cx - 3, cy, cx + 3, cy);
+        g.drawLine(cx, cy - 3, cx, cy + 3);
         if (splashTicks > 0) {
             g.setColor(0xBDEBFF);
             for (int b = 0; b < 5; b++) {
