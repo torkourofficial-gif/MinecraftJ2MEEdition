@@ -9,6 +9,7 @@ import javax.microedition.rms.RecordStoreException;
 public final class IndevViewerMIDlet extends MIDlet {
     static int sensitivity = 3;
     static int fogLevel = 1;
+    static boolean humbleMode = false;
 
     // Values above 1000 represent MIDP directional actions, not device key codes.
     public static final int CONTROL_FORWARD = 0, CONTROL_BACKWARD = 1;
@@ -135,6 +136,9 @@ public final class IndevViewerMIDlet extends MIDlet {
         titleScreen.showPauseMenu();
         Display.getDisplay(this).setCurrent(titleScreen);
         titleScreen.start();
+    }
+    void settingsChanged() {
+        if (worldCanvas != null) worldCanvas.applySettingsChange();
     }
     void resumeGame() {
         if (titleScreen!=null) titleScreen.stop();
