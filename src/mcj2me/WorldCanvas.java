@@ -31,7 +31,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Image guiImage;
     private Image guiBlocksImage;
     private Image inventoryImage;
-    private final Image[] blockIcons = new Image[BLOCK_NAMES.length];
+    private final Image[] blockIcons = new Image[16];
     private boolean inventoryOpen = false;
     private int inventoryCursor = 0;
     private float cloudPhase = 0.0f;
