@@ -31,6 +31,14 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Image guiImage;
     private Image guiBlocksImage;
     private Image inventoryImage;
+    private Image titleImage;
+    private Image skyboxImage;
+    private Image menuPanorama;
+    private Image menuTitle;
+    private int menuRenderWidth = -1, menuRenderHeight = -1;
+    private float menuPanoramaPhase = 0.0f;
+    private boolean menuScreen = true;
+    private int menuSelected = 0;
     private final Image[] blockIcons = new Image[9];
     private boolean inventoryOpen = false;
     private int inventoryCursor = 0;
@@ -116,6 +124,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         guiImage = Image.createImage("/mcj2me/gui.png");
         guiBlocksImage = Image.createImage("/mcj2me/gui_blocks.png");
         inventoryImage = Image.createImage("/mcj2me/inventory.png");
+        titleImage = Image.createImage("/mcj2me/title.png");
+        skyboxImage = Image.createImage("/mcj2me/skybox.png");
         blockIcons[0] = createGuiBlockIcon(GUI_ICON_X[0], GUI_ICON_Y[0]);
         blockIcons[1] = createGuiBlockIcon(GUI_ICON_X[1], GUI_ICON_Y[1]);
         blockIcons[2] = createGuiBlockIcon(GUI_ICON_X[2], GUI_ICON_Y[2]);
@@ -222,8 +232,14 @@ final class WorldCanvas extends Canvas implements Runnable {
     public void run() {
         while (running) {
             if (!paused) {
-                updateMovement();
-                animateWater();
+                if (menuScreen) {
+                    int maxPan = Math.max(0, menuPanorama.getWidth() - Math.max(1, getWidth()));
+                    menuPanoramaPhase += 0.35f;
+                    if (menuPanoramaPhase > maxPan) menuPanoramaPhase = 0.0f;
+                } else {
+                    updateMovement();
+                    animateWater();
+                }
                 repaint();
                 serviceRepaints();
             }
@@ -244,6 +260,10 @@ final class WorldCanvas extends Canvas implements Runnable {
             g.drawString(errorMessage, 4, 28, Graphics.TOP | Graphics.LEFT);
             g.drawString("Requires MIDP 2.0 + M3G (JSR-184)", 4, 52,
                          Graphics.TOP | Graphics.LEFT);
+            return;
+        }
+        if (menuScreen) {
+            drawTitleScreen(g);
             return;
         }
         boolean targetBound = false;
@@ -283,6 +303,103 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean isCameraUnderwater() {
         return terrain.isWaterAt((int) cameraX, (int) cameraZ)
             && cameraY < WATER_LEVEL;
+    }
+
+    private void drawTitleScreen(Graphics g) {
+        int w = Math.max(1, getWidth());
+        int h = Math.max(1, getHeight());
+        if (menuRenderWidth != w || menuRenderHeight != h || menuPanorama == null) {
+            menuRenderWidth = w;
+            menuRenderHeight = h;
+            // A double-width panorama lets the old Java title-screen backdrop drift slowly.
+            menuPanorama = resizeImage(skyboxImage, w * 2, h, true);
+            int maxTitleW = Math.max(1, Math.min(w - 20, 512));
+            int maxTitleH = Math.max(1, Math.min(h / 3, 128));
+            float scale = Math.min((float) maxTitleW / titleImage.getWidth(),
+                                   (float) maxTitleH / titleImage.getHeight());
+            int titleW = Math.max(1, (int) (titleImage.getWidth() * scale));
+            int titleH = Math.max(1, (int) (titleImage.getHeight() * scale));
+            menuTitle = resizeImage(titleImage, titleW, titleH, false);
+            menuPanoramaPhase = 0.0f;
+        }
+
+        int maxPan = Math.max(0, menuPanorama.getWidth() - w);
+        int panX = Math.min(maxPan, (int) menuPanoramaPhase);
+        g.drawRegion(menuPanorama, panX, 0, w, h, 0, 0, 0,
+                     Graphics.TOP | Graphics.LEFT);
+
+        // Darken the lower half so the classic gray menu buttons stay legible.
+        g.setColor(0x101820);
+        g.fillRect(0, h / 2, w, h - h / 2);
+        g.setColor(0x000000);
+        g.fillRect(0, h / 2, w, 2);
+
+        int titleX = (w - menuTitle.getWidth()) / 2;
+        int titleY = Math.max(8, h / 10);
+        g.drawImage(menuTitle, titleX, titleY, Graphics.TOP | Graphics.LEFT);
+
+        int buttonW = Math.min(w - 24, 210);
+        if (buttonW < 1) buttonW = w;
+        int buttonH = Math.min(28, Math.max(22, h / 10));
+        int buttonX = (w - buttonW) / 2;
+        int firstY = Math.max(titleY + menuTitle.getHeight() + 10, h * 3 / 5);
+        if (firstY + buttonH * 2 + 7 > h - 26) firstY = Math.max(titleY + menuTitle.getHeight() + 4, h - buttonH * 2 - 31);
+        drawMenuButton(g, buttonX, firstY, buttonW, buttonH, "Singleplayer", menuSelected == 0);
+        drawMenuButton(g, buttonX, firstY + buttonH + 7, buttonW, buttonH, "Quit Game", menuSelected == 1);
+
+        g.setColor(0xFFFFFF);
+        g.drawString("Minecraft J2ME Edition", 5, h - 17, Graphics.BOTTOM | Graphics.LEFT);
+        g.setColor(0xFFFF55);
+        g.drawString("Indev demake", w - 5, h - 17, Graphics.BOTTOM | Graphics.RIGHT);
+    }
+
+    private void drawMenuButton(Graphics g, int x, int y, int w, int h,
+                                String label, boolean selected) {
+        g.setColor(selected ? 0x777777 : 0x555555);
+        g.fillRect(x, y, w, h);
+        g.setColor(selected ? 0xFFFFAA : 0xAAAAAA);
+        g.drawRect(x, y, w - 1, h - 1);
+        g.setColor(0x222222);
+        g.drawLine(x + 1, y + h - 2, x + w - 2, y + h - 2);
+        g.drawLine(x + w - 2, y + 1, x + w - 2, y + h - 2);
+        g.setColor(selected ? 0xFFFF55 : 0xFFFFFF);
+        javax.microedition.lcdui.Font font = javax.microedition.lcdui.Font.getDefaultFont();
+        g.drawString(label, x + (w - font.stringWidth(label)) / 2,
+                     y + (h - font.getHeight()) / 2,
+                     Graphics.TOP | Graphics.LEFT);
+    }
+
+    /**
+     * Nearest-neighbor scaling compatible with MIDP 2.0. In cover mode, crop
+     * the source to the target aspect ratio before scaling; scanline storage
+     * avoids allocating a full-size source pixel buffer on small Java heaps.
+     */
+    private Image resizeImage(Image source, int targetW, int targetH, boolean cover) {
+        int sw = source.getWidth(), sh = source.getHeight();
+        int cropX = 0, cropY = 0, cropW = sw, cropH = sh;
+        if (cover) {
+            long lhs = (long) sw * targetH;
+            long rhs = (long) sh * targetW;
+            if (lhs > rhs) {
+                cropW = (int) ((long) sh * targetW / targetH);
+                cropX = (sw - cropW) / 2;
+            } else if (lhs < rhs) {
+                cropH = (int) ((long) sw * targetH / targetW);
+                cropY = (sh - cropH) / 2;
+            }
+        }
+        int[] row = new int[sw];
+        int[] pixels = new int[targetW * targetH];
+        for (int y = 0; y < targetH; y++) {
+            int sy = cropY + (int) ((long) y * cropH / targetH);
+            source.getRGB(row, 0, sw, 0, sy, sw, 1);
+            int dest = y * targetW;
+            for (int x = 0; x < targetW; x++) {
+                int sx = cropX + (int) ((long) x * cropW / targetW);
+                pixels[dest + x] = row[sx];
+            }
+        }
+        return Image.createRGBImage(pixels, targetW, targetH, true);
     }
 
     private void drawInventory(Graphics g) {
@@ -369,6 +486,41 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     protected synchronized void keyPressed(int keyCode) {
         int action = getGameAction(keyCode);
+
+        if (menuScreen) {
+            if (action == UP || keyCode == '2' || action == DOWN || keyCode == '8') {
+                menuSelected = 1 - menuSelected;
+                repaint();
+                return;
+            }
+            if (action == LEFT || action == RIGHT || keyCode == '4' || keyCode == '6') {
+                menuSelected = 1 - menuSelected;
+                repaint();
+                return;
+            }
+            if (action == FIRE || keyCode == '5' || keyCode == ' ' || keyCode == '\n') {
+                if (menuSelected == 0) {
+                    menuScreen = false;
+                } else {
+                    stop();
+                    midlet.notifyDestroyed();
+                    return;
+                }
+                repaint();
+                return;
+            }
+            if (keyCode == '1') {
+                menuScreen = false;
+                repaint();
+                return;
+            }
+            if (keyCode == '3') {
+                stop();
+                midlet.notifyDestroyed();
+                return;
+            }
+            return;
+        }
 
         if (keyCode == '#') {
             inventoryOpen = true;
