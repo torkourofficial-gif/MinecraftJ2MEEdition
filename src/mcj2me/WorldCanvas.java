@@ -245,7 +245,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 updateDayNight();
                 animateWater();
                 if (passiveMobs != null) passiveMobs.update(cameraX, cameraZ);
-                if (hostileMobs != null) hostileMobs.update(cameraX, cameraZ);
+                if (hostileMobs != null) hostileMobs.update(cameraX, cameraZ, daylightLevel <= 0.42f);
                 updateTntFuse();
                 repaint();
                 serviceRepaints();
