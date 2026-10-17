@@ -78,6 +78,12 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     private Appearance groundAppearance;
     private Mesh[][] activeChunks = new Mesh[8][8];
+    // Tracks even empty chunks whose terrain/water builders return no mesh.
+    private boolean[][] builtChunks = new boolean[8][8];
+    private int loadedCenterX = -99;
+    private int loadedCenterZ = -99;
+    private int loadedFacingSector = -99;
+    private boolean chunksDirty = true;
     private Thread thread;
     private boolean running;
     private boolean paused;
@@ -303,6 +309,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         while (running) {
             if (!paused) {
                 updateMovement();
+                // Stream at most one missing chunk pair per tick to avoid large
+                // mesh-allocation spikes on memory-constrained J2ME devices.
+                updateChunks();
                 updateDayNight();
                 animateWater();
                 if (passiveMobs != null) passiveMobs.update(cameraX, cameraZ);
@@ -815,20 +824,28 @@ final class WorldCanvas extends Canvas implements Runnable {
      * Their meshes remain cached, so turning around re-enables them without
      * rebuilding geometry or creating garbage.
      */
+    private int facingSector() {
+        float normalized = yaw % 360.0f;
+        if (normalized < 0.0f) normalized += 360.0f;
+        return ((int) ((normalized + 22.5f) / 45.0f)) & 7;
+    }
+
+    private boolean isChunkInFront(int x, int z, float forwardX, float forwardZ) {
+        float dx = x * CHUNK + CHUNK * 0.5f - cameraX;
+        float dz = z * CHUNK + CHUNK * 0.5f - cameraZ;
+        // Keep chunks whose bounds might still cross the camera's forward plane.
+        float behindMargin = CHUNK * 0.71f + 1.0f;
+        return dx * forwardX + dz * forwardZ >= -behindMargin;
+    }
+
     private void updateChunkVisibility() {
         float radians = (float) (yaw * Math.PI / 180.0);
         float forwardX = (float) Math.sin(radians);
         float forwardZ = -(float) Math.cos(radians);
-        // A chunk is 16x16; this margin covers its half-diagonal so chunks
-        // straddling the camera plane are kept visible to avoid edge popping.
-        float behindMargin = CHUNK * 0.71f + 1.0f;
 
         for (int x = 0; x < 8; x++) {
             for (int z = 0; z < 8; z++) {
-                float dx = x * CHUNK + CHUNK * 0.5f - cameraX;
-                float dz = z * CHUNK + CHUNK * 0.5f - cameraZ;
-                boolean visible = dx * forwardX + dz * forwardZ >= -behindMargin;
-
+                boolean visible = isChunkInFront(x, z, forwardX, forwardZ);
                 Mesh terrainMesh = activeChunks[x][z];
                 if (terrainMesh != null) terrainMesh.setRenderingEnable(visible);
                 Mesh waterMesh = activeWaterChunks[x][z];
@@ -837,18 +854,31 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
     }
 
+    /**
+     * Direction-aware chunk streaming: meshes behind the camera are detached
+     * and released for GC. Rebuilding is incremental (one terrain/water pair
+     * per game tick), avoiding a large allocation spike when turning around.
+     */
     private synchronized void updateChunks() {
         int centerX = ((int) cameraX) / CHUNK;
         int centerZ = ((int) cameraZ) / CHUNK;
-        if (centerX == loadedCenterX && centerZ == loadedCenterZ) return;
+        int sector = facingSector();
+        if (centerX != loadedCenterX || centerZ != loadedCenterZ
+                || sector != loadedFacingSector) {
+            chunksDirty = true;
+        }
+        if (!chunksDirty) return;
 
-        // Keep meshes that are still inside the moving 3x3 window. Rebuilding
-        // every terrain and water chunk on each 16-block step caused a large
-        // CPU/GC spike on small CLDC devices even though most chunks were unchanged.
+        float radians = (float) (yaw * Math.PI / 180.0f);
+        float forwardX = (float) Math.sin(radians);
+        float forwardZ = -(float) Math.cos(radians);
+
+        // First discard chunks outside the local window or behind the player.
         for (int x = 0; x < 8; x++) {
             for (int z = 0; z < 8; z++) {
-                boolean wanted = Math.abs(x - centerX) <= RADIUS
+                boolean inRange = Math.abs(x - centerX) <= RADIUS
                     && Math.abs(z - centerZ) <= RADIUS;
+                boolean wanted = inRange && isChunkInFront(x, z, forwardX, forwardZ);
                 if (!wanted) {
                     Mesh old = activeChunks[x][z];
                     if (old != null) {
@@ -860,28 +890,41 @@ final class WorldCanvas extends Canvas implements Runnable {
                         waterGroup.removeChild(oldWater);
                         activeWaterChunks[x][z] = null;
                     }
-                } else {
-                    // The absolute chunk index is also the cache key. Existing
-                    // meshes remain valid until terrain is explicitly edited.
-                    if (activeChunks[x][z] == null) {
-                        Mesh mesh = buildChunk(x, z);
-                        if (mesh != null) {
-                            activeChunks[x][z] = mesh;
-                            terrainGroup.addChild(mesh);
-                        }
-                    }
-                    if (activeWaterChunks[x][z] == null) {
-                        Mesh waterMesh = buildWaterChunk(x, z);
-                        if (waterMesh != null) {
-                            activeWaterChunks[x][z] = waterMesh;
-                            waterGroup.addChild(waterMesh);
-                        }
-                    }
+                    builtChunks[x][z] = false;
                 }
             }
         }
+
         loadedCenterX = centerX;
         loadedCenterZ = centerZ;
+        loadedFacingSector = sector;
+
+        // Build only one missing chunk per tick. builtChunks also records empty
+        // water meshes, so a chunk with no water isn't rebuilt every frame.
+        for (int x = 0; x < 8; x++) {
+            for (int z = 0; z < 8; z++) {
+                boolean inRange = Math.abs(x - centerX) <= RADIUS
+                    && Math.abs(z - centerZ) <= RADIUS;
+                boolean wanted = inRange && isChunkInFront(x, z, forwardX, forwardZ);
+                if (wanted && !builtChunks[x][z]) {
+                    Mesh mesh = buildChunk(x, z);
+                    if (mesh != null) {
+                        activeChunks[x][z] = mesh;
+                        terrainGroup.addChild(mesh);
+                    }
+                    Mesh waterMesh = buildWaterChunk(x, z);
+                    if (waterMesh != null) {
+                        activeWaterChunks[x][z] = waterMesh;
+                        waterGroup.addChild(waterMesh);
+                    }
+                    builtChunks[x][z] = true;
+                    updateChunkVisibility();
+                    return; // chunksDirty remains true; continue next tick
+                }
+            }
+        }
+
+        chunksDirty = false;
         updateChunkVisibility();
     }
 
@@ -913,10 +956,13 @@ final class WorldCanvas extends Canvas implements Runnable {
                     waterGroup.removeChild(oldWater);
                     activeWaterChunks[x][z] = null;
                 }
+                builtChunks[x][z] = false;
             }
         }
         loadedCenterX = -99;
         loadedCenterZ = -99;
+        loadedFacingSector = -99;
+        chunksDirty = true;
         updateChunks();
     }
 
