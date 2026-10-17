@@ -41,6 +41,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private final float[] decorationX = new float[MAX_DECORATIONS];
     private final float[] decorationY = new float[MAX_DECORATIONS];
     private final float[] decorationZ = new float[MAX_DECORATIONS];
+    private final float[] decorationYaw = new float[MAX_DECORATIONS];
+    private final boolean[] decorationOpen = new boolean[MAX_DECORATIONS];
     private int decorationCount = 0;
     private final Light[] torchLights = new Light[4];
     private int torchLightUpdateTicks = 0;
@@ -1387,8 +1389,11 @@ final class WorldCanvas extends Canvas implements Runnable {
                 decorationX[decorationHit] = decorationX[last];
                 decorationY[decorationHit] = decorationY[last];
                 decorationZ[decorationHit] = decorationZ[last];
+                decorationYaw[decorationHit] = decorationYaw[last];
+                decorationOpen[decorationHit] = decorationOpen[last];
             }
             decorationMeshes[last] = null;
+            decorationOpen[last] = false;
             decorationCount--;
             updateTorchLights();
             if (type == BLOCK_TORCH) reloadEditedChunks();
@@ -1506,7 +1511,16 @@ final class WorldCanvas extends Canvas implements Runnable {
         decorationX[at] = x;
         decorationY[at] = y;
         decorationZ[at] = z;
+        decorationYaw[at] = yaw;
+        decorationOpen[at] = false;
         return true;
+    }
+
+    private void toggleDoor(int index) {
+        if (index < 0 || index >= decorationCount || decorationTypes[index] != BLOCK_DOOR) return;
+        decorationOpen[index] = !decorationOpen[index];
+        float angle = decorationYaw[index] + (decorationOpen[index] ? 90.0f : 0.0f);
+        decorationMeshes[index].setOrientation(angle, 0.0f, 1.0f, 0.0f);
     }
 
     private int raycastDecoration() {
@@ -1561,6 +1575,14 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void placeBlock() {
+        // Use the place/interact key on an existing door to open or close it.
+        // This check comes before inventory validation, so interaction works
+        // even when the currently selected hotbar slot is empty.
+        int decorationHit = raycastDecoration();
+        if (decorationHit >= 0 && decorationTypes[decorationHit] == BLOCK_DOOR) {
+            toggleDoor(decorationHit);
+            return;
+        }
         if (selectedSlot < 0 || selectedSlot >= inventory.length || inventory[selectedSlot] <= 0) return;
         int[] hit = raycastSurface();
         if (hit == null) return;
