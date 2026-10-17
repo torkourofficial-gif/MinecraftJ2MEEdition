@@ -153,7 +153,7 @@ final class PassiveMob {
                     positions[v * 3] = (short)face[c * 3];
                     positions[v * 3 + 1] = (short)face[c * 3 + 1];
                     positions[v * 3 + 2] = (short)face[c * 3 + 2];
-                    int[] uv = {0, 0, 0, 8, 8, 0, 8, 8};
+                    int[] uv = {0, 0, 0, 1, 1, 0, 1, 1};
                     texCoords[v * 2] = (short)uv[c * 2];
                     texCoords[v * 2 + 1] = (short)uv[c * 2 + 1];
                     indices[v] = v;
