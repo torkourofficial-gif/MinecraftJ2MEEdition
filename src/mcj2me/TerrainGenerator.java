@@ -12,6 +12,7 @@ final class TerrainGenerator {
     private final short[][] heights = new short[SIZE][SIZE];
     private final byte[][] topTypes = new byte[SIZE][SIZE];
     private final boolean[][] waterBasins = new boolean[SIZE][SIZE];
+    private final boolean[][] visitedBasins = new boolean[SIZE][SIZE];
 
     TerrainGenerator() {
         // Build the land first. Lakes are discovered from the resulting
@@ -38,8 +39,8 @@ final class TerrainGenerator {
      * reach the map edge are treated as open lowlands, not inland lakes.
      * Keeping only sizeable, sufficiently deep regions avoids tiny puddles.
      *
-     * The existing waterBasins array doubles as the visited mask, and a short
-     * queue stores packed column indices to keep memory use modest on CLDC.
+     * A visited mask prevents rejected open lowlands from being flood-filled
+     * repeatedly. A short queue stores packed column indices to limit memory.
      */
     private void markEnclosedBasins() {
         short[] queue = new short[SIZE * SIZE];
@@ -48,7 +49,7 @@ final class TerrainGenerator {
 
         for (int sx = 0; sx < SIZE; sx++) {
             for (int sz = 0; sz < SIZE; sz++) {
-                if (waterBasins[sx][sz] || heights[sx][sz] >= WATER_LEVEL) continue;
+                if (visitedBasins[sx][sz] || heights[sx][sz] >= WATER_LEVEL) continue;
 
                 int head = 0;
                 int tail = 0;
@@ -56,7 +57,7 @@ final class TerrainGenerator {
                 boolean touchesEdge = false;
                 int start = sx * SIZE + sz;
                 queue[tail++] = (short) start;
-                waterBasins[sx][sz] = true;
+                visitedBasins[sx][sz] = true;
 
                 while (head < tail) {
                     int index = queue[head++] & 0xFFFF;
@@ -76,10 +77,10 @@ final class TerrainGenerator {
 
                 boolean basin = !touchesEdge && tail >= minimumArea
                     && lowest <= WATER_LEVEL - minimumDepth;
-                if (!basin) {
+                if (basin) {
                     for (int i = 0; i < tail; i++) {
                         int index = queue[i] & 0xFFFF;
-                        waterBasins[index / SIZE][index % SIZE] = false;
+                        waterBasins[index / SIZE][index % SIZE] = true;
                     }
                 }
             }
@@ -87,8 +88,8 @@ final class TerrainGenerator {
     }
 
     private int enqueueLowland(int x, int z, short[] queue, int tail) {
-        if (!waterBasins[x][z] && heights[x][z] < WATER_LEVEL) {
-            waterBasins[x][z] = true;
+        if (!visitedBasins[x][z] && heights[x][z] < WATER_LEVEL) {
+            visitedBasins[x][z] = true;
             queue[tail++] = (short) (x * SIZE + z);
         }
         return tail;
