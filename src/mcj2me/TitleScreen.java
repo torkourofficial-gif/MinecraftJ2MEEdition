@@ -296,7 +296,7 @@ final class TitleScreen extends Canvas implements Runnable {
                 if (selected==0) { settingsOpen=true; selected=0; repaint(); }
                 else { stop(); owner.returnToMainMenu(); }
             } else {
-                if (selected==0) owner.startGame();
+                if (selected==0) owner.openWorldSelect();
                 else if (selected==1) { settingsOpen=true; selected=0; repaint(); }
                 else { stop(); owner.quitGame(); }
             }
