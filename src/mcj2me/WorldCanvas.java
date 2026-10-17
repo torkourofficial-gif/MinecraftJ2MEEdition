@@ -965,28 +965,28 @@ final class WorldCanvas extends Canvas implements Runnable {
                 int nh = terrain.getHeight(x - 1, z);
                 if (!terrain.isWaterAt(x - 1, z) && Math.max(h, nh) < WATER_LEVEL) {
                     int y0 = Math.max(h, nh);
-                    vertex = addWaterQuad(positions, texCoords, indices, stripLengths,
+                    vertex = addWaterQuad(positions, texCoords, stripLengths,
                         vertex, strip++, x, y0, z + 1, x, WATER_LEVEL, z + 1,
                         x, y0, z, x, WATER_LEVEL, z);
                 }
                 nh = terrain.getHeight(x + 1, z);
                 if (!terrain.isWaterAt(x + 1, z) && Math.max(h, nh) < WATER_LEVEL) {
                     int y0 = Math.max(h, nh);
-                    vertex = addWaterQuad(positions, texCoords, indices, stripLengths,
+                    vertex = addWaterQuad(positions, texCoords, stripLengths,
                         vertex, strip++, x + 1, y0, z, x + 1, WATER_LEVEL, z,
                         x + 1, y0, z + 1, x + 1, WATER_LEVEL, z + 1);
                 }
                 nh = terrain.getHeight(x, z - 1);
                 if (!terrain.isWaterAt(x, z - 1) && Math.max(h, nh) < WATER_LEVEL) {
                     int y0 = Math.max(h, nh);
-                    vertex = addWaterQuad(positions, texCoords, indices, stripLengths,
+                    vertex = addWaterQuad(positions, texCoords, stripLengths,
                         vertex, strip++, x, y0, z, x, WATER_LEVEL, z,
                         x + 1, y0, z, x + 1, WATER_LEVEL, z);
                 }
                 nh = terrain.getHeight(x, z + 1);
                 if (!terrain.isWaterAt(x, z + 1) && Math.max(h, nh) < WATER_LEVEL) {
                     int y0 = Math.max(h, nh);
-                    vertex = addWaterQuad(positions, texCoords, indices, stripLengths,
+                    vertex = addWaterQuad(positions, texCoords, stripLengths,
                         vertex, strip++, x + 1, y0, z + 1, x + 1, WATER_LEVEL, z + 1,
                         x, y0, z + 1, x, WATER_LEVEL, z + 1);
                 }
@@ -1000,7 +1000,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         VertexBuffer buffer = new VertexBuffer();
         buffer.setPositions(vertexArray, 1.0f, null);
         buffer.setTexCoords(0, texArray, 1.0f, null);
-        TriangleStripArray triangles = new TriangleStripArray(indices, stripLengths);
+        TriangleStripArray triangles = new TriangleStripArray(0, stripLengths);
         return new Mesh(buffer, triangles, waterAppearance);
     }
 
@@ -1009,9 +1009,9 @@ final class WorldCanvas extends Canvas implements Runnable {
                              int x0, int y0, int z0, int x1, int y1, int z1,
                              int x2, int y2, int z2, int x3, int y3, int z3) {
         vertex = addWaterVertex(positions, texCoords, vertex, x0, y0, z0, 0, 0);
-        vertex = addWaterVertex(positions, texCoords, indices, vertex, x1, y1, z1, 0, 1);
-        vertex = addWaterVertex(positions, texCoords, indices, vertex, x2, y2, z2, 1, 0);
-        vertex = addWaterVertex(positions, texCoords, indices, vertex, x3, y3, z3, 1, 1);
+        vertex = addWaterVertex(positions, texCoords, vertex, x1, y1, z1, 0, 1);
+        vertex = addWaterVertex(positions, texCoords, vertex, x2, y2, z2, 1, 0);
+        vertex = addWaterVertex(positions, texCoords, vertex, x3, y3, z3, 1, 1);
         stripLengths[strip] = 4;
         return vertex;
     }
@@ -1224,25 +1224,25 @@ final class WorldCanvas extends Canvas implements Runnable {
 
                 int neighbor = terrain.getHeight(x - 1, z);
                 for (int sy = neighbor; sy < h; sy++) {
-                    vertex = addQuad(positions, texCoords, colors, indices, stripLengths,
+                    vertex = addQuad(positions, texCoords, colors, stripLengths,
                         vertex, strip++, x, sy, z + 1, x, sy + 1, z + 1,
                         x, sy, z, x, sy + 1, z, sideTile(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h), sideTileY(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h));
                 }
                 neighbor = terrain.getHeight(x + 1, z);
                 for (int sy = neighbor; sy < h; sy++) {
-                    vertex = addQuad(positions, texCoords, colors, indices, stripLengths,
+                    vertex = addQuad(positions, texCoords, colors, stripLengths,
                         vertex, strip++, x + 1, sy, z, x + 1, sy + 1, z,
                         x + 1, sy, z + 1, x + 1, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h), sideTileY(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h));
                 }
                 neighbor = terrain.getHeight(x, z - 1);
                 for (int sy = neighbor; sy < h; sy++) {
-                    vertex = addQuad(positions, texCoords, colors, indices, stripLengths,
+                    vertex = addQuad(positions, texCoords, colors, stripLengths,
                         vertex, strip++, x, sy, z, x, sy + 1, z,
                         x + 1, sy, z, x + 1, sy + 1, z, sideTile(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h), sideTileY(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h));
                 }
                 neighbor = terrain.getHeight(x, z + 1);
                 for (int sy = neighbor; sy < h; sy++) {
-                    vertex = addQuad(positions, texCoords, colors, indices, stripLengths,
+                    vertex = addQuad(positions, texCoords, colors, stripLengths,
                         vertex, strip++, x + 1, sy, z + 1, x + 1, sy + 1, z + 1,
                         x, sy, z + 1, x, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h), sideTileY(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h));
                 }
@@ -1254,7 +1254,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                         for (lx = x - radius; lx <= x + radius; lx++) for (lz = z - radius; lz <= z + radius; lz++) {
                             if (lx == x && lz == z && y <= crown) continue;
                             if (terrain.isLeafBlockAt(lx, y, lz)) {
-                                vertex = addTreeCube(positions, texCoords, colors, indices, stripLengths, vertex, strip, lx, y, lz, 4, 3);
+                                vertex = addTreeCube(positions, texCoords, colors, stripLengths, vertex, strip, lx, y, lz, 4, 3);
                                 strip += countExposedTreeFaces(lx, y, lz);
                             }
                         }
@@ -1323,27 +1323,27 @@ final class WorldCanvas extends Canvas implements Runnable {
         int topX = (tx == 4 && ty == 1) ? 5 : tx;
         int topY = (tx == 4 && ty == 1) ? 1 : ty;
         if (!isTreeVoxelAt(x, y + 1, z)) {
-            vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++,
+            vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
                 x, y+1, z, x, y+1, z+1, x+1, y+1, z, x+1, y+1, z+1, topX, topY);
         }
         if (!isTreeVoxelAt(x, y, z + 1)) {
-            vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++,
+            vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
                 x, y, z+1, x, y+1, z+1, x+1, y, z+1, x+1, y+1, z+1, tx, ty);
         }
         if (!isTreeVoxelAt(x + 1, y, z)) {
-            vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++,
+            vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
                 x+1, y, z, x+1, y+1, z, x, y, z, x, y+1, z, tx, ty);
         }
         if (!isTreeVoxelAt(x - 1, y, z)) {
-            vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++,
+            vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
                 x, y, z, x, y+1, z, x, y, z+1, x, y+1, z+1, tx, ty);
         }
         if (!isTreeVoxelAt(x, y, z - 1)) {
-            vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++,
+            vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
                 x+1, y, z+1, x+1, y+1, z+1, x+1, y, z, x+1, y+1, z, tx, ty);
         }
         if (!isTreeVoxelAt(x, y - 1, z)) {
-            vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++,
+            vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
                 x, y, z, x, y+1, z, x+1, y, z, x+1, y+1, z, tx, ty);
         }
         return vertex;
@@ -1890,11 +1890,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         int firstVertex = vertex;
         vertex = addVertex(positions, texCoords, colors, vertex, x0, y0, z0,
                            tileX, tileY, 0, shade);
-        vertex = addVertex(positions, texCoords, colors, indices, vertex, x1, y1, z1,
+        vertex = addVertex(positions, texCoords, colors, vertex, x1, y1, z1,
                            tileX, tileY, 1, shade);
-        vertex = addVertex(positions, texCoords, colors, indices, vertex, x2, y2, z2,
+        vertex = addVertex(positions, texCoords, colors, vertex, x2, y2, z2,
                            tileX, tileY, 2, shade);
-        vertex = addVertex(positions, texCoords, colors, indices, vertex, x3, y3, z3,
+        vertex = addVertex(positions, texCoords, colors, vertex, x3, y3, z3,
                            tileX, tileY, 3, shade);
         if (glow > 0) {
             int green = shade - glow / 5;
@@ -1938,7 +1938,6 @@ final class WorldCanvas extends Canvas implements Runnable {
         positions[p] = (short) x;
         positions[p + 1] = (short) y;
         positions[p + 2] = (short) z;
-        indices[vertex] = vertex;
         int colorOffset = vertex * 3;
         colors[colorOffset] = (byte) shade;
         colors[colorOffset + 1] = (byte) shade;
