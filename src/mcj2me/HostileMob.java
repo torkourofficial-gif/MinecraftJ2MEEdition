@@ -12,12 +12,12 @@ final class HostileMob {
     private final Random random = new Random();
     private final Mob[] mobs = new Mob[COUNT];
     private Appearance zombieAppearance;
+    private boolean nightActive;
 
     HostileMob(Group parent, TerrainGenerator terrain, float startX, float startZ) throws Exception {
         this.terrain = terrain;
         parent.addChild(group);
         zombieAppearance = PassiveMob.textureAppearance(Image.createImage("/mcj2me/zombie.png"));
-        Appearance hurt = PassiveMob.getHurtAppearance();
         for (int i = 0; i < COUNT; i++) {
             int x = startX < 8 ? 12 + i * 3 : (int)startX + (i == 0 ? -9 : 9);
             int z = (int)startZ + (i == 0 ? -8 : 8);
@@ -26,15 +26,35 @@ final class HostileMob {
             if (z < 3) z = 3;
             if (z > TerrainGenerator.SIZE - 4) z = TerrainGenerator.SIZE - 4;
             if (terrain.isWaterAt(x, z)) z = Math.min(TerrainGenerator.SIZE - 4, z + 3);
-            Mesh mesh = PassiveMob.createMobMesh(zombieAppearance, true);
+            Mesh mesh = PassiveMob.createMobMesh(zombieAppearance, PassiveMob.MOB_ZOMBIE);
             Mob mob = new Mob(mesh, zombieAppearance, x + 0.5f, z + 0.5f, random);
             mobs[i] = mob;
-            group.addChild(mesh);
             mesh.setTranslation(mob.x, terrain.getHeight(x, z), mob.z);
         }
     }
 
-    void update(float playerX, float playerZ) {
+    void update(float playerX, float playerZ, boolean isNight) {
+        if (isNight != nightActive) {
+            nightActive = isNight;
+            for (int i = 0; i < mobs.length; i++) {
+                Mob mob = mobs[i];
+                if (isNight) {
+                    if (!mob.alive) {
+                        mob.alive = true;
+                        mob.health = 3;
+                        mob.hurtTicks = 0;
+                        mob.x = mob.homeX;
+                        mob.z = mob.homeZ;
+                        mob.mesh.setAppearance(0, mob.normal);
+                        mob.mesh.setTranslation(mob.x, terrain.getHeight((int)mob.x, (int)mob.z), mob.z);
+                    }
+                    group.addChild(mob.mesh);
+                } else if (mob.alive) {
+                    group.removeChild(mob.mesh);
+                }
+            }
+        }
+        if (!nightActive) return;
         for (int i = 0; i < mobs.length; i++) {
             Mob mob = mobs[i];
             if (!mob.alive) continue;
@@ -43,6 +63,7 @@ final class HostileMob {
     }
 
     boolean hit(float px, float py, float pz, float yaw, float pitch) {
+        if (!nightActive) return false;
         Mob target = null;
         float best = 4.6f;
         for (int i = 0; i < mobs.length; i++) {
