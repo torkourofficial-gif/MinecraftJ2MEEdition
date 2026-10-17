@@ -1150,18 +1150,32 @@ final class WorldCanvas extends Canvas implements Runnable {
             return;
         }
 
+        // hit = {x, z, blockY, sideHit}; sideHit allows mining exposed cliff/cave-wall faces.
         int[] hit = raycastSurface();
         if (hit == null) return;
-        int x = hit[0], z = hit[1], h = terrain.getHeight(x, z);
+        int x = hit[0], z = hit[1], blockY = hit[2];
+        int h = terrain.getHeight(x, z);
         if (h <= 1) return;
 
-        int type = terrain.getTopType(x, z);
+        boolean sideHit = hit[3] != 0;
+        int type = sideHit ? terrain.getBlockTypeAt(x, blockY, z)
+                           : terrain.getTopType(x, z);
         if (type == TerrainGenerator.BLOCK_BEDROCK) return;
         if (type >= 0 && type < inventory.length) inventory[type]++;
-        spawnBlockParticles(type, x + 0.5f, h - 0.5f, z + 0.5f);
-        int nextType = terrain.getSubsurfaceType(x, h - 2, z);
-        terrain.setHeight(x, z, h - 1);
-        terrain.setTopType(x, z, nextType);
+        spawnBlockParticles(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
+
+        if (sideHit) {
+            // This terrain is height-map based, so a side edit lowers that column
+            // to the struck layer rather than creating a fully voxel-shaped cavity.
+            int newHeight = blockY + 1;
+            if (newHeight >= h) return;
+            terrain.setHeight(x, z, newHeight);
+            terrain.setTopType(x, z, type);
+        } else {
+            int nextType = terrain.getSubsurfaceType(x, h - 2, z);
+            terrain.setHeight(x, z, h - 1);
+            terrain.setTopType(x, z, nextType);
+        }
         reloadEditedChunks();
         resolvePlayerAfterTerrainEdit();
     }
@@ -1207,7 +1221,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         float dx = (float) (Math.sin(xr) * Math.cos(yr));
         float dz = (float) (-Math.cos(xr) * Math.cos(yr));
         float dy = (float) Math.sin(yr);
-        for (float d = 0.35f; d <= 5.0f; d += 0.08f) {
+        // Start almost at the camera; a larger minimum distance skipped nearby leaves.
+        for (float d = 0.05f; d <= 5.0f; d += 0.04f) {
             int x = (int) (cameraX + dx * d);
             int y = (int) (cameraY + dy * d);
             int z = (int) (cameraZ + dz * d);
@@ -1216,9 +1231,45 @@ final class WorldCanvas extends Canvas implements Runnable {
         return null;
     }
 
+    /**
+     * Sample the view ray at short intervals so blocks close to the camera
+     * are not skipped. Returns {x, z, blockY, sideHit}; sideHit is true when
+     * the ray intersects an exposed vertical face below the column's top.
+     */
     private int[] raycastSurface() {
-        double yr=Math.PI*pitch/180.0,xr=Math.PI*yaw/180.0; float dx=(float)(Math.sin(xr)*Math.cos(yr)),dz=(float)(-Math.cos(xr)*Math.cos(yr)),dy=(float)Math.sin(yr);
-        for(float d=0.5f;d<=5.0f;d+=0.15f){int x=(int)(cameraX+dx*d),z=(int)(cameraZ+dz*d);if(x<1||z<1||x>=TerrainGenerator.SIZE-1||z>=TerrainGenerator.SIZE-1)continue;float y=cameraY+dy*d;int surface=terrain.getHeight(x,z);if(y<=surface+0.25f&&y>=surface-1.0f)return new int[]{x,z};}return null;
+        double yr = Math.PI * pitch / 180.0;
+        double xr = Math.PI * yaw / 180.0;
+        float dx = (float) (Math.sin(xr) * Math.cos(yr));
+        float dz = (float) (-Math.cos(xr) * Math.cos(yr));
+        float dy = (float) Math.sin(yr);
+
+        for (float d = 0.05f; d <= 5.0f; d += 0.04f) {
+            float fx = cameraX + dx * d;
+            float fy = cameraY + dy * d;
+            float fz = cameraZ + dz * d;
+            int x = (int) fx, z = (int) fz;
+            int blockY = (int) fy;
+            if (x < 1 || z < 1 || x >= TerrainGenerator.SIZE - 1
+                    || z >= TerrainGenerator.SIZE - 1 || blockY < 0) continue;
+
+            int surface = terrain.getHeight(x, z);
+            // Top-face hit, including a small tolerance around the surface.
+            if (fy <= surface + 0.25f && fy >= surface - 1.0f) {
+                return new int[] {x, z, surface - 1, 0};
+            }
+
+            // Side-face hit: this column rises above the ray while at least one
+            // neighboring column leaves the sampled block layer exposed.
+            if (blockY < surface - 1 && blockY >= 0) {
+                if (terrain.getHeight(x - 1, z) <= blockY
+                        || terrain.getHeight(x + 1, z) <= blockY
+                        || terrain.getHeight(x, z - 1) <= blockY
+                        || terrain.getHeight(x, z + 1) <= blockY) {
+                    return new int[] {x, z, blockY, 1};
+                }
+            }
+        }
+        return null;
     }
 
     private int addQuad(short[] positions, short[] texCoords, byte[] colors, int[] indices,
