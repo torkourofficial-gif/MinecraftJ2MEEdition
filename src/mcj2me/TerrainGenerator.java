@@ -43,9 +43,40 @@ final class TerrainGenerator {
             }
         }
         generateWaterBasinStructures(random);
+        generateCaveSystems(random);
         lowerWorldEdgesTowardSea();
         for (int x = 0; x < SIZE; x++) {
             System.arraycopy(heights[x], 0, originalHeights[x], 0, SIZE);
+        }
+    }
+
+    /**
+     * Adds winding, stone-sided cave ravines and entrances to the height map.
+     * The current renderer stores one surface height per X/Z column, so these
+     * are open cave cuts, not fully enclosed voxel tunnels.
+     */
+    private void generateCaveSystems(Random random) {
+        int systems = 5 + random.nextInt(4);
+        for (int c=0; c<systems; c++) {
+            int x=10+random.nextInt(SIZE-20), z=10+random.nextInt(SIZE-20);
+            if (Math.abs(x-64)<15 && Math.abs(z-105)<18) z=72;
+            float angle=random.nextFloat()*6.2831853f;
+            int length=18+random.nextInt(25), floor=13+random.nextInt(8);
+            for (int step=0; step<length; step++) {
+                int cx=x+(int)(Math.cos(angle)*step), cz=z+(int)(Math.sin(angle)*step);
+                if (cx<5 || cz<5 || cx>=SIZE-5 || cz>=SIZE-5) break;
+                if (step%5==0) angle+=(random.nextInt(3)-1)*0.24f;
+                int radius=2+(((step+c)%3==0)?1:0);
+                for (int dx=-radius; dx<=radius; dx++) for (int dz=-radius; dz<=radius; dz++) {
+                    int px=cx+dx, pz=cz+dz;
+                    if (px<2 || pz<2 || px>=SIZE-2 || pz>=SIZE-2) continue;
+                    int d2=dx*dx+dz*dz;
+                    if (d2>radius*radius+1) continue;
+                    int target=floor+Math.max(0,radius-(int)Math.sqrt(d2));
+                    if (heights[px][pz]>target) heights[px][pz]=(short)target;
+                    waterBasins[px][pz]=false;
+                }
+            }
         }
     }
 
@@ -192,6 +223,12 @@ final class TerrainGenerator {
     static final int BLOCK_GOLD_ORE = 7;
     static final int BLOCK_DIAMOND_ORE = 8;
     static final int BLOCK_BEDROCK = 9;
+    static final int BLOCK_TNT = 10;
+    static final int BLOCK_PLANKS = 11;
+    static final int BLOCK_SAND = 12;
+    static final int BLOCK_GRAVEL = 13;
+    static final int BLOCK_BRICK = 14;
+    static final int BLOCK_OBSIDIAN = 15;
 
     int getTopType(int x, int z) {
         if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return BLOCK_BEDROCK;
@@ -200,7 +237,7 @@ final class TerrainGenerator {
 
     void setTopType(int x, int z, int type) {
         if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return;
-        if (type < BLOCK_GRASS || type > BLOCK_BEDROCK) type = BLOCK_GRASS;
+        if (type < BLOCK_GRASS || type > BLOCK_OBSIDIAN) type = BLOCK_GRASS;
         topTypes[x][z] = (byte) type;
     }
 
