@@ -63,7 +63,7 @@ final class TitleScreen extends Canvas implements Runnable {
     }
     protected void paint(Graphics g) {
         int w=Math.max(1,getWidth()), h=Math.max(1,getHeight());
-        if (renderWidth!=w || renderHeight!=h || panorama==null) {
+        if (renderWidth!=w || renderHeight!=h || (panorama==null && cubeFrame==null)) {
             renderWidth=w; renderHeight=h;
             if (skybox!=null) {
                 skyboxWidth=skybox.getWidth(); skyboxHeight=skybox.getHeight();
@@ -157,7 +157,9 @@ final class TitleScreen extends Canvas implements Runnable {
      */
     private void renderCubeFrame() {
         if (skyboxPixels==null || skyboxWidth<4 || skyboxHeight<3) return;
-        final int outW=120, outH=80;
+        int screenW=Math.max(1,getWidth()), screenH=Math.max(1,getHeight());
+        final int outW=Math.max(1,Math.min(160,(screenW+1)/2));
+        final int outH=Math.max(1,Math.min(160,(screenH+1)/2));
         int[] out=new int[outW*outH];
         float aspect=(float)outW/outH;
         float tanHalf=(float)Math.tan(Math.PI/4.0);
@@ -193,7 +195,8 @@ final class TitleScreen extends Canvas implements Runnable {
                 out[py*outW+px]=skyboxPixels[syy*skyboxWidth+sx];
             }
         }
-        cubeFrame=Image.createRGBImage(out,outW,outH,false);
+        Image lowResolution=Image.createRGBImage(out,outW,outH,false);
+        cubeFrame=resizeImage(lowResolution,screenW,screenH,false);
     }
     private void drawButton(Graphics g,int x,int y,int w,int h,String label,boolean active) {
         g.setColor(active?0x777777:0x555555); g.fillRect(x,y,w,h);
