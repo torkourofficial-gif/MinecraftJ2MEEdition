@@ -123,7 +123,7 @@ final class PassiveMob {
         } else if (mobType == MOB_COW) {
             // Cow: 12x18x10 body, 8x8x6 head, four 4x12x4 legs.
             boxes = new int[][] {
-                {-6, 8, -5, 6, 26, 5}, {-4, 17, -3, 4, 25, 3},
+                {-6, 8, -5, 6, 26, 5}, {-4, 17, -8, 4, 25, -2},
                 {-5, 0, -4, -1, 12, 0}, {1, 0, -4, 5, 12, 0},
                 {-5, 0, 0, -1, 12, 4}, {1, 0, 0, 5, 12, 4}
             };
@@ -131,7 +131,7 @@ final class PassiveMob {
         } else if (mobType == MOB_PIG) {
             // Pig: 10x8x8 body, 8x8x8 head, four 4x6x4 legs.
             boxes = new int[][] {
-                {-5, 5, -4, 5, 13, 4}, {-4, 6, -4, 4, 14, 4},
+                {-5, 5, -4, 5, 13, 4}, {-4, 6, -7, 4, 14, 1},
                 {-5, 0, -4, -1, 6, 0}, {1, 0, -4, 5, 6, 0},
                 {-5, 0, 0, -1, 6, 4}, {1, 0, 0, 5, 6, 4}
             };
@@ -139,7 +139,7 @@ final class PassiveMob {
         } else {
             // Sheep: 12x17x10 body, 8x8x6 head, four 4x12x4 legs.
             boxes = new int[][] {
-                {-6, 8, -5, 6, 25, 5}, {-4, 16, -3, 4, 24, 3},
+                {-6, 8, -5, 6, 25, 5}, {-4, 16, -8, 4, 24, -2},
                 {-5, 0, -4, -1, 12, 0}, {1, 0, -4, 5, 12, 0},
                 {-5, 0, 0, -1, 12, 4}, {1, 0, 0, 5, 12, 4}
             };
@@ -201,9 +201,11 @@ final class PassiveMob {
         buffer.setPositions(p, 1.0f / 16.0f, null);
         buffer.setTexCoords(0, t, 1.0f / 1024.0f, null);
         Mesh result = new Mesh(buffer, new TriangleStripArray(indices, strips), appearance);
-        if (mobType == MOB_COW) result.setScale(1.0f, 0.86f, 1.0f);
-        else if (mobType == MOB_SHEEP) result.setScale(1.0f, 0.80f, 1.0f);
-        else if (mobType == MOB_ZOMBIE) result.setScale(0.80f, 1.0f, 0.80f);
+        // Match adult Java Edition proportions while preserving the classic pixel-model silhouettes.
+        if (mobType == MOB_COW) result.setScale(1.0f, 0.86f, 1.0f);       // ~1.4 blocks tall
+        else if (mobType == MOB_PIG) result.setScale(1.0f, 1.03f, 1.0f);  // ~0.9 blocks tall
+        else if (mobType == MOB_SHEEP) result.setScale(1.0f, 0.832f, 1.0f); // ~1.3 blocks tall
+        else if (mobType == MOB_ZOMBIE) result.setScale(0.80f, 0.975f, 0.80f); // ~0.6 x 1.95 blocks
         return result;
     }
 
