@@ -1486,7 +1486,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (!isTreeVoxelAt(x + 1, y, z)) faces++;
         if (!isTreeVoxelAt(x - 1, y, z)) faces++;
         if (!isTreeVoxelAt(x, y, z - 1)) faces++;
-        if (!isTreeVoxelAt(x, y - 1, z)) faces++;
+        // Leaf textures contain transparent pixels, so even a face touching
+        // another leaf must be emitted: otherwise the canopy can show a hole
+        // from below through the transparent parts of the neighboring block.
+        if (terrain.isLeafBlockAt(x, y, z) || !isTreeVoxelAt(x, y - 1, z)) faces++;
         return faces;
     }
 
@@ -1516,11 +1519,10 @@ final class WorldCanvas extends Canvas implements Runnable {
             vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
                 x+1, y, z+1, x+1, y+1, z+1, x+1, y, z, x+1, y+1, z, tx, ty);
         }
-        if (!isTreeVoxelAt(x, y - 1, z)) {
-            // The underside must be a horizontal face. The previous vertex
-            // layout accidentally emitted another vertical face here, leaving
-            // the bottom of leaf blocks open and allowing the player to clip
-            // into the canopy from below.
+        if ((tx == 4 && ty == 3) || !isTreeVoxelAt(x, y - 1, z)) {
+            // Always draw leaf undersides, even when another leaf is directly
+            // below. Leaf textures are transparent, so culling this internal
+            // face can leave visible gaps when viewed from underneath.
             vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
                 x, y, z, x+1, y, z, x, y, z+1, x+1, y, z+1, tx, ty);
         }
