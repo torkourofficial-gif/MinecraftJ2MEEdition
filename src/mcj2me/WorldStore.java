@@ -7,14 +7,16 @@ import java.io.DataOutputStream;
 import javax.microedition.rms.RecordStore;
 import javax.microedition.rms.RecordStoreException;
 
-/** Persistent world catalogue stored by MIDP Record Management System. */
+/** Persistent world catalogue and chunked world snapshots in MIDP RMS. */
 final class WorldStore {
     private static final String STORE = "mcj2me-worlds";
+    private static final int SNAPSHOT_CHUNK = 6000;
 
     static final class WorldInfo {
         final String name;
         final int seed;
-        WorldInfo(String n, int s) { name = n; seed = s; }
+        final int id;
+        WorldInfo(String n, int s, int recordId) { name = n; seed = s; id = recordId; }
     }
 
     static synchronized WorldInfo[] list() throws Exception {
@@ -24,17 +26,14 @@ final class WorldStore {
             int count = rs.getNumRecords();
             WorldInfo[] result = new WorldInfo[count];
             int out = 0;
-            for (int id = 1; id <= count; id++) {
+            for (int id = 1; id <= rs.getNextRecordID() - 1; id++) {
                 try {
-                    DataInputStream in = new DataInputStream(
-                        new ByteArrayInputStream(rs.getRecord(id)));
+                    DataInputStream in = new DataInputStream(new ByteArrayInputStream(rs.getRecord(id)));
                     String name = in.readUTF();
                     int seed = in.readInt();
-                    result[out++] = new WorldInfo(name, seed);
+                    result[out++] = new WorldInfo(name, seed, id);
                     in.close();
-                } catch (Exception badRecord) {
-                    // Ignore an incomplete record rather than breaking the world list.
-                }
+                } catch (Exception badRecord) { /* Ignore incomplete records. */ }
             }
             if (out == result.length) return result;
             WorldInfo[] compact = new WorldInfo[out];
@@ -60,6 +59,7 @@ final class WorldStore {
         long now = System.currentTimeMillis();
         int seed = (int)(now ^ (now >>> 32) ^ (now * 1103515245L));
         RecordStore rs = null;
+        int id;
         try {
             rs = RecordStore.openRecordStore(STORE, true);
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -68,11 +68,47 @@ final class WorldStore {
             out.writeInt(seed);
             out.flush();
             byte[] data = bytes.toByteArray();
-            rs.addRecord(data, 0, data.length);
+            id = rs.addRecord(data, 0, data.length);
         } finally {
             if (rs != null) try { rs.closeRecordStore(); } catch (RecordStoreException ignored) { }
         }
-        return new WorldInfo(name, seed);
+        return new WorldInfo(name, seed, id);
+    }
+
+    static synchronized void saveState(int worldId, byte[] state) throws Exception {
+        String name = stateStoreName(worldId);
+        try { RecordStore.deleteRecordStore(name); } catch (RecordStoreNotFoundException ignored) { }
+        if (state == null || state.length == 0) return;
+        RecordStore rs = null;
+        try {
+            rs = RecordStore.openRecordStore(name, true);
+            for (int offset = 0; offset < state.length; offset += SNAPSHOT_CHUNK) {
+                int length = Math.min(SNAPSHOT_CHUNK, state.length - offset);
+                rs.addRecord(state, offset, length);
+            }
+        } finally {
+            if (rs != null) try { rs.closeRecordStore(); } catch (RecordStoreException ignored) { }
+        }
+    }
+
+    static synchronized byte[] loadState(int worldId) throws Exception {
+        RecordStore rs = null;
+        try {
+            rs = RecordStore.openRecordStore(stateStoreName(worldId), false);
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            for (int id = 1; id <= rs.getNextRecordID() - 1; id++) {
+                try { bytes.write(rs.getRecord(id)); } catch (Exception ignored) { }
+            }
+            return bytes.toByteArray();
+        } catch (RecordStoreNotFoundException missing) {
+            return null;
+        } finally {
+            if (rs != null) try { rs.closeRecordStore(); } catch (RecordStoreException ignored) { }
+        }
+    }
+
+    private static String stateStoreName(int id) {
+        return "mcw" + Integer.toString(id, 36);
     }
 
     private static boolean contains(WorldInfo[] worlds, String name) {
