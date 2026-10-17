@@ -1,6 +1,10 @@
 package mcj2me;
 
 import java.util.Random;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 
 /**
  * Deterministic height-map terrain with water represented as vertical block
@@ -351,6 +355,41 @@ final class TerrainGenerator {
 
     private int leafId(int x, int y, int z) {
         return y * SIZE * SIZE + z * SIZE + x;
+    }
+
+    /** Serialize mutable terrain data; immutable strata are regenerated from the saved seed. */
+    byte[] saveState() throws Exception {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytes);
+        for (int x = 0; x < SIZE; x++)
+            for (int z = 0; z < SIZE; z++) out.writeShort(heights[x][z]);
+        for (int x = 0; x < SIZE; x++)
+            for (int z = 0; z < SIZE; z++) out.writeByte(topTypes[x][z]);
+        for (int x = 0; x < SIZE; x++)
+            for (int z = 0; z < SIZE; z++) out.writeBoolean(waterBasins[x][z]);
+        out.writeInt(removedLeafCount);
+        for (int i = 0; i < removedLeafCount; i++) out.writeInt(removedLeafIds[i]);
+        out.flush();
+        return bytes.toByteArray();
+    }
+
+    void loadState(byte[] data) throws Exception {
+        if (data == null) return;
+        DataInputStream in = new DataInputStream(new ByteArrayInputStream(data));
+        for (int x = 0; x < SIZE; x++)
+            for (int z = 0; z < SIZE; z++) heights[x][z] = in.readShort();
+        for (int x = 0; x < SIZE; x++)
+            for (int z = 0; z < SIZE; z++) topTypes[x][z] = in.readByte();
+        for (int x = 0; x < SIZE; x++)
+            for (int z = 0; z < SIZE; z++) waterBasins[x][z] = in.readBoolean();
+        int count = in.readInt();
+        if (count < 0 || count > SIZE * SIZE * HEIGHT) throw new Exception("Invalid saved leaf data");
+        if (count > removedLeafIds.length) removedLeafIds = new int[count];
+        removedLeafCount = count;
+        for (int i = 0; i < count; i++) removedLeafIds[i] = in.readInt();
+        for (int x = 0; x < SIZE; x++)
+            for (int z = 0; z < SIZE; z++) treeAtCache[x][z] = 0;
+        in.close();
     }
 
     int countTreeLeaves(int tx, int tz) {
