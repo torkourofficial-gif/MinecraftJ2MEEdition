@@ -62,10 +62,14 @@ final class TerrainGenerator {
             int radiusX = 6 + random.nextInt(6);
             int radiusZ = 6 + random.nextInt(6);
             int depth = 3 + random.nextInt(5);
-            int minX = Math.max(1, cx - radiusX - 1);
-            int maxX = Math.min(SIZE - 2, cx + radiusX + 1);
-            int minZ = Math.max(1, cz - radiusZ - 1);
-            int maxZ = Math.min(SIZE - 2, cz + radiusZ + 1);
+            // Extend the outer bank beyond the pool itself so it joins the
+            // surrounding landscape instead of ending as a floating ledge.
+            int bankRadiusX = radiusX * 13 / 10 + 2;
+            int bankRadiusZ = radiusZ * 13 / 10 + 2;
+            int minX = Math.max(1, cx - bankRadiusX);
+            int maxX = Math.min(SIZE - 2, cx + bankRadiusX);
+            int minZ = Math.max(1, cz - bankRadiusZ);
+            int maxZ = Math.min(SIZE - 2, cz + bankRadiusZ);
             int floor = WATER_LEVEL - depth;
             if (floor < 3) floor = 3;
 
@@ -76,17 +80,15 @@ final class TerrainGenerator {
                     float distance = dx * dx + dz * dz;
                     int edgeJitter = hash(x + b * 17, z - b * 11) & 3;
                     float edge = 1.0f + (edgeJitter - 1) * 0.045f;
-                    if (distance > edge * edge) continue;
-
                     float normalized = (float) Math.sqrt(distance) / edge;
+                    if (normalized > 1.30f) continue;
                     int originalHeight = heights[x][z];
                     int h;
 
-                    if (normalized <= 0.72f) {
-                        // Shape the underwater bowl gradually from its floor
-                        // to the shoreline. The whole inner bowl stays below
-                        // the shared waterline, without a raised volcanic rim.
-                        float t = normalized / 0.72f;
+                    if (normalized <= 0.62f) {
+                        // A rounded, submerged bowl. Keep the water's edge
+                        // inside the bank, with no exposed ground at water height.
+                        float t = normalized / 0.62f;
                         float smooth = t * t * (3.0f - 2.0f * t);
                         h = floor + (int) ((WATER_LEVEL - 1 - floor) * smooth);
                         if (h >= WATER_LEVEL) h = WATER_LEVEL - 1;
@@ -94,15 +96,16 @@ final class TerrainGenerator {
                         heights[x][z] = (short) h;
                         waterBasins[x][z] = true;
                     } else {
-                        // Blend the outer bank back into the untouched local
-                        // terrain height. At the edge the basin disappears
-                        // into the landscape instead of forming a mountain.
-                        float t = (normalized - 0.72f) / 0.28f;
+                        // Build a real shoreline: its inner edge stands above
+                        // the water surface, then slopes gradually back into
+                        // the local terrain over a broad ring (not a volcano rim).
+                        float t = (normalized - 0.62f) / 0.68f;
                         if (t < 0.0f) t = 0.0f;
                         if (t > 1.0f) t = 1.0f;
                         float smooth = t * t * (3.0f - 2.0f * t);
-                        h = WATER_LEVEL - 1
-                            + (int) ((originalHeight - (WATER_LEVEL - 1)) * smooth);
+                        int bankBase = WATER_LEVEL + 1;
+                        int bankTarget = Math.max(bankBase, originalHeight);
+                        h = bankBase + (int) ((bankTarget - bankBase) * smooth);
                         if (h < 2) h = 2;
                         if (!waterBasins[x][z]) heights[x][z] = (short) h;
                     }
