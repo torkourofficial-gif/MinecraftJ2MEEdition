@@ -1517,8 +1517,12 @@ final class WorldCanvas extends Canvas implements Runnable {
                 x+1, y, z+1, x+1, y+1, z+1, x+1, y, z, x+1, y+1, z, tx, ty);
         }
         if (!isTreeVoxelAt(x, y - 1, z)) {
+            // The underside must be a horizontal face. The previous vertex
+            // layout accidentally emitted another vertical face here, leaving
+            // the bottom of leaf blocks open and allowing the player to clip
+            // into the canopy from below.
             vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
-                x, y, z, x, y+1, z, x+1, y, z, x+1, y+1, z, tx, ty);
+                x, y, z, x+1, y, z, x, y, z+1, x+1, y, z+1, tx, ty);
         }
         return vertex;
     }
