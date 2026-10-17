@@ -16,7 +16,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final float TURN_SPEED = 3.0f;
     private static final int WATER_LEVEL = TerrainGenerator.WATER_LEVEL;
     // Keep the distant ocean below the terrain skyline; inland lakes retain WATER_LEVEL.
-    private static final int HORIZON_SEA_LEVEL = WATER_LEVEL - 5;
+    private static final int HORIZON_SEA_LEVEL = 10;
     private static final float WATER_ALPHA = 0.66f;
 
     private final IndevViewerMIDlet midlet;
