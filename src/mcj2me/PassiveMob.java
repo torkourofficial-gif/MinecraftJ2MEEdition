@@ -124,7 +124,7 @@ final class PassiveMob {
             // Vanilla Java geometry: body is a 12x18x10 cube rotated 90 degrees on X.
             // Head uses its original 8x8x6 dimensions and sits low at the front.
             boxes = new int[][] {
-                {-6, -10, -7, 6, 8, 3}, {-4, 0, -14, 4, 8, -8},
+                {-6, -10, -7, 6, 8, 3}, {-4, 16, -14, 4, 24, -8},
                 {-6, 0, -7, -2, 12, -3}, {2, 0, -7, 6, 12, -3},
                 {-6, 0, 5, -2, 12, 9}, {2, 0, 5, 6, 12, 9}
             };
@@ -142,7 +142,7 @@ final class PassiveMob {
             // Vanilla sheep body plus its wool layer: wider than the bare body.
             // The original torso is rotated on X; the head is 6x6x8 and lower than the cow's.
             boxes = new int[][] {
-                {-6, -10, -5, 6, 10, 5}, {-3, 2, -14, 3, 8, -6},
+                {-6, -10, -9, 6, 8, 1}, {-3, 16, -14, 3, 22, -6},
                 {-6, 0, -7, -2, 12, -3}, {2, 0, -7, 6, 12, -3},
                 {-6, 0, 5, -2, 12, 9}, {2, 0, 5, 6, 12, 9}
             };
@@ -178,7 +178,7 @@ final class PassiveMob {
                     // UVs are calculated before this transform, so their faces rotate with the cube.
                     if (boxIndex == 0 && (mobType == MOB_COW || mobType == MOB_SHEEP)) {
                         int oldY = py;
-                        py = -pz + 5;
+                        py = 19 + pz;
                         pz = oldY + 2;
                     }
                     positions[v * 3] = (short)px;
