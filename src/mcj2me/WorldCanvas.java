@@ -4,6 +4,10 @@ import javax.microedition.lcdui.Canvas;
 import javax.microedition.lcdui.Graphics;
 import javax.microedition.lcdui.Image;
 import javax.microedition.m3g.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 
 final class WorldCanvas extends Canvas implements Runnable {
     // Keep the movement IDs local so this class does not depend on MIDlet constant visibility.
@@ -184,8 +188,18 @@ final class WorldCanvas extends Canvas implements Runnable {
         terrain = new TerrainGenerator(seed);
         setFullScreenMode(true);
         try {
-            if (savedTerrain != null) terrain.loadState(savedTerrain);
+            if (savedTerrain != null) {
+                DataInputStream in = new DataInputStream(new ByteArrayInputStream(savedTerrain));
+                int terrainLength = in.readInt();
+                if (terrainLength < 0 || terrainLength > savedTerrain.length - 4)
+                    throw new Exception("Invalid saved terrain");
+                byte[] terrainData = new byte[terrainLength];
+                in.readFully(terrainData);
+                terrain.loadState(terrainData);
+                in.close();
+            }
             setupScene();
+            if (savedTerrain != null) restorePlayerState(savedTerrain);
         } catch (OutOfMemoryError e) {
             errorMessage = "Not enough Java heap for M3G.";
         } catch (Exception e) {
@@ -196,7 +210,26 @@ final class WorldCanvas extends Canvas implements Runnable {
     String getWorldName() { return worldName; }
     int getWorldSeed() { return worldSeed; }
     int getWorldId() { return worldId; }
-    byte[] saveTerrainState() throws Exception { return terrain.saveState(); }
+    byte[] saveTerrainState() throws Exception {
+        byte[] terrainData = terrain.saveState();
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytes);
+        out.writeInt(terrainData.length);
+        out.write(terrainData);
+        out.writeFloat(cameraX); out.writeFloat(cameraY); out.writeFloat(cameraZ);
+        out.writeFloat(yaw); out.writeFloat(pitch);
+        out.writeInt(dayTick); out.writeInt(selectedSlot);
+        out.writeInt(inventory.length);
+        for (int i = 0; i < inventory.length; i++) out.writeInt(inventory[i]);
+        out.writeInt(decorationCount);
+        for (int i = 0; i < decorationCount; i++) {
+            out.writeInt(decorationTypes[i]);
+            out.writeFloat(decorationX[i]); out.writeFloat(decorationY[i]); out.writeFloat(decorationZ[i]);
+            out.writeFloat(decorationYaw[i]); out.writeBoolean(decorationOpen[i]);
+        }
+        out.flush();
+        return bytes.toByteArray();
+    }
     boolean hasSetupError() { return errorMessage != null; }
     String getSetupError() { return errorMessage; }
 
