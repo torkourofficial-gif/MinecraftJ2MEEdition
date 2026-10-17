@@ -1,8 +1,9 @@
 package mcj2me;
 
 /**
- * Small deterministic height-map generator. No world-sized block array is
- * needed: each column stores only its surface height.
+ * Deterministic height-map terrain with water represented as vertical block
+ * columns. Solid terrain remains height-map based; water occupies individual
+ * integer Y cells from the terrain surface up to the shared waterline.
  */
 final class TerrainGenerator {
     static final int SIZE = 128;
@@ -79,6 +80,14 @@ final class TerrainGenerator {
     boolean isWaterAt(int x, int z) {
         return x >= 0 && z >= 0 && x < SIZE && z < SIZE
             && waterBasins[x][z] && heights[x][z] < WATER_LEVEL;
+    }
+
+    /**
+     * Tests one water block cell. Water is traversable, but its occupied
+     * volume is discrete: x/z selects a column and y selects a block layer.
+     */
+    boolean isWaterBlockAt(int x, int y, int z) {
+        return isWaterAt(x, z) && y >= heights[x][z] && y < WATER_LEVEL;
     }
 
     int getWaterLevel() {
