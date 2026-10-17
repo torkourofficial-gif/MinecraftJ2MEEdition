@@ -357,10 +357,35 @@ final class TerrainGenerator {
     /** Lightweight Indev-like shadow levels used as M3G vertex colors. */
     int getShadowShade(int x, int z, int y) {
         if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return 220;
+
+        // Check nearby tree crowns once, instead of calling isLeafBlockAt four
+        // times (each of which repeats the same tree-candidate search).
         int overheadLeaves = 0;
-        for (int above = y + 2; above <= y + 5 && above < HEIGHT; above++) {
-            if (isLeafBlockAt(x, above, z)) overheadLeaves++;
+        int minTreeX = Math.max(5, x - 2);
+        int maxTreeX = Math.min(SIZE - 6, x + 2);
+        int minTreeZ = Math.max(5, z - 2);
+        int maxTreeZ = Math.min(SIZE - 6, z + 2);
+        for (int tx = minTreeX; tx <= maxTreeX; tx++) {
+            if (tx % 11 != 5) continue;
+            for (int tz = minTreeZ; tz <= maxTreeZ; tz++) {
+                if (tz % 13 != 6 || !isTreeAt(tx, tz)) continue;
+                int crown = getHeight(tx, tz) + getTreeHeight(tx, tz) - 1;
+                for (int layer = 0; layer < 3; layer++) {
+                    int leafY = crown - 1 + layer;
+                    int radius = layer == 2 ? 1 : 2;
+                    if (leafY < y + 2 || leafY > y + 5 || leafY >= HEIGHT) continue;
+                    if (Math.abs(x - tx) > radius || Math.abs(z - tz) > radius) continue;
+                    if (x == tx && z == tz && leafY <= crown) continue;
+                    int id = leafId(x, leafY, z);
+                    boolean removed = false;
+                    for (int i = 0; i < removedLeafCount; i++) {
+                        if (removedLeafIds[i] == id) { removed = true; break; }
+                    }
+                    if (!removed) overheadLeaves++;
+                }
+            }
         }
+
         int shade = 255;
         if (overheadLeaves >= 2) shade = 142;
         else if (overheadLeaves == 1) shade = 190;
