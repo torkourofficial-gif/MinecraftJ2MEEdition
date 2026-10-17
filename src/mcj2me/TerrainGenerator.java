@@ -1,5 +1,7 @@
 package mcj2me;
 
+import java.util.Random;
+
 /**
  * Deterministic height-map terrain with water represented as vertical block
  * columns. Solid terrain remains height-map based; water occupies individual
@@ -12,11 +14,16 @@ final class TerrainGenerator {
     private final short[][] heights = new short[SIZE][SIZE];
     private final byte[][] topTypes = new byte[SIZE][SIZE];
     private final boolean[][] waterBasins = new boolean[SIZE][SIZE];
-    private final boolean[][] visitedBasins = new boolean[SIZE][SIZE];
+    private final int seed;
 
     TerrainGenerator() {
-        // Build the land first. Lakes are discovered from the resulting
-        // terrain instead of stamping circular bowls at predetermined points.
+        // Each new world receives a random seed.
+        long now = System.currentTimeMillis();
+        seed = (int) (now ^ (now >>> 32) ^ new Random(now).nextInt());
+        Random random = new Random(seed);
+
+        // Generate natural terrain first, then place actual lake structures
+        // that carve their own basins and fill them with water.
         for (int x = 0; x < SIZE; x++) {
             for (int z = 0; z < SIZE; z++) {
                 int broad = valueNoise(x, z, 32);
@@ -30,69 +37,55 @@ final class TerrainGenerator {
                 heights[x][z] = (short) h;
             }
         }
-        markEnclosedBasins();
+        generateWaterBasinStructures(random);
     }
 
     /**
-     * Finds naturally enclosed lowland regions in the generated height map.
-     * A flood fill marks connected columns below the waterline. Regions that
-     * reach the map edge are treated as open lowlands, not inland lakes.
-     * Keeping only sizeable, sufficiently deep regions avoids tiny puddles.
-     *
-     * A visited mask prevents rejected open lowlands from being flood-filled
-     * repeatedly. A short queue stores packed column indices to limit memory.
+     * Places lake structures directly into the height map. Each structure
+     * carves a bowl, creates a raised irregular shoreline, and marks its
+     * flooded interior. Position, shape and depth vary by world seed.
      */
-    private void markEnclosedBasins() {
-        short[] queue = new short[SIZE * SIZE];
-        final int minimumArea = 18;
-        final int minimumDepth = 3;
+    private void generateWaterBasinStructures(Random random) {
+        int basinCount = 7 + random.nextInt(6);
+        for (int b = 0; b < basinCount; b++) {
+            int cx = 12 + random.nextInt(SIZE - 24);
+            int cz = 12 + random.nextInt(SIZE - 24);
+            int radiusX = 5 + random.nextInt(6);
+            int radiusZ = 5 + random.nextInt(6);
+            int depth = 3 + random.nextInt(5);
+            int minX = Math.max(1, cx - radiusX - 2);
+            int maxX = Math.min(SIZE - 2, cx + radiusX + 2);
+            int minZ = Math.max(1, cz - radiusZ - 2);
+            int maxZ = Math.min(SIZE - 2, cz + radiusZ + 2);
+            int baseHeight = heights[cx][cz];
+            int floor = WATER_LEVEL - depth;
+            if (floor < 3) floor = 3;
 
-        for (int sx = 0; sx < SIZE; sx++) {
-            for (int sz = 0; sz < SIZE; sz++) {
-                if (visitedBasins[sx][sz] || heights[sx][sz] >= WATER_LEVEL) continue;
+            for (int x = minX; x <= maxX; x++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    float dx = (float) (x - cx) / (float) radiusX;
+                    float dz = (float) (z - cz) / (float) radiusZ;
+                    float distance = dx * dx + dz * dz;
+                    int edgeJitter = hash(x + b * 17, z - b * 11) & 3;
+                    float edge = 1.0f + (edgeJitter - 1) * 0.055f;
+                    if (distance > edge * edge) continue;
 
-                int head = 0;
-                int tail = 0;
-                int lowest = HEIGHT;
-                boolean touchesEdge = false;
-                int start = sx * SIZE + sz;
-                queue[tail++] = (short) start;
-                visitedBasins[sx][sz] = true;
-
-                while (head < tail) {
-                    int index = queue[head++] & 0xFFFF;
-                    int x = index / SIZE;
-                    int z = index % SIZE;
-                    int h = heights[x][z];
-                    if (h < lowest) lowest = h;
-                    if (x == 0 || z == 0 || x == SIZE - 1 || z == SIZE - 1) {
-                        touchesEdge = true;
+                    float normalized = (float) Math.sqrt(distance);
+                    // The inner bowl rises toward the waterline, creating a
+                    // broad pool instead of a tiny puddle at the center.
+                    int h = floor + (int) (normalized * (depth + 2));
+                    if (normalized > 0.82f) {
+                        h += (int) ((normalized - 0.82f) * 11.0f);
                     }
-
-                    if (x > 0) tail = enqueueLowland(x - 1, z, queue, tail);
-                    if (x + 1 < SIZE) tail = enqueueLowland(x + 1, z, queue, tail);
-                    if (z > 0) tail = enqueueLowland(x, z - 1, queue, tail);
-                    if (z + 1 < SIZE) tail = enqueueLowland(x, z + 1, queue, tail);
-                }
-
-                boolean basin = !touchesEdge && tail >= minimumArea
-                    && lowest <= WATER_LEVEL - minimumDepth;
-                if (basin) {
-                    for (int i = 0; i < tail; i++) {
-                        int index = queue[i] & 0xFFFF;
-                        waterBasins[index / SIZE][index % SIZE] = true;
-                    }
+                    h += hash(x + b * 29, z + b * 7) & 1;
+                    int rimHeight = Math.max(WATER_LEVEL + 1, baseHeight);
+                    if (h > rimHeight) h = rimHeight;
+                    if (h < 2) h = 2;
+                    heights[x][z] = (short) h;
+                    waterBasins[x][z] = h < WATER_LEVEL && distance <= 0.82f;
                 }
             }
         }
-    }
-
-    private int enqueueLowland(int x, int z, short[] queue, int tail) {
-        if (!visitedBasins[x][z] && heights[x][z] < WATER_LEVEL) {
-            visitedBasins[x][z] = true;
-            queue[tail++] = (short) (x * SIZE + z);
-        }
-        return tail;
     }
 
     int getHeight(int x, int z) {
@@ -167,7 +160,7 @@ final class TerrainGenerator {
     }
 
     private int hash(int x, int z) {
-        int n = x * 374761393 + z * 668265263 + 0x51ED270B;
+        int n = x * 374761393 + z * 668265263 + seed + 0x51ED270B;
         n = (n ^ (n >>> 13)) * 1274126177;
         n ^= n >>> 16;
         return (n & 2047) - 1024;
