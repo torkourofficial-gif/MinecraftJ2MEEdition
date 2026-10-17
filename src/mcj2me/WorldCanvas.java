@@ -814,32 +814,40 @@ final class WorldCanvas extends Canvas implements Runnable {
         int centerZ = ((int) cameraZ) / CHUNK;
         if (centerX == loadedCenterX && centerZ == loadedCenterZ) return;
 
+        // Keep meshes that are still inside the moving 3x3 window. Rebuilding
+        // every terrain and water chunk on each 16-block step caused a large
+        // CPU/GC spike on small CLDC devices even though most chunks were unchanged.
         for (int x = 0; x < 8; x++) {
             for (int z = 0; z < 8; z++) {
-                Mesh old = activeChunks[x][z];
-                if (old != null) {
-                    terrainGroup.removeChild(old);
-                    activeChunks[x][z] = null;
-                }
-                Mesh oldWater = activeWaterChunks[x][z];
-                if (oldWater != null) {
-                    waterGroup.removeChild(oldWater);
-                    activeWaterChunks[x][z] = null;
-                }
-            }
-        }
-        for (int cx = centerX - RADIUS; cx <= centerX + RADIUS; cx++) {
-            for (int cz = centerZ - RADIUS; cz <= centerZ + RADIUS; cz++) {
-                if (cx >= 0 && cz >= 0 && cx < 8 && cz < 8) {
-                    Mesh mesh = buildChunk(cx, cz);
-                    if (mesh != null) {
-                        activeChunks[cx][cz] = mesh;
-                        terrainGroup.addChild(mesh);
+                boolean wanted = Math.abs(x - centerX) <= RADIUS
+                    && Math.abs(z - centerZ) <= RADIUS;
+                if (!wanted) {
+                    Mesh old = activeChunks[x][z];
+                    if (old != null) {
+                        terrainGroup.removeChild(old);
+                        activeChunks[x][z] = null;
                     }
-                    Mesh waterMesh = buildWaterChunk(cx, cz);
-                    if (waterMesh != null) {
-                        activeWaterChunks[cx][cz] = waterMesh;
-                        waterGroup.addChild(waterMesh);
+                    Mesh oldWater = activeWaterChunks[x][z];
+                    if (oldWater != null) {
+                        waterGroup.removeChild(oldWater);
+                        activeWaterChunks[x][z] = null;
+                    }
+                } else {
+                    // The absolute chunk index is also the cache key. Existing
+                    // meshes remain valid until terrain is explicitly edited.
+                    if (activeChunks[x][z] == null) {
+                        Mesh mesh = buildChunk(x, z);
+                        if (mesh != null) {
+                            activeChunks[x][z] = mesh;
+                            terrainGroup.addChild(mesh);
+                        }
+                    }
+                    if (activeWaterChunks[x][z] == null) {
+                        Mesh waterMesh = buildWaterChunk(x, z);
+                        if (waterMesh != null) {
+                            activeWaterChunks[x][z] = waterMesh;
+                            waterGroup.addChild(waterMesh);
+                        }
                     }
                 }
             }
