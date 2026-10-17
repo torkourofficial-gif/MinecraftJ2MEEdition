@@ -177,7 +177,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         world.setBackground(background);
         Fog distanceFog = new Fog();
         distanceFog.setColor(0xB6CBE0);
-        distanceFog.setLinear(38.0f, 118.0f);
+        distanceFog.setLinear(20.0f, 52.0f);
         world.setFog(distanceFog);
 
         Light ambient = new Light();
