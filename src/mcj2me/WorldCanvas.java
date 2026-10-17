@@ -1926,11 +1926,12 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean placeDecoration(int type, float x, float y, float z) {
         int variant = type - BLOCK_TORCH;
         if (variant < 0 || variant >= decorationBuffers.length) return false;
-        Mesh mesh = new Mesh(decorationBuffers[variant], decorationTriangles, decorationAppearances[variant]);
+        Mesh mesh = type == BLOCK_DOOR
+            ? createDoorMesh(decorationAppearances[variant])
+            : new Mesh(decorationBuffers[variant], decorationTriangles, decorationAppearances[variant]);
         if (type == BLOCK_TORCH) mesh.setScale(0.18f, 0.58f, 1.0f);
-        else if (type == BLOCK_DOOR) mesh.setScale(0.48f, 2.0f, 1.0f);
         else if (type == BLOCK_SAPLING) mesh.setScale(0.48f, 0.62f, 1.0f);
-        else mesh.setScale(0.38f, 0.48f, 1.0f);
+        else if (type != BLOCK_DOOR) mesh.setScale(0.38f, 0.48f, 1.0f);
         mesh.setOrientation(yaw, 0.0f, 1.0f, 0.0f);
         mesh.setTranslation(x, y, z);
         decorationGroup.addChild(mesh);
@@ -1943,6 +1944,71 @@ final class WorldCanvas extends Canvas implements Runnable {
         decorationYaw[at] = yaw;
         decorationOpen[at] = false;
         return true;
+    }
+
+    /**
+     * Build a proper two-block-tall door from the two adjacent 16x16 door
+     * atlas tiles: lower half at BLOCK_DOOR's tile and upper half immediately
+     * to its right. The panel is 1 block wide and 3/16 block thick.
+     */
+    private Mesh createDoorMesh(Appearance appearance) {
+        final int quadCount = 8;
+        short[] positions = new short[quadCount * 12];
+        short[] texCoords = new short[quadCount * 8];
+        int v = 0;
+        int doorX = BLOCK_TILE_X[BLOCK_DOOR], doorY = BLOCK_TILE_Y[BLOCK_DOOR];
+        int plankX = BLOCK_TILE_X[11], plankY = BLOCK_TILE_Y[11];
+
+        // Front and back: two separately textured 1x1 panels per side.
+        v = appendDoorQuad(positions, texCoords, v,
+            -8,0,-1, -8,16,-1, 8,0,-1, 8,16,-1, doorX,doorY);
+        v = appendDoorQuad(positions, texCoords, v,
+            -8,16,-1, -8,32,-1, 8,16,-1, 8,32,-1, doorX+1,doorY);
+        v = appendDoorQuad(positions, texCoords, v,
+            8,0,1, 8,16,1, -8,0,1, -8,16,1, doorX,doorY);
+        v = appendDoorQuad(positions, texCoords, v,
+            8,16,1, 8,32,1, -8,16,1, -8,32,1, doorX+1,doorY);
+
+        // Narrow edges use the plank tile, with the top/bottom capped.
+        v = appendDoorQuad(positions, texCoords, v,
+            -8,0,1, -8,32,1, -8,0,-1, -8,32,-1, plankX,plankY);
+        v = appendDoorQuad(positions, texCoords, v,
+            8,0,-1, 8,32,-1, 8,0,1, 8,32,1, plankX,plankY);
+        v = appendDoorQuad(positions, texCoords, v,
+            -8,32,-1, -8,32,1, 8,32,-1, 8,32,1, plankX,plankY);
+        v = appendDoorQuad(positions, texCoords, v,
+            -8,0,1, -8,0,-1, 8,0,1, 8,0,-1, plankX,plankY);
+
+        VertexArray pa = new VertexArray(v, 3, 2);
+        pa.set(0, v, positions);
+        VertexArray ta = new VertexArray(v, 2, 2);
+        ta.set(0, v, texCoords);
+        VertexBuffer vb = new VertexBuffer();
+        vb.setPositions(pa, 1.0f / 16.0f, null);
+        vb.setTexCoords(0, ta, 1.0f / 256.0f, null);
+        int[] stripLengths = {4,4,4,4,4,4,4,4};
+        int[] indices = new int[v];
+        for (int i=0; i<v; i++) indices[i]=i;
+        TriangleStripArray triangles = new TriangleStripArray(indices, stripLengths);
+        return new Mesh(vb, triangles, appearance);
+    }
+
+    private int appendDoorQuad(short[] positions, short[] texCoords, int vertex,
+                               int x0,int y0,int z0, int x1,int y1,int z1,
+                               int x2,int y2,int z2, int x3,int y3,int z3,
+                               int tileX,int tileY) {
+        int p=vertex*3;
+        positions[p]=(short)x0; positions[p+1]=(short)y0; positions[p+2]=(short)z0;
+        positions[p+3]=(short)x1; positions[p+4]=(short)y1; positions[p+5]=(short)z1;
+        positions[p+6]=(short)x2; positions[p+7]=(short)y2; positions[p+8]=(short)z2;
+        positions[p+9]=(short)x3; positions[p+10]=(short)y3; positions[p+11]=(short)z3;
+        int t=vertex*2, u0=tileX*16+1, u1=(tileX+1)*16-1;
+        int v0=tileY*16+1, v1=(tileY+1)*16-1;
+        texCoords[t]=(short)u0; texCoords[t+1]=(short)v1;
+        texCoords[t+2]=(short)u0; texCoords[t+3]=(short)v0;
+        texCoords[t+4]=(short)u1; texCoords[t+5]=(short)v1;
+        texCoords[t+6]=(short)u1; texCoords[t+7]=(short)v0;
+        return vertex+4;
     }
 
     private void toggleDoor(int index) {
