@@ -2083,13 +2083,13 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         // Front and back: two separately textured 1x1 panels per side.
         v = appendDoorQuad(positions, texCoords, v,
-            -16,0,-3, -16,32,-3, 16,0,-3, 16,32,-3, doorX,doorY);
+            -16,0,-3, -16,32,-3, 16,0,-3, 16,32,-3, doorX,doorY+1);
         v = appendDoorQuad(positions, texCoords, v,
-            -16,32,-3, -16,64,-3, 16,32,-3, 16,64,-3, doorX+1,doorY);
+            -16,32,-3, -16,64,-3, 16,32,-3, 16,64,-3, doorX,doorY);
         v = appendDoorQuad(positions, texCoords, v,
-            16,0,3, 16,32,3, -16,0,3, -16,32,3, doorX,doorY);
+            16,0,3, 16,32,3, -16,0,3, -16,32,3, doorX,doorY+1);
         v = appendDoorQuad(positions, texCoords, v,
-            16,32,3, 16,64,3, -16,32,3, -16,64,3, doorX+1,doorY);
+            16,32,3, 16,64,3, -16,32,3, -16,64,3, doorX,doorY);
 
         // Narrow edges use the plank tile, with the top/bottom capped.
         v = appendDoorQuad(positions, texCoords, v,
