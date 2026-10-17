@@ -241,7 +241,7 @@ final class PassiveMob {
             else if (part == 1) { x=28; y=8; w=10; h=8; d=8; }// body
             else { x=0; y=16; w=4; h=6; d=4; }                  // legs
         } else {
-            if (part == 0) { x=0; y=0; w=8; h=8; d=6; }          // head
+            if (part == 0) { x=0; y=0; w=6; h=6; d=8; }          // classic sheep head is 6x6x8
             else if (part == 1) { x=28; y=8; w=8; h=16; d=6; }// body
             else { x=0; y=16; w=4; h=12; d=4; }                // legs
         }
@@ -256,26 +256,12 @@ final class PassiveMob {
     }
 
     static float directionAngle(float dx, float dz) {
-        float ax = dx < 0.0f ? -dx : dx;
-        float az = dz < 0.0f ? -dz : dz;
-
-        if (ax < 0.001f && az < 0.001f) {
+        if (dx > -0.001f && dx < 0.001f && dz > -0.001f && dz < 0.001f) {
             return 0.0f;
         }
-
-        if (ax > az * 2.0f) {
-            return dx > 0.0f ? 90.0f : -90.0f;
-        }
-
-        if (az > ax * 2.0f) {
-            return dz > 0.0f ? 180.0f : 0.0f;
-        }
-
-        if (dx > 0.0f) {
-            return dz > 0.0f ? 135.0f : 45.0f;
-        }
-
-        return dz > 0.0f ? -135.0f : -45.0f;
+        // Models face -Z by default. Invert X for M3G's Y-axis rotation
+        // so the mob looks where its movement vector points, not behind it.
+        return (float)(Math.atan2(-dx, -dz) * 180.0 / Math.PI);
     }
 
     static float hitDistance(float px, float py, float pz, float yaw, float pitch,
