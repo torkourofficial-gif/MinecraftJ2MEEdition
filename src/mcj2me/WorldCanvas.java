@@ -66,7 +66,6 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
     private int tntFuseTicks = 0, tntX = -1, tntZ = -1, tntFlashCounter = 0;
     private boolean tntFlashOn = false;
-    private int explosionFlashTicks = 0;
     private static final int BLOCK_PARTICLE_COUNT = 12;
     private static final int BLOCK_PARTICLE_LIFE = 20;
     private final float[] blockParticleX = new float[BLOCK_PARTICLE_COUNT];
@@ -272,10 +271,6 @@ final class WorldCanvas extends Canvas implements Runnable {
             g.drawString(e.toString(), 4, 24, Graphics.TOP | Graphics.LEFT);
         } finally { if (targetBound) graphics3D.releaseTarget(); }
         drawUnderwaterOverlay(g);
-        if (explosionFlashTicks > 0) {
-            g.setColor(0xFFF1B0);
-            g.fillRect(0, 0, getWidth(), getHeight());
-        }
         drawHud(g);
     }
 
@@ -1052,7 +1047,6 @@ final class WorldCanvas extends Canvas implements Runnable {
 
 
     private int sideTile(int topType, int layerType, int y, int height) {
-        if (topType == TerrainGenerator.BLOCK_TNT && tntFuseTicks > 0 && tntFlashOn) return 9;
         if (topType == TerrainGenerator.BLOCK_GRASS && y == height - 1) return 3;
         if (layerType == TerrainGenerator.BLOCK_WOOD) return 4;
         if (layerType < 0 || layerType >= BLOCK_TILE_X.length) layerType = TerrainGenerator.BLOCK_STONE;
@@ -1060,7 +1054,6 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private int sideTileY(int topType, int layerType, int y, int height) {
-        if (topType == TerrainGenerator.BLOCK_TNT && tntFuseTicks > 0 && tntFlashOn) return 0;
         if (topType == TerrainGenerator.BLOCK_GRASS && y == height - 1) return 0;
         if (layerType == TerrainGenerator.BLOCK_WOOD) return 1;
         if (layerType < 0 || layerType >= BLOCK_TILE_Y.length) layerType = TerrainGenerator.BLOCK_STONE;
@@ -1153,6 +1146,30 @@ final class WorldCanvas extends Canvas implements Runnable {
         particleTicks = BLOCK_PARTICLE_LIFE;
     }
 
+    private void spawnExplosionDebris(int[] types, float[] xs, float[] ys, float[] zs) {
+        for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
+            int type = types[i];
+            if (type < 0 || type >= blockParticleAppearances.length) type = TerrainGenerator.BLOCK_DIRT;
+            double angle = (Math.PI * 2.0 * i / BLOCK_PARTICLE_COUNT)
+                + ((i % 3) - 1) * 0.21;
+            float horizontalSpeed = 0.055f + (i % 4) * 0.018f;
+            blockParticleX[i] = xs[i];
+            blockParticleY[i] = ys[i];
+            blockParticleZ[i] = zs[i];
+            blockParticleVX[i] = (float) Math.cos(angle) * horizontalSpeed;
+            blockParticleVZ[i] = (float) Math.sin(angle) * horizontalSpeed;
+            blockParticleVY[i] = 0.075f + (i % 4) * 0.018f;
+            blockParticleSize[i] = 0.08f + (i % 3) * 0.025f;
+            blockParticleMeshes[i].setAppearance(0, blockParticleAppearances[type]);
+            blockParticleMeshes[i].setScale(blockParticleSize[i], blockParticleSize[i],
+                                             blockParticleSize[i]);
+            blockParticleMeshes[i].setOrientation((i * 37) % 360, 1.0f, 1.0f, 0.5f);
+            blockParticleMeshes[i].setTranslation(xs[i], ys[i], zs[i]);
+            blockParticleMeshes[i].setRenderingEnable(true);
+        }
+        particleTicks = BLOCK_PARTICLE_LIFE;
+    }
+
     private void updateBlockParticles() {
         if (particleTicks <= 0) return;
         for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
@@ -1181,7 +1198,6 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void updateTntFuse() {
-        if (explosionFlashTicks > 0) explosionFlashTicks--;
         if (tntFuseTicks <= 0) return;
         tntFuseTicks--;
         tntFlashCounter++;
@@ -1196,9 +1212,29 @@ final class WorldCanvas extends Canvas implements Runnable {
     private void explodeTnt() {
         int cx = tntX, cz = tntZ;
         tntX = -1; tntZ = -1; tntFlashOn = false; tntFlashCounter = 0;
-        explosionFlashTicks = 8;
         if (cx < 0 || cz < 0) return;
         int radius = 4;
+        // Scatter one shared burst of debris across the affected blocks. The
+        // particle pool is small on CLDC devices, so each particle samples a
+        // different destroyed column instead of restarting the pool per block.
+        int[] debrisTypes = new int[BLOCK_PARTICLE_COUNT];
+        float[] debrisX = new float[BLOCK_PARTICLE_COUNT];
+        float[] debrisY = new float[BLOCK_PARTICLE_COUNT];
+        float[] debrisZ = new float[BLOCK_PARTICLE_COUNT];
+        for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
+            double angle = (Math.PI * 2.0 * i / BLOCK_PARTICLE_COUNT)
+                + ((i % 3) - 1) * 0.21;
+            int offset = 1 + (i % radius);
+            int bx = Math.max(1, Math.min(TerrainGenerator.SIZE - 2,
+                cx + (int)Math.round(Math.cos(angle) * offset)));
+            int bz = Math.max(1, Math.min(TerrainGenerator.SIZE - 2,
+                cz + (int)Math.round(Math.sin(angle) * offset)));
+            int oldHeight = terrain.getHeight(bx, bz);
+            debrisTypes[i] = terrain.getTopType(bx, bz);
+            debrisX[i] = bx + 0.5f;
+            debrisY[i] = oldHeight + 0.35f;
+            debrisZ[i] = bz + 0.5f;
+        }
         for (int x = Math.max(1, cx-radius); x <= Math.min(TerrainGenerator.SIZE-2, cx+radius); x++) {
             for (int z = Math.max(1, cz-radius); z <= Math.min(TerrainGenerator.SIZE-2, cz+radius); z++) {
                 int dx=x-cx, dz=z-cz, d2=dx*dx+dz*dz;
@@ -1211,7 +1247,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                     (nh < 20 ? TerrainGenerator.BLOCK_STONE : TerrainGenerator.BLOCK_DIRT));
             }
         }
-        spawnBlockParticles(TerrainGenerator.BLOCK_TNT,cx+0.5f,terrain.getHeight(cx,cz)+0.5f,cz+0.5f);
+        spawnExplosionDebris(debrisTypes, debrisX, debrisY, debrisZ);
         reloadEditedChunks();
         resolvePlayerAfterTerrainEdit();
     }
