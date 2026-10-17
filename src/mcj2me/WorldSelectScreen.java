@@ -42,13 +42,13 @@ final class WorldSelectScreen implements CommandListener {
             if (selected == 0 || command == create) { askName(); return; }
             if (selected > 0 && selected <= worlds.length) {
                 WorldStore.WorldInfo world = worlds[selected - 1];
-                owner.startGame(world.name, world.seed);
+                owner.startGame(world.name, world.seed, world.id);
             }
         } else if (displayable instanceof TextBox) {
             if (command == create) {
                 try {
                     WorldStore.WorldInfo world = WorldStore.create(((TextBox)displayable).getString());
-                    owner.startGame(world.name, world.seed);
+                    owner.startGame(world.name, world.seed, world.id);
                 } catch (Exception e) {
                     owner.showWorldError("Could not save this world.");
                 }
