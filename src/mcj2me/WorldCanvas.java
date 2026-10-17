@@ -30,7 +30,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final float WATER_ALPHA = 0.66f;
 
     private final IndevViewerMIDlet midlet;
-    private final TerrainGenerator terrain = new TerrainGenerator();
+    private final TerrainGenerator terrain;
     private Graphics3D graphics3D;
     private World world;
     private Group terrainGroup;
@@ -168,9 +168,14 @@ final class WorldCanvas extends Canvas implements Runnable {
     private float yaw = 0.0f;
     private float pitch = -28.0f;
     private String errorMessage;
+    private final String worldName;
+    private final int worldSeed;
 
-    WorldCanvas(IndevViewerMIDlet owner) {
+    WorldCanvas(IndevViewerMIDlet owner, String name, int seed) {
         midlet = owner;
+        worldName = name;
+        worldSeed = seed;
+        terrain = new TerrainGenerator(seed);
         setFullScreenMode(true);
         try {
             setupScene();
@@ -180,6 +185,11 @@ final class WorldCanvas extends Canvas implements Runnable {
             errorMessage = "M3G setup failed: " + e.toString();
         }
     }
+
+    String getWorldName() { return worldName; }
+    int getWorldSeed() { return worldSeed; }
+    boolean hasSetupError() { return errorMessage != null; }
+    String getSetupError() { return errorMessage; }
 
     private void setupScene() throws Exception {
         // Initialize M3G objects inside the guarded setup path so API/linkage
