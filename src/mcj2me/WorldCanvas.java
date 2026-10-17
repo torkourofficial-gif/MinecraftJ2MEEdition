@@ -60,10 +60,19 @@ final class WorldCanvas extends Canvas implements Runnable {
     private final int[] inventory = {64, 64, 64, 64, 64};
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
     private static final int BLOCK_PARTICLE_COUNT = 12;
+    private static final int BLOCK_PARTICLE_LIFE = 20;
+    private final float[] blockParticleX = new float[BLOCK_PARTICLE_COUNT];
+    private final float[] blockParticleY = new float[BLOCK_PARTICLE_COUNT];
+    private final float[] blockParticleZ = new float[BLOCK_PARTICLE_COUNT];
     private final float[] blockParticleVX = new float[BLOCK_PARTICLE_COUNT];
     private final float[] blockParticleVY = new float[BLOCK_PARTICLE_COUNT];
-    private final int[] blockParticleSize = new int[BLOCK_PARTICLE_COUNT];
-    private int blockParticleColor = 0xB5A06A;
+    private final float[] blockParticleVZ = new float[BLOCK_PARTICLE_COUNT];
+    private final float[] blockParticleSize = new float[BLOCK_PARTICLE_COUNT];
+    private final Mesh[] blockParticleMeshes = new Mesh[BLOCK_PARTICLE_COUNT];
+    private Group blockParticleGroup;
+    private VertexBuffer blockParticleBuffer;
+    private TriangleStripArray blockParticleTriangles;
+    private Appearance[] blockParticleAppearances = new Appearance[5];
     private float cameraX = 64.0f;
     private float cameraY;
     private float velocityX, velocityZ, verticalVelocity;
@@ -96,6 +105,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         terrainGroup = new Group();
         waterGroup = new Group();
         cloudGroup = new Group();
+        blockParticleGroup = new Group();
         camera = new Camera();
 
         Image atlas = Image.createImage("/mcj2me/textures.png");
@@ -172,6 +182,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         Mesh horizonSea = buildHorizonSea();
         if (horizonSea != null) waterGroup.addChild(horizonSea);
         world.addChild(cloudGroup);
+        setupBlockParticles();
+        world.addChild(blockParticleGroup);
         updateCamera();
         updateChunks();
     }
@@ -302,16 +314,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 g.drawArc(bx, by, 2 + (splashTicks % 3), 2 + (splashTicks % 3), 0, 360);
             }
         }
-        if (particleTicks > 0) {
-            int age = 10 - particleTicks;
-            g.setColor(blockParticleColor);
-            for (int p = 0; p < BLOCK_PARTICLE_COUNT; p++) {
-                int px = cx + Math.round(blockParticleVX[p] * age);
-                int py = cy + Math.round(blockParticleVY[p] * age + 0.22f * age * age);
-                int size = blockParticleSize[p];
-                g.fillRect(px, py, size, size);
-            }
-        }
+
     }
 
     protected synchronized void keyPressed(int keyCode) {
@@ -518,7 +521,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
 
         if (actionCooldown > 0) actionCooldown--;
-        if (particleTicks > 0) particleTicks--;
+        updateBlockParticles();
         if (changed) updateCamera();
         if (positionChanged) updateChunks();
     }
@@ -950,33 +953,98 @@ final class WorldCanvas extends Canvas implements Runnable {
         return vertex;
     }
     /**
-     * Spawn small screen-space block fragments at the crosshair, with a burst
-     * and gravity arc inspired by classic Minecraft block-breaking particles.
-     * Kept in MIDP Graphics so this remains cheap on old J2ME devices.
+     * Build one shared 3D cube mesh and lightweight per-particle scene nodes.
+     * Particles are tiny colored cubes in world space, not HUD/crosshair pixels.
      */
-    private void spawnBlockParticles(int blockType) {
-        if (blockType == 0) blockParticleColor = 0x7E9D43;       // grass
-        else if (blockType == 1) blockParticleColor = 0x8B6545;  // dirt
-        else if (blockType == 2) blockParticleColor = 0x929292;  // stone
-        else if (blockType == 3) blockParticleColor = 0xA77A45;  // wood
-        else blockParticleColor = 0x477D39;                      // leaves
+    private void setupBlockParticles() {
+        short[] positions = {
+            -1, -1,  1,  -1,  1,  1,   1, -1,  1,   1,  1,  1,
+             1, -1, -1,   1,  1, -1,  -1, -1, -1,  -1,  1, -1,
+            -1, -1, -1,  -1,  1, -1,  -1, -1,  1,  -1,  1,  1,
+             1, -1,  1,   1,  1,  1,   1, -1, -1,   1,  1, -1,
+            -1,  1,  1,  -1,  1, -1,   1,  1,  1,   1,  1, -1,
+            -1, -1, -1,  -1, -1,  1,   1, -1, -1,   1, -1,  1
+        };
+        int[] indices = new int[24];
+        int[] stripLengths = {4, 4, 4, 4, 4, 4};
+        for (int i = 0; i < 24; i++) indices[i] = i;
+        VertexArray vertexArray = new VertexArray(24, 3, 2);
+        vertexArray.set(0, 24, positions);
+        blockParticleBuffer = new VertexBuffer();
+        blockParticleBuffer.setPositions(vertexArray, 0.5f, null);
+        blockParticleTriangles = new TriangleStripArray(indices, stripLengths);
 
-        for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
-            // Evenly distributed directions with slight deterministic variation.
-            double angle = (Math.PI * 2.0 * i / BLOCK_PARTICLE_COUNT)
-                + ((i % 3) - 1) * 0.13;
-            float speed = 0.8f + (i % 4) * 0.28f;
-            blockParticleVX[i] = (float) Math.cos(angle) * speed;
-            blockParticleVY[i] = (float) Math.sin(angle) * speed - 0.7f;
-            blockParticleSize[i] = 2 + (i % 3 == 0 ? 1 : 0);
+        int[] colors = {0x7E9D43, 0x8B6545, 0x929292, 0xA77A45, 0x477D39};
+        for (int t = 0; t < colors.length; t++) {
+            Material material = new Material();
+            material.setColor(Material.AMBIENT, colors[t]);
+            material.setColor(Material.DIFFUSE, colors[t]);
+            material.setColor(Material.EMISSIVE, colors[t] & 0x003F3F3F);
+            Appearance appearance = new Appearance();
+            appearance.setMaterial(material);
+            PolygonMode pm = new PolygonMode();
+            pm.setCulling(PolygonMode.CULL_NONE);
+            pm.setShading(PolygonMode.SHADE_FLAT);
+            appearance.setPolygonMode(pm);
+            blockParticleAppearances[t] = appearance;
         }
-        particleTicks = 10;
+        for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
+            blockParticleMeshes[i] = new Mesh(blockParticleBuffer,
+                blockParticleTriangles, blockParticleAppearances[0]);
+            blockParticleMeshes[i].setRenderingEnable(false);
+            blockParticleGroup.addChild(blockParticleMeshes[i]);
+        }
+    }
+
+    private void spawnBlockParticles(int blockType, float x, float y, float z) {
+        int type = blockType;
+        if (type < 0 || type >= blockParticleAppearances.length) type = 1;
+        for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
+            double angle = (Math.PI * 2.0 * i / BLOCK_PARTICLE_COUNT)
+                + ((i % 3) - 1) * 0.17;
+            float horizontalSpeed = 0.035f + (i % 4) * 0.012f;
+            blockParticleX[i] = x;
+            blockParticleY[i] = y;
+            blockParticleZ[i] = z;
+            blockParticleVX[i] = (float) Math.cos(angle) * horizontalSpeed;
+            blockParticleVZ[i] = (float) Math.sin(angle) * horizontalSpeed;
+            blockParticleVY[i] = 0.045f + (i % 4) * 0.012f;
+            blockParticleSize[i] = 0.07f + (i % 3) * 0.025f;
+            blockParticleMeshes[i].setAppearance(blockParticleAppearances[type]);
+            blockParticleMeshes[i].setScale(blockParticleSize[i], blockParticleSize[i],
+                                             blockParticleSize[i]);
+            blockParticleMeshes[i].setOrientation((i * 37) % 360, 1.0f, 1.0f, 0.5f);
+            blockParticleMeshes[i].setTranslation(x, y, z);
+            blockParticleMeshes[i].setRenderingEnable(true);
+        }
+        particleTicks = BLOCK_PARTICLE_LIFE;
+    }
+
+    private void updateBlockParticles() {
+        if (particleTicks <= 0) return;
+        for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
+            blockParticleX[i] += blockParticleVX[i];
+            blockParticleY[i] += blockParticleVY[i];
+            blockParticleZ[i] += blockParticleVZ[i];
+            blockParticleVY[i] -= 0.0045f;
+            blockParticleMeshes[i].setTranslation(blockParticleX[i],
+                blockParticleY[i], blockParticleZ[i]);
+            blockParticleMeshes[i].setOrientation((i * 37 + (BLOCK_PARTICLE_LIFE - particleTicks) * 13)
+                % 360, 1.0f, 1.0f, 0.5f);
+        }
+        particleTicks--;
+        if (particleTicks <= 0) {
+            for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
+                blockParticleMeshes[i].setRenderingEnable(false);
+            }
+        }
     }
 
     private void breakBlock() {
         int[] leafHit = raycastLeafBlock();
         if (leafHit != null && terrain.removeLeafBlock(leafHit[0], leafHit[1], leafHit[2])) {
-            spawnBlockParticles(4);
+            spawnBlockParticles(4, leafHit[0] + 0.5f, leafHit[1] + 0.5f,
+                leafHit[2] + 0.5f);
             reloadEditedChunks();
             updateCamera();
             return;
@@ -989,7 +1057,7 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         int type = terrain.getTopType(x, z);
         if (type >= 0 && type < inventory.length) inventory[type]++;
-        spawnBlockParticles(type);
+        spawnBlockParticles(type, x + 0.5f, h - 0.5f, z + 0.5f);
         terrain.setHeight(x, z, h - 1);
         terrain.setTopType(x, z, 1);
         reloadEditedChunks();
