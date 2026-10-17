@@ -18,13 +18,13 @@ public final class IndevViewerMIDlet extends MIDlet {
         Display.getDisplay(this).setCurrent(titleScreen);
         titleScreen.start();
     }
-    void startGame() {
+    public void startGame() {
         if (titleScreen!=null) titleScreen.stop();
         if (worldCanvas==null) worldCanvas=new WorldCanvas(this);
         Display.getDisplay(this).setCurrent(worldCanvas);
         worldCanvas.start();
     }
-    void quitGame() {
+    public void quitGame() {
         if (titleScreen!=null) titleScreen.stop();
         if (worldCanvas!=null) worldCanvas.stop();
         notifyDestroyed();
