@@ -2089,9 +2089,22 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean placeDecoration(int type, float x, float y, float z) {
         int variant = type - BLOCK_TORCH;
         if (variant < 0 || variant >= decorationBuffers.length) return false;
-        Mesh mesh = type == BLOCK_DOOR
-            ? createDoorMesh(decorationAppearances[variant])
-            : new Mesh(decorationBuffers[variant], decorationTriangles, decorationAppearances[variant]);
+        Mesh mesh;
+        if (type == BLOCK_DOOR) {
+            // Keep door placement from silently failing if a handset's M3G
+            // implementation rejects the multi-strip custom mesh. Fall back
+            // to the already-supported decoration quad, scaled to door height.
+            try {
+                mesh = createDoorMesh(decorationAppearances[variant]);
+            } catch (RuntimeException meshError) {
+                mesh = new Mesh(decorationBuffers[variant], decorationTriangles,
+                    decorationAppearances[variant]);
+                mesh.setScale(0.48f, 1.0f, 1.0f);
+            }
+        } else {
+            mesh = new Mesh(decorationBuffers[variant], decorationTriangles,
+                decorationAppearances[variant]);
+        }
         if (type == BLOCK_TORCH) mesh.setScale(0.18f, 0.58f, 1.0f);
         else if (type == BLOCK_SAPLING) mesh.setScale(0.48f, 0.62f, 1.0f);
         else if (type != BLOCK_DOOR) mesh.setScale(0.38f, 0.48f, 1.0f);
