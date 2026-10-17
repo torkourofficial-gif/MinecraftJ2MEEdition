@@ -46,6 +46,8 @@ final class PassiveMob {
     }
 
 
+    void setEnabled(boolean enabled) { group.setRenderingEnable(enabled); }
+
     void update(float playerX, float playerZ) {
         tick++;
         for (int i = 0; i < mobs.length; i++) {
