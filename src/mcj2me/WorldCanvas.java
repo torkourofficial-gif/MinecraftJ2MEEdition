@@ -759,13 +759,56 @@ final class WorldCanvas extends Canvas implements Runnable {
         return vertex;
     }
     private void breakBlock() {
-        int[] hit=raycastSurface(); if(hit==null)return; int x=hit[0],z=hit[1],h=terrain.getHeight(hit[0],hit[1]); if(h<=1)return;
-        int type=terrain.getTopType(x,z); if(type>=0&&type<inventory.length)inventory[type]++; terrain.setHeight(x,z,h-1); terrain.setTopType(x,z,1);
-        particleTicks=8; loadedCenterX=-99; updateChunks(); cameraY=terrain.getHeight((int)cameraX,(int)cameraZ)+1.65f; updateCamera();
+        int[] hit = raycastSurface();
+        if (hit == null) return;
+        int x = hit[0], z = hit[1], h = terrain.getHeight(x, z);
+        if (h <= 1) return;
+
+        int type = terrain.getTopType(x, z);
+        if (type >= 0 && type < inventory.length) inventory[type]++;
+        terrain.setHeight(x, z, h - 1);
+        terrain.setTopType(x, z, 1);
+        particleTicks = 8;
+        loadedCenterX = -99;
+        updateChunks();
+        resolvePlayerAfterTerrainEdit();
     }
+
     private void placeBlock() {
-        if(inventory[selectedSlot]<=0)return; int[] hit=raycastSurface(); if(hit==null)return; int x=hit[0],z=hit[1],h=terrain.getHeight(hit[0],hit[1]); if(h>=TerrainGenerator.HEIGHT-3)return;
-        terrain.setHeight(x,z,h+1); terrain.setTopType(x,z,selectedSlot); inventory[selectedSlot]--; loadedCenterX=-99; updateChunks(); cameraY=terrain.getHeight((int)cameraX,(int)cameraZ)+1.65f; updateCamera();
+        if (inventory[selectedSlot] <= 0) return;
+        int[] hit = raycastSurface();
+        if (hit == null) return;
+        int x = hit[0], z = hit[1], h = terrain.getHeight(x, z);
+        if (h >= TerrainGenerator.HEIGHT - 3) return;
+
+        terrain.setHeight(x, z, h + 1);
+        terrain.setTopType(x, z, selectedSlot);
+        inventory[selectedSlot]--;
+        loadedCenterX = -99;
+        updateChunks();
+        resolvePlayerAfterTerrainEdit();
+    }
+
+    /**
+     * Keep the current jump/swim trajectory when a distant block is edited.
+     * Only correct the player if the edited terrain has actually moved the
+     * ground into the player's feet, or removed the support under a grounded
+     * player. This avoids snapping the camera to the ground on every edit.
+     */
+    private void resolvePlayerAfterTerrainEdit() {
+        float groundY = terrain.getHeight((int) cameraX, (int) cameraZ) + 1.65f;
+        if (cameraY < groundY) {
+            // A newly raised block intersects the player: place them safely
+            // on top, and cancel only the downward motion into that block.
+            cameraY = groundY;
+            if (verticalVelocity < 0.0f) verticalVelocity = 0.0f;
+            airborne = false;
+        } else if (cameraY > groundY + 0.02f) {
+            // If the block underfoot was removed, begin falling naturally.
+            // Existing upward/downward velocity is deliberately preserved.
+            airborne = true;
+        }
+        updateCamera();
     }
     private int[] raycastSurface() {
         double yr=Math.PI*pitch/180.0,xr=Math.PI*yaw/180.0; float dx=(float)(Math.sin(xr)*Math.cos(yr)),dz=(float)(-Math.cos(xr)*Math.cos(yr)),dy=(float)Math.sin(yr);
