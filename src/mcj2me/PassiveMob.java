@@ -35,7 +35,7 @@ final class PassiveMob {
                 z = Math.min(TerrainGenerator.SIZE - 4, z + 1);
             }
             Appearance appearance = appearances[types[i]];
-            Mesh mesh = createMobMesh(appearance, false);
+            Mesh mesh = createMobMesh(appearance, types[i]);
             Mob mob = new Mob(mesh, appearance, x + 0.5f, z + 0.5f, random);
             mobs[i] = mob;
             group.addChild(mesh);
@@ -73,19 +73,13 @@ final class PassiveMob {
         return true;
     }
 
+    static final int MOB_COW = 0;
+    static final int MOB_PIG = 1;
+    static final int MOB_SHEEP = 2;
+    static final int MOB_ZOMBIE = 3;
+
     static Appearance textureAppearance(Image source) {
-        int sw = source.getWidth(), sh = source.getHeight();
-        int cw = Math.min(8, sw), ch = Math.min(8, sh);
-        int[] sample = new int[cw * ch];
-        source.getRGB(sample, 0, cw, 0, 0, cw, ch);
-        int[] pixels = new int[64];
-        for (int y = 0; y < 8; y++) {
-            for (int x = 0; x < 8; x++) {
-                pixels[y * 8 + x] = sample[(y * ch / 8) * cw + (x * cw / 8)];
-            }
-        }
-        Image patch = Image.createRGBImage(pixels, 8, 8, true);
-        Texture2D texture = new Texture2D(new Image2D(Image2D.RGBA, patch));
+        Texture2D texture = new Texture2D(new Image2D(Image2D.RGBA, source));
         texture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
         texture.setWrapping(Texture2D.WRAP_CLAMP, Texture2D.WRAP_CLAMP);
         Appearance appearance = new Appearance();
@@ -114,30 +108,34 @@ final class PassiveMob {
         return hurtAppearance;
     }
 
-    /** Build a single mesh from six cuboids; coordinates are in half-block units. */
-    static Mesh createMobMesh(Appearance appearance, boolean humanoid) {
+    /** Build low-poly cuboids using the classic 64x32 mob skin atlas. */
+    static Mesh createMobMesh(Appearance appearance, int mobType) {
         int[][] boxes;
-        if (humanoid) {
+        int[] parts;
+        if (mobType == MOB_ZOMBIE) {
             boxes = new int[][] {
                 {-1, 2, -1, 1, 6, 1}, {-1, 6, -1, 1, 8, 1},
                 {-3, 2, -1, -2, 6, 1}, {2, 2, -1, 3, 6, 1},
                 {-1, 0, -1, 0, 2, 1}, {0, 0, -1, 1, 2, 1}
             };
+            parts = new int[] {1, 0, 2, 2, 3, 3};
         } else {
             boxes = new int[][] {
                 {-2, 2, -3, 2, 4, 3}, {-1, 3, -5, 1, 5, -3},
                 {-2, 0, -2, -1, 2, -1}, {1, 0, -2, 2, 2, -1},
                 {-2, 0, 1, -1, 2, 2}, {1, 0, 1, 2, 2, 2}
             };
+            parts = new int[] {1, 0, 2, 2, 2, 2};
         }
+
         int vertexCount = boxes.length * 24;
         short[] positions = new short[vertexCount * 3];
         short[] texCoords = new short[vertexCount * 2];
         int[] indices = new int[vertexCount];
         int[] strips = new int[boxes.length * 6];
         int v = 0, strip = 0;
-        for (int b = 0; b < boxes.length; b++) {
-            int[] q = boxes[b];
+        for (int boxIndex = 0; boxIndex < boxes.length; boxIndex++) {
+            int[] q = boxes[boxIndex];
             int x0=q[0], y0=q[1], z0=q[2], x1=q[3], y1=q[4], z1=q[5];
             int[][] faces = {
                 {x0,y0,z0, x0,y1,z0, x1,y0,z0, x1,y1,z0},
@@ -147,15 +145,30 @@ final class PassiveMob {
                 {x0,y1,z0, x0,y1,z1, x1,y1,z0, x1,y1,z1},
                 {x0,y0,z1, x0,y0,z0, x1,y0,z1, x1,y0,z0}
             };
-            for (int f = 0; f < faces.length; f++) {
-                int[] face = faces[f];
-                for (int c = 0; c < 4; c++) {
-                    positions[v * 3] = (short)face[c * 3];
-                    positions[v * 3 + 1] = (short)face[c * 3 + 1];
-                    positions[v * 3 + 2] = (short)face[c * 3 + 2];
-                    int[] uv = {0, 0, 0, 1, 1, 0, 1, 1};
-                    texCoords[v * 2] = (short)uv[c * 2];
-                    texCoords[v * 2 + 1] = (short)uv[c * 2 + 1];
+            int[][] uv = getFaceUvs(mobType, parts[boxIndex]);
+            for (int faceIndex = 0; faceIndex < faces.length; faceIndex++) {
+                int[] face = faces[faceIndex];
+                int[] rect = uv[faceIndex];
+                for (int corner = 0; corner < 4; corner++) {
+                    positions[v * 3] = (short)face[corner * 3];
+                    positions[v * 3 + 1] = (short)face[corner * 3 + 1];
+                    positions[v * 3 + 2] = (short)face[corner * 3 + 2];
+                    int u, vv;
+                    if (faceIndex == 4) {
+                        u = (corner == 0 || corner == 1) ? rect[0] : rect[2];
+                        vv = (corner == 0 || corner == 2) ? rect[3] : rect[1];
+                    } else if (faceIndex == 5) {
+                        u = (corner == 0 || corner == 2) ? rect[2] : rect[0];
+                        vv = (corner == 0 || corner == 1) ? rect[1] : rect[3];
+                    } else {
+                        u = (corner == 0 || corner == 1) ? rect[0] : rect[2];
+                        vv = (corner == 0 || corner == 2) ? rect[3] : rect[1];
+                        if (faceIndex == 1 || faceIndex == 2) {
+                            u = (corner == 0 || corner == 1) ? rect[2] : rect[0];
+                        }
+                    }
+                    texCoords[v * 2] = (short)(u * 1024 / 64);
+                    texCoords[v * 2 + 1] = (short)(vv * 1024 / 32);
                     indices[v] = v;
                     v++;
                 }
@@ -168,8 +181,39 @@ final class PassiveMob {
         t.set(0, vertexCount, texCoords);
         VertexBuffer buffer = new VertexBuffer();
         buffer.setPositions(p, 0.5f, null);
-        buffer.setTexCoords(0, t, 1.0f, null);
+        buffer.setTexCoords(0, t, 1.0f / 1024.0f, null);
         return new Mesh(buffer, new TriangleStripArray(indices, strips), appearance);
+    }
+
+    /** Returns UV rectangles for front, back, left, right, top and bottom faces. */
+    private static int[][] getFaceUvs(int mobType, int part) {
+        int x, y, w, h, d;
+        if (mobType == MOB_ZOMBIE) {
+            if (part == 0) { x=0; y=0; w=8; h=8; d=8; }          // head
+            else if (part == 1) { x=16; y=16; w=8; h=12; d=4; } // torso
+            else if (part == 2) { x=40; y=16; w=4; h=12; d=4; }// arms
+            else { x=0; y=16; w=4; h=12; d=4; }                // legs
+        } else if (mobType == MOB_COW) {
+            if (part == 0) { x=0; y=0; w=8; h=8; d=6; }          // head
+            else if (part == 1) { x=18; y=4; w=12; h=18; d=10; }// body
+            else { x=0; y=16; w=4; h=12; d=4; }                // legs
+        } else if (mobType == MOB_PIG) {
+            if (part == 0) { x=0; y=0; w=8; h=8; d=8; }          // head
+            else if (part == 1) { x=28; y=8; w=10; h=16; d=8; }// body
+            else { x=0; y=16; w=4; h=6; d=4; }                 // legs
+        } else {
+            if (part == 0) { x=0; y=0; w=8; h=8; d=6; }          // head
+            else if (part == 1) { x=28; y=8; w=8; h=16; d=6; }// body
+            else { x=0; y=16; w=4; h=12; d=4; }                // legs
+        }
+        int[][] rects = new int[6][4];
+        rects[0] = new int[] {x+d, y+d, x+d+w, y+d+h};
+        rects[1] = new int[] {x+d+w+d, y+d, x+d+w+d+w, y+d+h};
+        rects[2] = new int[] {x, y+d, x+d, y+d+h};
+        rects[3] = new int[] {x+d+w, y+d, x+d+w+d, y+d+h};
+        rects[4] = new int[] {x+d, y, x+d+w, y+d};
+        rects[5] = new int[] {x+d+w, y, x+d+w+w, y+d};
+        return rects;
     }
 
     static float hitDistance(float px, float py, float pz, float yaw, float pitch,
