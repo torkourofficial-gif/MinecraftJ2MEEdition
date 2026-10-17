@@ -125,7 +125,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final int[] BLOCK_TILE_Y = {
         0, 0, 0, 1, 3, 1, 2, 2, 3, 1, 0, 0, 4, 1, 0, 3, 5, 0, 0, 0, 5,
         1, 1, 1,
-        6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7
     };
     // 48x48 block icons in gui_blocks.png, mapped to grass/dirt/stone/log/leaves.
     // 48x48 cells verified against gui_blocks.png: grass, dirt, stone,
@@ -1316,7 +1316,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                     int g = (original >> 8) & 255;
                     int b = original & 255;
                     int nr = (r * tr) / 255, ng = (g * tg) / 255, nb = (b * tb) / 255;
-                    pixels[(6 * 16 + py) * width + tileX + px] =
+                    pixels[(7 * 16 + py) * width + tileX + px] =
                         (a << 24) | (nr << 16) | (ng << 8) | nb;
                 }
             }
@@ -2055,7 +2055,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         else if (type == BLOCK_SAPLING) mesh.setScale(0.48f, 0.62f, 1.0f);
         else if (type != BLOCK_DOOR) mesh.setScale(0.38f, 0.48f, 1.0f);
         mesh.setOrientation(yaw, 0.0f, 1.0f, 0.0f);
-        mesh.setTranslation(x, y, z);
+        // Door geometry's local origin is its hinge; other decorations stay centered.
+        if (type == BLOCK_DOOR) mesh.setTranslation(x - 0.5f, y, z);
+        else mesh.setTranslation(x, y, z);
         decorationGroup.addChild(mesh);
         int at = decorationCount++;
         decorationMeshes[at] = mesh;
@@ -2069,9 +2071,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     /**
-     * Build a proper two-block-tall door from the two adjacent 16x16 door
-     * atlas tiles: lower half at BLOCK_DOOR's tile and upper half immediately
-     * to its right. The panel is 1 block wide and 3/16 block thick.
+     * Build a two-block-tall door. In the Indev atlas the wooden door's upper
+     * tile is at (1,5) and its lower tile is directly below at (1,6).
+     * Local X=0 is the hinge edge, so rotating the mesh opens it like a real
+     * door instead of spinning it around its center.
      */
     private Mesh createDoorMesh(Appearance appearance) {
         final int quadCount = 8;
@@ -2081,25 +2084,26 @@ final class WorldCanvas extends Canvas implements Runnable {
         int doorX = BLOCK_TILE_X[BLOCK_DOOR], doorY = BLOCK_TILE_Y[BLOCK_DOOR];
         int plankX = BLOCK_TILE_X[11], plankY = BLOCK_TILE_Y[11];
 
-        // Front and back: two separately textured 1x1 panels per side.
+        // Front and back panels. Each half is exactly one block high;
+        // both sides use the same atlas tile and UV orientation.
         v = appendDoorQuad(positions, texCoords, v,
-            -16,0,-3, -16,32,-3, 16,0,-3, 16,32,-3, doorX,doorY+1);
+            0,0,-1, 0,32,-1, 32,0,-1, 32,32,-1, doorX,doorY+1);
         v = appendDoorQuad(positions, texCoords, v,
-            -16,32,-3, -16,64,-3, 16,32,-3, 16,64,-3, doorX,doorY);
+            0,32,-1, 0,64,-1, 32,32,-1, 32,64,-1, doorX,doorY);
         v = appendDoorQuad(positions, texCoords, v,
-            -16,0,3, -16,32,3, 16,0,3, 16,32,3, doorX,doorY+1);
+            0,0,1, 0,32,1, 32,0,1, 32,32,1, doorX,doorY+1);
         v = appendDoorQuad(positions, texCoords, v,
-            -16,32,3, -16,64,3, 16,32,3, 16,64,3, doorX,doorY);
+            0,32,1, 0,64,1, 32,32,1, 32,64,1, doorX,doorY);
 
-        // Narrow edges use the plank tile, with the top/bottom capped.
+        // Thin side edges and top/bottom caps use the plank tile.
         v = appendDoorQuad(positions, texCoords, v,
-            -16,0,3, -16,64,3, -16,0,-3, -16,64,-3, plankX,plankY);
+            0,0,1, 0,64,1, 0,0,-1, 0,64,-1, plankX,plankY);
         v = appendDoorQuad(positions, texCoords, v,
-            16,0,-3, 16,64,-3, 16,0,3, 16,64,3, plankX,plankY);
+            32,0,-1, 32,64,-1, 32,0,1, 32,64,1, plankX,plankY);
         v = appendDoorQuad(positions, texCoords, v,
-            -16,64,-3, -16,64,3, 16,64,-3, 16,64,3, plankX,plankY);
+            0,64,-1, 0,64,1, 32,64,-1, 32,64,1, plankX,plankY);
         v = appendDoorQuad(positions, texCoords, v,
-            -16,0,3, -16,0,-3, 16,0,3, 16,0,-3, plankX,plankY);
+            0,0,1, 0,0,-1, 32,0,1, 32,0,-1, plankX,plankY);
 
         VertexArray pa = new VertexArray(v, 3, 2);
         pa.set(0, v, positions);
