@@ -30,12 +30,26 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Group terrainGroup;
     private Group waterGroup;
     private Group cloudGroup;
+    private Group decorationGroup;
+    private Texture2D terrainTexture;
+    private VertexBuffer[] decorationBuffers = new VertexBuffer[5];
+    private Appearance[] decorationAppearances = new Appearance[5];
+    private TriangleStripArray decorationTriangles;
+    private static final int MAX_DECORATIONS = 32;
+    private final Mesh[] decorationMeshes = new Mesh[MAX_DECORATIONS];
+    private final int[] decorationTypes = new int[MAX_DECORATIONS];
+    private final float[] decorationX = new float[MAX_DECORATIONS];
+    private final float[] decorationY = new float[MAX_DECORATIONS];
+    private final float[] decorationZ = new float[MAX_DECORATIONS];
+    private int decorationCount = 0;
+    private final Light[] torchLights = new Light[4];
+    private int torchLightUpdateTicks = 0;
     private Texture2D waterTexture;
     private Texture2D cloudTexture;
     private Image guiImage;
     private Image guiBlocksImage;
     private Image inventoryImage;
-    private final Image[] blockIcons = new Image[16];
+    private final Image[] blockIcons = new Image[21];
     private boolean inventoryOpen = false;
     private int inventoryCursor = 0;
     private float cloudPhase = 0.0f;
@@ -62,15 +76,16 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean lookUp, lookDown, turnLeft, turnRight;
     private boolean jumpHeld;
     // Indev-era terrain atlas tiles: surface blocks, ores, then bedrock.
-    private static final int[] BLOCK_TILE_X = {0, 2, 1, 5, 4, 2, 1, 2, 2, 1, 8, 4, 2, 3, 6, 5};
-    private static final int[] BLOCK_TILE_Y = {0, 0, 0, 1, 3, 1, 2, 2, 3, 1, 0, 1, 4, 1, 0, 3};
+    private static final int[] BLOCK_TILE_X = {0, 2, 1, 5, 4, 2, 1, 2, 2, 1, 8, 4, 2, 3, 6, 5, 0, 13, 12, 15, 1};
+    private static final int[] BLOCK_TILE_Y = {0, 0, 0, 1, 3, 1, 2, 2, 3, 1, 0, 1, 4, 1, 0, 3, 5, 0, 0, 0, 5};
     // 48x48 block icons in gui_blocks.png, mapped to grass/dirt/stone/log/leaves.
     // 48x48 cells verified against gui_blocks.png: grass, dirt, stone,
     // oak log, and leaves. The sheet is a block-icon atlas, not textures.png.
     private static final int[] GUI_ICON_X = {432, 144, 0, 288, 96};
     private static final int[] GUI_ICON_Y = {0, 288, 0, 48, 288};
-    private static final String[] BLOCK_NAMES = {"GRASS", "DIRT", "STONE", "WOOD", "LEAVES", "COAL", "IRON", "GOLD", "DIAMOND", "BEDROCK", "TNT", "PLANKS", "SAND", "GRAVEL", "BRICK", "OBSIDIAN"};
-    private final int[] inventory = {64, 64, 64, 64, 64, 0, 0, 0, 0, 0, 8, 32, 32, 32, 16, 8};
+    private static final int BLOCK_TORCH = 16, BLOCK_YELLOW_FLOWER = 17, BLOCK_RED_FLOWER = 18, BLOCK_SAPLING = 19, BLOCK_DOOR = 20;
+    private static final String[] BLOCK_NAMES = {"GRASS", "DIRT", "STONE", "WOOD", "LEAVES", "COAL", "IRON", "GOLD", "DIAMOND", "BEDROCK", "TNT", "PLANKS", "SAND", "GRAVEL", "BRICK", "OBSIDIAN", "TORCH", "YELLOW FLOWER", "RED FLOWER", "SAPLING", "DOOR"};
+    private final int[] inventory = {64, 64, 64, 64, 64, 16, 8, 8, 4, 0, 8, 32, 32, 32, 16, 8, 16, 4, 4, 4, 2};
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
     private int tntFuseTicks = 0, tntX = -1, tntZ = -1, tntFlashCounter = 0;
     private boolean tntFlashOn = false;
@@ -122,6 +137,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         waterGroup = new Group();
         cloudGroup = new Group();
         blockParticleGroup = new Group();
+        decorationGroup = new Group();
         camera = new Camera();
 
         Image atlas = Image.createImage("/mcj2me/textures.png");
@@ -141,6 +157,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         Texture2D texture = new Texture2D(image2D);
         texture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
         texture.setWrapping(Texture2D.WRAP_CLAMP, Texture2D.WRAP_CLAMP);
+        terrainTexture = texture;
 
         groundAppearance = new Appearance();
         groundAppearance.setTexture(0, texture);
@@ -203,6 +220,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         world.setActiveCamera(camera);
         world.addChild(terrainGroup);
         world.addChild(waterGroup);
+        world.addChild(decorationGroup);
+        setupDecorations();
+        setupTorchLights();
         Mesh clouds = buildCloudPlane(cloudAppearance);
         if (clouds != null) cloudGroup.addChild(clouds);
         // A separate, very large sea surface continues beyond the finite map.
@@ -248,6 +268,10 @@ final class WorldCanvas extends Canvas implements Runnable {
                 if (passiveMobs != null) passiveMobs.update(cameraX, cameraZ);
                 if (hostileMobs != null) hostileMobs.update(cameraX, cameraZ, daylightLevel <= 0.42f);
                 updateTntFuse();
+                if (++torchLightUpdateTicks >= 10) {
+                    torchLightUpdateTicks = 0;
+                    updateTorchLights();
+                }
                 repaint();
             }
             try {
@@ -1349,6 +1373,27 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void breakBlock() {
+        int decorationHit = raycastDecoration();
+        if (decorationHit >= 0) {
+            int type = decorationTypes[decorationHit];
+            inventory[type]++;
+            spawnBlockParticles(type, decorationX[decorationHit], decorationY[decorationHit] + 0.35f,
+                decorationZ[decorationHit]);
+            decorationGroup.removeChild(decorationMeshes[decorationHit]);
+            int last = decorationCount - 1;
+            if (decorationHit != last) {
+                decorationMeshes[decorationHit] = decorationMeshes[last];
+                decorationTypes[decorationHit] = decorationTypes[last];
+                decorationX[decorationHit] = decorationX[last];
+                decorationY[decorationHit] = decorationY[last];
+                decorationZ[decorationHit] = decorationZ[last];
+            }
+            decorationMeshes[last] = null;
+            decorationCount--;
+            updateTorchLights();
+            return;
+        }
+
         int[] leafHit = raycastLeafBlock();
         if (leafHit != null && terrain.removeLeafBlock(leafHit[0], leafHit[1], leafHit[2])) {
             spawnBlockParticles(4, leafHit[0] + 0.5f, leafHit[1] + 0.5f,
@@ -1395,13 +1440,140 @@ final class WorldCanvas extends Canvas implements Runnable {
         resolvePlayerAfterTerrainEdit();
     }
 
+    private void setupDecorations() {
+        int[] indices = {0, 1, 2, 3};
+        int[] stripLengths = {4};
+        decorationTriangles = new TriangleStripArray(indices, stripLengths);
+        for (int i = 0; i < 5; i++) {
+            short[] positions = {-1, 0, 0, -1, 2, 0, 1, 0, 0, 1, 2, 0};
+            short[] uv = {
+                (short)(BLOCK_TILE_X[BLOCK_TORCH + i] * 16 + 1), (short)((BLOCK_TILE_Y[BLOCK_TORCH + i] + 1) * 16 - 1),
+                (short)(BLOCK_TILE_X[BLOCK_TORCH + i] * 16 + 1), (short)(BLOCK_TILE_Y[BLOCK_TORCH + i] * 16 + 1),
+                (short)((BLOCK_TILE_X[BLOCK_TORCH + i] + 1) * 16 - 1), (short)((BLOCK_TILE_Y[BLOCK_TORCH + i] + 1) * 16 - 1),
+                (short)((BLOCK_TILE_X[BLOCK_TORCH + i] + 1) * 16 - 1), (short)(BLOCK_TILE_Y[BLOCK_TORCH + i] * 16 + 1)
+            };
+            VertexArray va = new VertexArray(4, 3, 2);
+            va.set(0, 4, positions);
+            VertexArray ta = new VertexArray(4, 2, 2);
+            ta.set(0, 4, uv);
+            VertexBuffer vb = new VertexBuffer();
+            vb.setPositions(va, 0.5f, null);
+            vb.setTexCoords(0, ta, 1.0f / 256.0f, null);
+            decorationBuffers[i] = vb;
+            Appearance appearance = new Appearance();
+            appearance.setTexture(0, terrainTexture);
+            appearance.setFog(distanceFog);
+            PolygonMode pm = new PolygonMode();
+            pm.setCulling(PolygonMode.CULL_NONE);
+            pm.setShading(PolygonMode.SHADE_FLAT);
+            appearance.setPolygonMode(pm);
+            CompositingMode blend = new CompositingMode();
+            blend.setBlending(CompositingMode.ALPHA);
+            blend.setDepthWriteEnable(false);
+            appearance.setCompositingMode(blend);
+            decorationAppearances[i] = appearance;
+        }
+    }
+
+    private void setupTorchLights() {
+        for (int i = 0; i < torchLights.length; i++) {
+            Light light = new Light();
+            light.setMode(Light.POINT);
+            light.setColor(0xFFB45A);
+            light.setIntensity(1.0f);
+            light.setAttenuation(1.0f, 0.08f, 0.025f);
+            light.setTranslation(0.0f, -1000.0f, 0.0f);
+            world.addChild(light);
+            torchLights[i] = light;
+        }
+    }
+
+    private boolean placeDecoration(int type, float x, float y, float z) {
+        int variant = type - BLOCK_TORCH;
+        if (variant < 0 || variant >= decorationBuffers.length) return false;
+        Mesh mesh = new Mesh(decorationBuffers[variant], decorationTriangles, decorationAppearances[variant]);
+        if (type == BLOCK_TORCH) mesh.setScale(0.18f, 0.58f, 1.0f);
+        else if (type == BLOCK_DOOR) mesh.setScale(0.48f, 1.0f, 1.0f);
+        else if (type == BLOCK_SAPLING) mesh.setScale(0.48f, 0.62f, 1.0f);
+        else mesh.setScale(0.38f, 0.48f, 1.0f);
+        mesh.setOrientation(yaw, 0.0f, 1.0f, 0.0f);
+        mesh.setTranslation(x, y, z);
+        decorationGroup.addChild(mesh);
+        int at = decorationCount++;
+        decorationMeshes[at] = mesh;
+        decorationTypes[at] = type;
+        decorationX[at] = x;
+        decorationY[at] = y;
+        decorationZ[at] = z;
+        return true;
+    }
+
+    private int raycastDecoration() {
+        double yr = Math.PI * pitch / 180.0;
+        double xr = Math.PI * yaw / 180.0;
+        float dx = (float)(Math.sin(xr) * Math.cos(yr));
+        float dz = (float)(-Math.cos(xr) * Math.cos(yr));
+        float dy = (float)Math.sin(yr);
+        for (float d = 0.05f; d <= 5.0f; d += 0.05f) {
+            float px = cameraX + dx * d, py = cameraY + dy * d, pz = cameraZ + dz * d;
+            for (int i = decorationCount - 1; i >= 0; i--) {
+                float radius = decorationTypes[i] == BLOCK_TORCH ? 0.22f : 0.48f;
+                float height = decorationTypes[i] == BLOCK_DOOR ? 2.0f :
+                    (decorationTypes[i] == BLOCK_TORCH ? 1.15f : 0.96f);
+                if (Math.abs(px - decorationX[i]) <= radius &&
+                    Math.abs(pz - decorationZ[i]) <= radius &&
+                    py >= decorationY[i] && py <= decorationY[i] + height) return i;
+            }
+        }
+        return -1;
+    }
+
+    private void updateTorchLights() {
+        int[] nearest = {-1, -1, -1, -1};
+        float[] distances = {Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE};
+        for (int i = 0; i < decorationCount; i++) {
+            if (decorationTypes[i] != BLOCK_TORCH) continue;
+            float dx = decorationX[i] - cameraX, dz = decorationZ[i] - cameraZ;
+            float d2 = dx * dx + dz * dz;
+            for (int slot = 0; slot < nearest.length; slot++) {
+                if (d2 < distances[slot]) {
+                    for (int shift = nearest.length - 1; shift > slot; shift--) {
+                        nearest[shift] = nearest[shift - 1];
+                        distances[shift] = distances[shift - 1];
+                    }
+                    nearest[slot] = i;
+                    distances[slot] = d2;
+                    break;
+                }
+            }
+        }
+        for (int i = 0; i < torchLights.length; i++) {
+            if (nearest[i] >= 0 && distances[i] < 18.0f * 18.0f) {
+                int at = nearest[i];
+                torchLights[i].setTranslation(decorationX[at], decorationY[at] + 0.7f, decorationZ[at]);
+                torchLights[i].setIntensity(1.0f);
+            } else {
+                torchLights[i].setIntensity(0.0f);
+                torchLights[i].setTranslation(0.0f, -1000.0f, 0.0f);
+            }
+        }
+    }
+
     private void placeBlock() {
-        if (inventory[selectedSlot] <= 0) return;
+        if (selectedSlot < 0 || selectedSlot >= inventory.length || inventory[selectedSlot] <= 0) return;
         int[] hit = raycastSurface();
         if (hit == null) return;
         int x = hit[0], z = hit[1], h = terrain.getHeight(x, z);
+        if (selectedSlot >= BLOCK_TORCH) {
+            if (decorationCount >= MAX_DECORATIONS) return;
+            if (h >= TerrainGenerator.HEIGHT - 3) return;
+            if (placeDecoration(selectedSlot, x + 0.5f, h, z + 0.5f)) {
+                inventory[selectedSlot]--;
+                updateTorchLights();
+            }
+            return;
+        }
         if (h >= TerrainGenerator.HEIGHT - 3) return;
-
         terrain.setHeight(x, z, h + 1);
         terrain.setTopType(x, z, selectedSlot);
         inventory[selectedSlot]--;
