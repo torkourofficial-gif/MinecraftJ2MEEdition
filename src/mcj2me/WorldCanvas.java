@@ -1391,6 +1391,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             decorationMeshes[last] = null;
             decorationCount--;
             updateTorchLights();
+            if (type == BLOCK_TORCH) reloadEditedChunks();
             return;
         }
 
@@ -1493,7 +1494,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (variant < 0 || variant >= decorationBuffers.length) return false;
         Mesh mesh = new Mesh(decorationBuffers[variant], decorationTriangles, decorationAppearances[variant]);
         if (type == BLOCK_TORCH) mesh.setScale(0.18f, 0.58f, 1.0f);
-        else if (type == BLOCK_DOOR) mesh.setScale(0.48f, 1.0f, 1.0f);
+        else if (type == BLOCK_DOOR) mesh.setScale(0.48f, 2.0f, 1.0f);
         else if (type == BLOCK_SAPLING) mesh.setScale(0.48f, 0.62f, 1.0f);
         else mesh.setScale(0.38f, 0.48f, 1.0f);
         mesh.setOrientation(yaw, 0.0f, 1.0f, 0.0f);
@@ -1570,6 +1571,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (placeDecoration(selectedSlot, x + 0.5f, h, z + 0.5f)) {
                 inventory[selectedSlot]--;
                 updateTorchLights();
+                if (selectedSlot == BLOCK_TORCH) reloadEditedChunks();
             }
             return;
         }
@@ -1666,10 +1668,14 @@ final class WorldCanvas extends Canvas implements Runnable {
                         int tileX, int tileY) {
         // Indev-style lighting is block-flat: all four vertices of a face
         // share one shade, preventing M3G from interpolating triangular gradients.
-        int shade = terrain.getShadowShade(
-            (x0 + x1 + x2 + x3) / 4,
-            (z0 + z1 + z2 + z3) / 4,
-            (y0 + y1 + y2 + y3) / 4);
+        int centerX = (x0 + x1 + x2 + x3) / 4;
+        int centerY = (y0 + y1 + y2 + y3) / 4;
+        int centerZ = (z0 + z1 + z2 + z3) / 4;
+        int baseShade = terrain.getShadowShade(centerX, centerZ, centerY);
+        int glow = torchGlowAt(centerX, centerY, centerZ);
+        int shade = baseShade + glow;
+        if (shade > 255) shade = 255;
+        int firstVertex = vertex;
         vertex = addVertex(positions, texCoords, colors, indices, vertex, x0, y0, z0,
                            tileX, tileY, 0, shade);
         vertex = addVertex(positions, texCoords, colors, indices, vertex, x1, y1, z1,
@@ -1678,8 +1684,39 @@ final class WorldCanvas extends Canvas implements Runnable {
                            tileX, tileY, 2, shade);
         vertex = addVertex(positions, texCoords, colors, indices, vertex, x3, y3, z3,
                            tileX, tileY, 3, shade);
+        if (glow > 0) {
+            int green = shade - glow / 5;
+            int blue = shade - glow / 2;
+            if (green < baseShade) green = baseShade;
+            if (blue < baseShade) blue = baseShade;
+            for (int v = firstVertex; v < vertex; v++) {
+                int offset = v * 3;
+                colors[offset] = (byte) shade;
+                colors[offset + 1] = (byte) green;
+                colors[offset + 2] = (byte) blue;
+            }
+        }
         stripLengths[strip] = 4;
         return vertex;
+    }
+
+    /** Bakes warm torch light into terrain vertex colours for CLDC/M3G renderers
+     * that do not calculate per-pixel point lighting. The scene also carries
+     * real M3G point lights, so nearby supported renderers get dynamic lighting. */
+    private int torchGlowAt(int x, int y, int z) {
+        int glow = 0;
+        for (int i = 0; i < decorationCount; i++) {
+            if (decorationTypes[i] != BLOCK_TORCH) continue;
+            float dx = x + 0.5f - decorationX[i];
+            float dy = y + 0.5f - (decorationY[i] + 0.7f);
+            float dz = z + 0.5f - decorationZ[i];
+            float distance = (float)Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (distance < 7.0f) {
+                int amount = (int)((7.0f - distance) * 28.0f);
+                if (amount > glow) glow = amount;
+            }
+        }
+        return glow;
     }
 
     private int addVertex(short[] positions, short[] texCoords, byte[] colors, int[] indices,
