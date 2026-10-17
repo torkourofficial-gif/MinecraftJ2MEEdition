@@ -27,8 +27,8 @@ final class TerrainGenerator {
         seed = (int) (now ^ (now >>> 32) ^ new Random(now).nextInt());
         Random random = new Random(seed);
 
-        // Generate natural terrain first, then place actual lake structures
-        // that carve their own basins and fill them with water.
+        // Generate natural terrain, cut caves first, then carve/fill lakes last.
+        // This lets the basin geometry overwrite cave cuts wherever they overlap.
         for (int x = 0; x < SIZE; x++) {
             for (int z = 0; z < SIZE; z++) {
                 int broad = valueNoise(x, z, 32);
@@ -42,8 +42,8 @@ final class TerrainGenerator {
                 heights[x][z] = (short) h;
             }
         }
-        generateWaterBasinStructures(random);
         generateCaveSystems(random);
+        generateWaterBasinStructures(random);
         lowerWorldEdgesTowardSea();
         for (int x = 0; x < SIZE; x++) {
             System.arraycopy(heights[x], 0, originalHeights[x], 0, SIZE);
