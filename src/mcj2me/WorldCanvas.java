@@ -1976,7 +1976,11 @@ final class WorldCanvas extends Canvas implements Runnable {
             decorationOpen[last] = false;
             decorationCount--;
             updateTorchLights();
-            if (type == BLOCK_TORCH) reloadEditedChunks();
+            if (type == BLOCK_TORCH) {
+                int tx = (int)decorationX[decorationHit];
+                int tz = (int)decorationZ[decorationHit];
+                invalidateEditedArea(tx, tx, tz, tz);
+            }
             return;
         }
 
@@ -2247,7 +2251,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (placeDecoration(selectedSlot, x + 0.5f, h, z + 0.5f)) {
                 inventory[selectedSlot]--;
                 updateTorchLights();
-                if (selectedSlot == BLOCK_TORCH) reloadEditedChunks();
+                if (selectedSlot == BLOCK_TORCH) invalidateEditedArea(x, x, z, z);
             }
             return;
         }
@@ -2255,7 +2259,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         terrain.setHeight(x, z, h + 1);
         terrain.setTopType(x, z, selectedSlot);
         inventory[selectedSlot]--;
-        reloadEditedChunks();
+        invalidateEditedArea(x, x, z, z);
         resolvePlayerAfterTerrainEdit();
     }
 
