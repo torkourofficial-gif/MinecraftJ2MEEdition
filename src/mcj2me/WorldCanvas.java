@@ -408,12 +408,13 @@ final class WorldCanvas extends Canvas implements Runnable {
             // continuously strokes upward; the camera can cross the surface
             // instead of being clamped just beneath it.
             if (!airborne) airborne = true;
-            if (jumpHeld) verticalVelocity += 0.055f;
+            // Water should not provide automatic buoyancy: without input the
+            // player slowly sinks. Holding jump applies an upward swim stroke.
+            if (jumpHeld) verticalVelocity += 0.035f;
+            verticalVelocity -= 0.006f;
+            if (verticalVelocity < -0.035f) verticalVelocity = -0.035f;
+            if (verticalVelocity > 0.20f) verticalVelocity = 0.20f;
             cameraY += verticalVelocity;
-            verticalVelocity -= GRAVITY * 0.12f;
-            verticalVelocity += 0.006f;
-            if (verticalVelocity < -0.045f) verticalVelocity = -0.045f;
-            if (verticalVelocity > 0.24f) verticalVelocity = 0.24f;
 
             // Water never disables solid-ground collision. Keep the player's
             // feet above the terrain even while buoyancy/gravity is active.
