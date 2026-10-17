@@ -807,6 +807,34 @@ final class WorldCanvas extends Canvas implements Runnable {
             ((int) cameraX / 64) * 64,
             0.0f,
             ((int) cameraZ / 64) * 64);
+        updateChunkVisibility();
+    }
+
+    /**
+     * Hide terrain and water chunks wholly behind the camera's forward plane.
+     * Their meshes remain cached, so turning around re-enables them without
+     * rebuilding geometry or creating garbage.
+     */
+    private void updateChunkVisibility() {
+        float radians = (float) (yaw * Math.PI / 180.0);
+        float forwardX = (float) Math.sin(radians);
+        float forwardZ = -(float) Math.cos(radians);
+        // A chunk is 16x16; this margin covers its half-diagonal so chunks
+        // straddling the camera plane are kept visible to avoid edge popping.
+        float behindMargin = CHUNK * 0.71f + 1.0f;
+
+        for (int x = 0; x < 8; x++) {
+            for (int z = 0; z < 8; z++) {
+                float dx = x * CHUNK + CHUNK * 0.5f - cameraX;
+                float dz = z * CHUNK + CHUNK * 0.5f - cameraZ;
+                boolean visible = dx * forwardX + dz * forwardZ >= -behindMargin;
+
+                Mesh terrainMesh = activeChunks[x][z];
+                if (terrainMesh != null) terrainMesh.setRenderingEnable(visible);
+                Mesh waterMesh = activeWaterChunks[x][z];
+                if (waterMesh != null) waterMesh.setRenderingEnable(visible);
+            }
+        }
     }
 
     private synchronized void updateChunks() {
@@ -854,6 +882,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         loadedCenterX = centerX;
         loadedCenterZ = centerZ;
+        updateChunkVisibility();
     }
 
     /**
