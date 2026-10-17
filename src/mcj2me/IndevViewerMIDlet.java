@@ -11,13 +11,13 @@ public final class IndevViewerMIDlet extends MIDlet {
     static int fogLevel = 1;
 
     // Values above 1000 represent MIDP directional actions, not device key codes.
-    static final int CONTROL_FORWARD = 0, CONTROL_BACKWARD = 1;
-    static final int CONTROL_STRAFE_LEFT = 2, CONTROL_STRAFE_RIGHT = 3;
-    static final int CONTROL_LOOK_UP = 4, CONTROL_LOOK_DOWN = 5;
-    static final int CONTROL_TURN_LEFT = 6, CONTROL_TURN_RIGHT = 7;
-    static final int CONTROL_JUMP = 8, CONTROL_BREAK = 9, CONTROL_PLACE = 10;
-    static final int CONTROL_COUNT = 11;
-    static final int KEY_UP = 1001, KEY_DOWN = 1002, KEY_LEFT = 1003, KEY_RIGHT = 1004;
+    public static final int CONTROL_FORWARD = 0, CONTROL_BACKWARD = 1;
+    public static final int CONTROL_STRAFE_LEFT = 2, CONTROL_STRAFE_RIGHT = 3;
+    public static final int CONTROL_LOOK_UP = 4, CONTROL_LOOK_DOWN = 5;
+    public static final int CONTROL_TURN_LEFT = 6, CONTROL_TURN_RIGHT = 7;
+    public static final int CONTROL_JUMP = 8, CONTROL_BREAK = 9, CONTROL_PLACE = 10;
+    public static final int CONTROL_COUNT = 11;
+    public static final int KEY_UP = 1001, KEY_DOWN = 1002, KEY_LEFT = 1003, KEY_RIGHT = 1004;
     static final String[] CONTROL_NAMES = {
         "Move forward", "Move backward", "Strafe left", "Strafe right",
         "Look up", "Look down", "Turn left", "Turn right",
@@ -82,7 +82,7 @@ public final class IndevViewerMIDlet extends MIDlet {
         return -1;
     }
 
-    static boolean controlPressed(int control, int keyCode, int gameAction) {
+    public static boolean controlPressed(int control, int keyCode, int gameAction) {
         int binding = controlKeys[control];
         if (binding == KEY_UP || binding == KEY_DOWN || binding == KEY_LEFT || binding == KEY_RIGHT) {
             if (keyCode == '2' || keyCode == '4' || keyCode == '6' || keyCode == '8') return false;
