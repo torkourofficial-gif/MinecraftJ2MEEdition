@@ -140,12 +140,12 @@ final class PassiveMob {
             };
             parts = new int[] {1, 0, 2, 2, 2, 2};
         } else {
-            // Sheep: classic wool is an inflated 8x16x6 body rotated sideways.
-            // Approximate the wool shell as a broad, low 12x10x20 torso; sheep legs are 6px tall.
+            // Sheep: wool silhouette is broad and fluffy; adult height is close to the cow.
+            // Keep the classic 12px legs and place them at the four corners under the fleece.
             boxes = new int[][] {
                 {-6, 8, -10, 6, 18, 10}, {-4, 16, -8, 4, 24, -2},
-                {-5, 0, -7, -1, 6, -3}, {1, 0, -7, 5, 6, -3},
-                {-5, 0, 5, -1, 6, 9}, {1, 0, 5, 5, 6, 9}
+                {-6, 0, -7, -2, 12, -3}, {2, 0, -7, 6, 12, -3},
+                {-6, 0, 5, -2, 12, 9}, {2, 0, 5, 6, 12, 9}
             };
             parts = new int[] {1, 0, 2, 2, 2, 2};
         }
