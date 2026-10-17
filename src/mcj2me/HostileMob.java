@@ -7,6 +7,7 @@ import javax.microedition.m3g.*;
 /** Simple wandering zombies that pursue the player only at close range. */
 final class HostileMob {
     private static final int COUNT = 2;
+    private static final float UNLOAD_DISTANCE_SQUARED = 1600.0f;
     private final TerrainGenerator terrain;
     private final Group group = new Group();
     private final Random random = new Random();
@@ -42,19 +43,20 @@ final class HostileMob {
             nightActive = isNight;
             for (int i = 0; i < mobs.length; i++) {
                 Mob mob = mobs[i];
-                if (isNight) {
-                    if (!mob.alive) {
-                        mob.alive = true;
-                        mob.health = 3;
-                        mob.hurtTicks = 0;
-                        mob.x = mob.homeX;
-                        mob.z = mob.homeZ;
-                        mob.mesh.setAppearance(0, mob.normal);
-                        mob.mesh.setTranslation(mob.x, terrain.getHeight((int)mob.x, (int)mob.z), mob.z);
-                    }
-                    group.addChild(mob.mesh);
-                } else if (mob.alive) {
-                    group.removeChild(mob.mesh);
+                if (!isNight) {
+                    if (mob.rendered) group.removeChild(mob.mesh);
+                    mob.rendered = false;
+                } else if (!mob.alive) {
+                    // The existing nightly zombie respawn behavior is preserved.
+                    mob.alive = true;
+                    mob.health = 3;
+                    mob.hurtTicks = 0;
+                    mob.x = mob.homeX;
+                    mob.z = mob.homeZ;
+                    mob.jumpY = 0.0f;
+                    mob.jumpVelocity = 0.0f;
+                    mob.mesh.setAppearance(0, mob.normal);
+                    mob.mesh.setTranslation(mob.x, terrain.getHeight((int)mob.x, (int)mob.z), mob.z);
                 }
             }
         }
@@ -62,6 +64,19 @@ final class HostileMob {
         for (int i = 0; i < mobs.length; i++) {
             Mob mob = mobs[i];
             if (!mob.alive) continue;
+            float dx = mob.x - playerX, dz = mob.z - playerZ;
+            if (dx * dx + dz * dz > UNLOAD_DISTANCE_SQUARED) {
+                if (mob.rendered) {
+                    group.removeChild(mob.mesh);
+                    mob.rendered = false;
+                }
+                continue; // Suspend zombie AI and terrain sampling while unloaded.
+            }
+            if (!mob.rendered) {
+                group.addChild(mob.mesh);
+                mob.rendered = true;
+                mob.mesh.setTranslation(mob.x, terrain.getHeight((int)mob.x, (int)mob.z), mob.z);
+            }
             mob.update(terrain, random, playerX, playerZ);
         }
     }
@@ -72,7 +87,7 @@ final class HostileMob {
         float best = 4.6f;
         for (int i = 0; i < mobs.length; i++) {
             Mob mob = mobs[i];
-            if (!mob.alive) continue;
+            if (!mob.alive || !mob.rendered) continue;
             // Match the ray-hit target to the classic zombie's 2x8x2
             // overall silhouette instead of the old oversized 0.9 radius.
             // Zombie hitbox: 0.6 blocks wide and about 1.95 blocks tall.
@@ -86,7 +101,8 @@ final class HostileMob {
         target.mesh.setAppearance(0, PassiveMob.getHurtAppearance());
         if (target.health <= 0) {
             target.alive = false;
-            group.removeChild(target.mesh);
+            if (target.rendered) group.removeChild(target.mesh);
+            target.rendered = false;
             deathX = target.x;
             deathZ = target.z;
             deathY = terrain.getHeight((int)target.x, (int)target.z) + target.jumpY + 0.5f;
@@ -112,6 +128,7 @@ final class HostileMob {
         float jumpY = 0.0f, jumpVelocity = 0.0f;
         int health = 3, hurtTicks, wanderTicks, hopCooldown;
         boolean alive = true;
+        boolean rendered;
         final Random random;
 
         Mob(Mesh mesh, Appearance normal, float x, float z, Random random) {
