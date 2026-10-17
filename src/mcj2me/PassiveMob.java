@@ -24,8 +24,16 @@ final class PassiveMob {
         getHurtAppearance();
         int[] types = {0, 1, 2, 0, 2};
         for (int i = 0; i < COUNT; i++) {
-            int x = dryCoordinate((int)startX + random.nextInt(13) - 6);
-            int z = dryCoordinate((int)startZ + random.nextInt(13) - 6);
+            int x = (int)startX + random.nextInt(13) - 6;
+            int z = (int)startZ + random.nextInt(13) - 6;
+            if (x < 3) x = 3;
+            if (x > TerrainGenerator.SIZE - 4) x = TerrainGenerator.SIZE - 4;
+            if (z < 3) z = 3;
+            if (z > TerrainGenerator.SIZE - 4) z = TerrainGenerator.SIZE - 4;
+            for (int attempt = 0; attempt < 8 && terrain.isWaterAt(x, z); attempt++) {
+                x = Math.min(TerrainGenerator.SIZE - 4, x + 1);
+                z = Math.min(TerrainGenerator.SIZE - 4, z + 1);
+            }
             Appearance appearance = appearances[types[i]];
             Mesh mesh = createMobMesh(appearance, false);
             Mob mob = new Mob(mesh, appearance, x + 0.5f, z + 0.5f, random);
@@ -35,13 +43,6 @@ final class PassiveMob {
         }
     }
 
-    private int dryCoordinate(int value) {
-        if (value < 3) value = 3;
-        if (value > TerrainGenerator.SIZE - 4) value = TerrainGenerator.SIZE - 4;
-        for (int n = 0; n < 8 && terrain.isWaterAt(value, value); n++) value++;
-        if (value > TerrainGenerator.SIZE - 4) value = TerrainGenerator.SIZE - 4;
-        return value;
-    }
 
     void update(float playerX, float playerZ) {
         tick++;
