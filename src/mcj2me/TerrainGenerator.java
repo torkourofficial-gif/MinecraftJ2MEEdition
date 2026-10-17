@@ -19,6 +19,8 @@ final class TerrainGenerator {
     // Sparse storage avoids a full 128x64x128 voxel array on the MIDP heap.
     private int[] removedLeafIds = new int[64];
     private int removedLeafCount;
+    // 0=unknown, 1=tree, -1=no tree. Tiny cache for the regular tree grid.
+    private final byte[][] treeAtCache = new byte[SIZE][SIZE];
     private final int seed;
 
     TerrainGenerator() {
@@ -266,6 +268,10 @@ final class TerrainGenerator {
         if (height < 1) height = 1;
         if (height > HEIGHT - 3) height = HEIGHT - 3;
         heights[x][z] = (short) height;
+        // Height edits can change tree eligibility at this column and neighbors.
+        for (int tx = Math.max(0, x - 1); tx <= Math.min(SIZE - 1, x + 1); tx++) {
+            for (int tz = Math.max(0, z - 1); tz <= Math.min(SIZE - 1, z + 1); tz++) treeAtCache[tx][tz] = 0;
+        }
     }
 
     /** Returns the block occupying a vertical side-wall cell. */
@@ -292,12 +298,17 @@ final class TerrainGenerator {
     }
     boolean isTreeAt(int x, int z) {
         if (x < 5 || z < 5 || x >= SIZE - 5 || z >= SIZE - 5 || x % 11 != 5 || z % 13 != 6) return false;
-        int h = getHeight(x, z), min = h, max = h, n; if (h < 12 || h > HEIGHT - 10) return false;
+        byte cached = treeAtCache[x][z];
+        if (cached != 0) return cached > 0;
+        int h = getHeight(x, z), min = h, max = h, n;
+        if (h < 12 || h > HEIGHT - 10) { treeAtCache[x][z] = -1; return false; }
         n = getHeight(x - 1, z); if (n < min) min = n; if (n > max) max = n;
         n = getHeight(x + 1, z); if (n < min) min = n; if (n > max) max = n;
         n = getHeight(x, z - 1); if (n < min) min = n; if (n > max) max = n;
         n = getHeight(x, z + 1); if (n < min) min = n; if (n > max) max = n;
-        return max - min <= 2 && (hash(x, z) & 3) != 0;
+        boolean result = max - min <= 2 && (hash(x, z) & 3) != 0;
+        treeAtCache[x][z] = result ? (byte) 1 : (byte) -1;
+        return result;
     }
     int getTreeHeight(int x, int z) { return 3 + ((hash(x + 19, z - 7) >>> 3) & 1); }
 
@@ -306,21 +317,18 @@ final class TerrainGenerator {
         if (x < 0 || z < 0 || x >= SIZE || z >= SIZE || y < 0 || y >= HEIGHT) return false;
         int id = leafId(x, y, z);
         for (int i = 0; i < removedLeafCount; i++) if (removedLeafIds[i] == id) return false;
-        for (int tx = Math.max(5, x - 2); tx <= Math.min(SIZE - 6, x + 2); tx++) {
-            if (tx % 11 != 5) continue;
-            for (int tz = Math.max(5, z - 2); tz <= Math.min(SIZE - 6, z + 2); tz++) {
-                if (tz % 13 != 6 || !isTreeAt(tx, tz)) continue;
-                int crown = getHeight(tx, tz) + getTreeHeight(tx, tz) - 1;
-                for (int layer = 0; layer < 3; layer++) {
-                    int leafY = crown - 1 + layer;
-                    int radius = layer == 2 ? 1 : 2;
-                    if (y != leafY || Math.abs(x - tx) > radius || Math.abs(z - tz) > radius) continue;
-                    if (x == tx && z == tz && y <= crown) continue;
-                    return true;
-                }
-            }
-        }
-        return false;
+        // Tree columns are spaced 11x13 apart, so at most one can cover this
+        // cell. Jump directly to that candidate instead of scanning a 5x5 area.
+        int tx = x - ((x - 5) % 11);
+        int tz = z - ((z - 6) % 13);
+        if (tx < 5 || tz < 6 || x - tx > 2 || z - tz > 2 || !isTreeAt(tx, tz)) return false;
+        int crown = getHeight(tx, tz) + getTreeHeight(tx, tz) - 1;
+        int layer = y - (crown - 1);
+        if (layer < 0 || layer > 2) return false;
+        int radius = layer == 2 ? 1 : 2;
+        if (Math.abs(x - tx) > radius || Math.abs(z - tz) > radius) return false;
+        if (x == tx && z == tz && y <= crown) return false;
+        return true;
     }
 
     boolean removeLeafBlock(int x, int y, int z) {
