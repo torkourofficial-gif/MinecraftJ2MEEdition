@@ -36,6 +36,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int inventoryCursor = 0;
     private float cloudPhase = 0.0f;
     private Appearance waterAppearance;
+    private Fog distanceFog;
     private Image underwaterOverlay;
     private int overlayWidth = -1, overlayHeight = -1;
     private Mesh[][] activeWaterChunks = new Mesh[8][8];
@@ -175,10 +176,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         Background background = new Background();
         background.setColor(0x87BFEA);
         world.setBackground(background);
-        Fog distanceFog = new Fog();
+        distanceFog = new Fog();
         distanceFog.setColor(0xB6CBE0);
         distanceFog.setLinear(20.0f, 52.0f);
-        world.setFog(distanceFog);
+        groundAppearance.setFog(distanceFog);
+        waterAppearance.setFog(distanceFog);
+        cloudAppearance.setFog(distanceFog);
 
         Light ambient = new Light();
         ambient.setMode(Light.AMBIENT);
@@ -1102,6 +1105,7 @@ final class WorldCanvas extends Canvas implements Runnable {
 
             Appearance appearance = new Appearance();
             appearance.setTexture(0, texture);
+            appearance.setFog(distanceFog);
             PolygonMode pm = new PolygonMode();
             pm.setCulling(PolygonMode.CULL_NONE);
             pm.setShading(PolygonMode.SHADE_FLAT);
