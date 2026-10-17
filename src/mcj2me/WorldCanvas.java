@@ -702,7 +702,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private Mesh buildCloudPlane(Appearance appearance) {
-        short[] positions = {-64, 53, -64, -64, 53, 192, 192, 53, -64, 192, 53, 192};
+        short[] positions = {-64, 60, -64, -64, 60, 192, 192, 60, -64, 192, 60, 192};
         short[] texCoords = {0, 0, 0, 16, 16, 0, 16, 16};
         int[] indices = {0, 1, 2, 3};
         int[] stripLengths = {4};
