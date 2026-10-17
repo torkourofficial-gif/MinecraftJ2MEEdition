@@ -200,6 +200,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
             setupScene();
             if (savedTerrain != null) restorePlayerState(savedTerrain);
+            ensurePlayerNotBuried();
         } catch (OutOfMemoryError e) {
             errorMessage = "Not enough Java heap for M3G.";
         } catch (Exception e) {
@@ -269,6 +270,23 @@ final class WorldCanvas extends Canvas implements Runnable {
         updateCamera();
         updateTorchLights();
         reloadEditedChunks();
+    }
+
+    /**
+     * Height smoothing is visual only: spawning at the smoothed height can put
+     * the camera inside the actual height-map column on steep slopes. Also
+     * repair older saves whose player position was stored below the surface.
+     */
+    private void ensurePlayerNotBuried() {
+        cameraX = clampWorldX(cameraX);
+        cameraZ = clampWorldZ(cameraZ);
+        float groundY = terrain.getHeight((int) cameraX, (int) cameraZ) + 1.65f;
+        if (cameraY < groundY) {
+            cameraY = groundY;
+            verticalVelocity = 0.0f;
+            airborne = false;
+        }
+        updateCamera();
     }
 
     boolean hasSetupError() { return errorMessage != null; }
@@ -370,7 +388,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         ambientLight.setColor(0xFFFFFF);
         world.addChild(ambientLight);
 
-        cameraY = terrain.getHeightSmooth(64.0f, 105.0f) + 1.65f;
+        cameraY = terrain.getHeight(64, 105) + 1.65f;
         camera.setPerspective(70.0f, 1.0f, 0.1f, 180.0f);
         world.addChild(camera);
         world.setActiveCamera(camera);
