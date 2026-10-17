@@ -130,6 +130,24 @@ public final class IndevViewerMIDlet extends MIDlet {
         Display.getDisplay(this).setCurrent(worldCanvas);
         worldCanvas.start();
     }
+    void showPauseMenu() {
+        if (titleScreen==null) titleScreen=new TitleScreen(this);
+        titleScreen.showPauseMenu();
+        Display.getDisplay(this).setCurrent(titleScreen);
+        titleScreen.start();
+    }
+    void resumeGame() {
+        if (titleScreen!=null) titleScreen.stop();
+        Display.getDisplay(this).setCurrent(worldCanvas);
+        if (worldCanvas!=null) worldCanvas.resume();
+    }
+    void returnToMainMenu() {
+        if (worldCanvas!=null) worldCanvas.stop();
+        if (titleScreen==null) titleScreen=new TitleScreen(this);
+        titleScreen.showMainMenu();
+        Display.getDisplay(this).setCurrent(titleScreen);
+        titleScreen.start();
+    }
     public void quitGame() {
         if (titleScreen!=null) titleScreen.stop();
         if (worldCanvas!=null) worldCanvas.stop();
