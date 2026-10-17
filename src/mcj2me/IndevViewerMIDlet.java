@@ -190,6 +190,7 @@ public final class IndevViewerMIDlet extends MIDlet {
     void returnToMainMenu() {
         saveWorld(worldCanvas);
         if (worldCanvas!=null) worldCanvas.stop();
+        worldCanvas = null;
         if (titleScreen==null) titleScreen=new TitleScreen(this);
         titleScreen.showMainMenu();
         Display.getDisplay(this).setCurrent(titleScreen);
