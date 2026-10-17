@@ -12,7 +12,7 @@ final class TitleScreen extends Canvas implements Runnable {
     private int renderWidth=-1, renderHeight=-1, selected=0;
     private float panoramaOffset;
     private Thread animationThread;
-    private boolean running, settingsOpen, controlsOpen, waitingForBinding;
+    private boolean running, settingsOpen, controlsOpen, waitingForBinding, pauseMenu;
     private int controlSelection = 0;
 
     TitleScreen(IndevViewerMIDlet midlet) {
@@ -20,6 +20,20 @@ final class TitleScreen extends Canvas implements Runnable {
         setFullScreenMode(true);
         try { skybox=Image.createImage("/mcj2me/skybox.png"); titleImage=Image.createImage("/mcj2me/title.png"); }
         catch (Exception e) { /* Menu remains usable if an image is missing. */ }
+    }
+    synchronized void showPauseMenu() {
+        pauseMenu = true;
+        settingsOpen = false;
+        controlsOpen = false;
+        waitingForBinding = false;
+        selected = 0;
+    }
+    synchronized void showMainMenu() {
+        pauseMenu = false;
+        settingsOpen = false;
+        controlsOpen = false;
+        waitingForBinding = false;
+        selected = 0;
     }
     synchronized void start() {
         if (running) return;
@@ -91,6 +105,15 @@ final class TitleScreen extends Canvas implements Runnable {
             g.setColor(0xFFFFFF);
             g.drawString("LEFT/RIGHT: change", w/2, h-43, Graphics.BOTTOM|Graphics.HCENTER);
             g.drawString("UP/DOWN: select  FIRE: open", w/2, h-25, Graphics.BOTTOM|Graphics.HCENTER);
+        } else if (pauseMenu) {
+            int bw=Math.min(w-24,210); if (bw<1) bw=w;
+            int bh=Math.min(29,Math.max(22,h/11)), bx=(w-bw)/2;
+            int y=Math.max(8,(h-bh*2-10)/2);
+            drawButton(g,bx,y,bw,bh,"Settings",selected==0);
+            drawButton(g,bx,y+bh+10,bw,bh,"Return to menu",selected==1);
+            g.setColor(0xFFFFFF);
+            g.drawString("PAUSED",w/2,y-30,Graphics.TOP|Graphics.HCENTER);
+            g.drawString("BACK: resume",w/2,h-32,Graphics.BOTTOM|Graphics.HCENTER);
         } else {
             int bw=Math.min(w-24,210); if (bw<1) bw=w;
             int bh=Math.min(27,Math.max(20,h/12)), bx=(w-bw)/2;
@@ -113,6 +136,23 @@ final class TitleScreen extends Canvas implements Runnable {
     }
     protected void keyPressed(int keyCode) {
         int action=getGameAction(keyCode);
+        if (isBackKey(keyCode)) {
+            if (controlsOpen) {
+                controlsOpen=false;
+                if (pauseMenu) { settingsOpen=false; selected=0; }
+                else { settingsOpen=true; selected=2; }
+            } else if (settingsOpen) {
+                settingsOpen=false;
+                if (pauseMenu) selected=0;
+                else selected=1;
+            } else if (pauseMenu) {
+                pauseMenu=false;
+                stop();
+                owner.resumeGame();
+            }
+            repaint();
+            return;
+        }
         if (controlsOpen) {
             if (waitingForBinding) {
                 int direction = IndevViewerMIDlet.directionalKey(keyCode, action);
@@ -144,22 +184,32 @@ final class TitleScreen extends Canvas implements Runnable {
                 else if (selected==1 && IndevViewerMIDlet.fogLevel<2) IndevViewerMIDlet.fogLevel++;
             } else if (action==FIRE || keyCode=='5' || keyCode==' ' || keyCode=='\n') {
                 if (selected==2) { controlsOpen=true; controlSelection=0; waitingForBinding=false; }
-                else if (selected==3) { settingsOpen=false; selected=1; }
-            } else if (keyCode=='*' || keyCode==42) { settingsOpen=false; selected=1; }
+                else if (selected==3) { settingsOpen=false; selected=pauseMenu ? 0 : 1; }
+            } else if (keyCode=='*' || keyCode==42) { settingsOpen=false; selected=pauseMenu ? 0 : 1; }
             repaint();
             return;
         }
+        int menuCount = pauseMenu ? 2 : 3;
         if (action==UP || action==DOWN || keyCode=='2' || keyCode=='8') {
-            selected=(selected+(action==UP || keyCode=='2' ? 2 : 1))%3; repaint(); return;
+            selected=(selected+(action==UP || keyCode=='2' ? menuCount-1 : 1))%menuCount; repaint(); return;
         }
         if (action==LEFT || action==RIGHT || keyCode=='4' || keyCode=='6') {
-            selected=(selected+1)%3; repaint(); return;
+            selected=(selected+1)%menuCount; repaint(); return;
         }
         if (action==FIRE || keyCode=='5' || keyCode==' ' || keyCode=='\n') {
-            if (selected==0) owner.startGame();
-            else if (selected==1) { settingsOpen=true; selected=0; repaint(); }
-            else { stop(); owner.quitGame(); }
+            if (pauseMenu) {
+                if (selected==0) { settingsOpen=true; selected=0; repaint(); }
+                else { stop(); owner.returnToMainMenu(); }
+            } else {
+                if (selected==0) owner.startGame();
+                else if (selected==1) { settingsOpen=true; selected=0; repaint(); }
+                else { stop(); owner.quitGame(); }
+            }
         }
+    }
+    private boolean isBackKey(int keyCode) {
+        // MIDP has no universal BACK constant; emulators/phones use common back/softkey codes.
+        return keyCode == 27 || keyCode == 8 || keyCode == 127 || keyCode == -7 || keyCode == -6;
     }
     private Image resizeImage(Image source,int targetW,int targetH,boolean cover) {
         int sw=source.getWidth(), sh=source.getHeight(), cropX=0,cropY=0,cropW=sw,cropH=sh;
