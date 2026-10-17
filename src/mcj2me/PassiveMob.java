@@ -7,6 +7,7 @@ import javax.microedition.m3g.*;
 /** Lightweight, low-poly passive animals for CLDC/M3G devices. */
 final class PassiveMob {
     private static final int COUNT = 5;
+    private static final float UNLOAD_DISTANCE_SQUARED = 1600.0f;
     private static Appearance hurtAppearance;
     private final TerrainGenerator terrain;
     private final Group group = new Group();
@@ -41,6 +42,7 @@ final class PassiveMob {
             Mob mob = new Mob(mesh, appearance, x + 0.5f, z + 0.5f, random);
             mobs[i] = mob;
             group.addChild(mesh);
+            mob.rendered = true;
             mesh.setTranslation(mob.x, terrain.getHeight(x, z), mob.z);
         }
     }
@@ -50,9 +52,23 @@ final class PassiveMob {
 
     void update(float playerX, float playerZ) {
         tick++;
+        float unloadDistanceSquared = UNLOAD_DISTANCE_SQUARED;
         for (int i = 0; i < mobs.length; i++) {
             Mob mob = mobs[i];
             if (!mob.alive) continue;
+            float dx = mob.x - playerX, dz = mob.z - playerZ;
+            if (dx * dx + dz * dz > unloadDistanceSquared) {
+                if (mob.rendered) {
+                    group.removeChild(mob.mesh);
+                    mob.rendered = false;
+                }
+                continue; // No animation, terrain queries, or AI while unloaded.
+            }
+            if (!mob.rendered) {
+                group.addChild(mob.mesh);
+                mob.rendered = true;
+                mob.mesh.setTranslation(mob.x, terrain.getHeight((int)mob.x, (int)mob.z), mob.z);
+            }
             mob.update(terrain, random, tick, playerX, playerZ, false);
         }
     }
@@ -62,7 +78,7 @@ final class PassiveMob {
         float best = 4.6f;
         for (int i = 0; i < mobs.length; i++) {
             Mob mob = mobs[i];
-            if (!mob.alive) continue;
+            if (!mob.alive || !mob.rendered) continue;
             float score = hitDistance(px, py, pz, yaw, pitch, mob.x, terrain.getHeight((int)mob.x, (int)mob.z) + 0.85f, mob.z, 0.95f);
             if (score >= 0.0f && score < best) { best = score; target = mob; }
         }
@@ -72,7 +88,8 @@ final class PassiveMob {
         target.mesh.setAppearance(0, getHurtAppearance());
         if (target.health <= 0) {
             target.alive = false;
-            group.removeChild(target.mesh);
+            if (target.rendered) group.removeChild(target.mesh);
+            target.rendered = false;
             deathX = target.x;
             deathZ = target.z;
             deathY = terrain.getHeight((int)target.x, (int)target.z) + target.jumpY + 0.45f;
@@ -319,6 +336,7 @@ final class PassiveMob {
         float jumpY = 0.0f, jumpVelocity = 0.0f;
         int health = 3, hurtTicks, wanderTicks, hopCooldown;
         boolean alive = true;
+        boolean rendered;
 
         Mob(Mesh mesh, Appearance normal, float x, float z, Random random) {
             this.mesh = mesh; this.normal = normal;
