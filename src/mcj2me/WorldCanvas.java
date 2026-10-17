@@ -852,27 +852,32 @@ final class WorldCanvas extends Canvas implements Runnable {
                         int x0, int y0, int z0, int x1, int y1, int z1,
                         int x2, int y2, int z2, int x3, int y3, int z3,
                         int tileX, int tileY) {
+        // Indev-style lighting is block-flat: all four vertices of a face
+        // share one shade, preventing M3G from interpolating triangular gradients.
+        int shade = terrain.getShadowShade(
+            (x0 + x1 + x2 + x3) / 4,
+            (z0 + z1 + z2 + z3) / 4,
+            (y0 + y1 + y2 + y3) / 4);
         vertex = addVertex(positions, texCoords, colors, indices, vertex, x0, y0, z0,
-                           tileX, tileY, 0);
+                           tileX, tileY, 0, shade);
         vertex = addVertex(positions, texCoords, colors, indices, vertex, x1, y1, z1,
-                           tileX, tileY, 1);
+                           tileX, tileY, 1, shade);
         vertex = addVertex(positions, texCoords, colors, indices, vertex, x2, y2, z2,
-                           tileX, tileY, 2);
+                           tileX, tileY, 2, shade);
         vertex = addVertex(positions, texCoords, colors, indices, vertex, x3, y3, z3,
-                           tileX, tileY, 3);
+                           tileX, tileY, 3, shade);
         stripLengths[strip] = 4;
         return vertex;
     }
 
     private int addVertex(short[] positions, short[] texCoords, byte[] colors, int[] indices,
                           int vertex, int x, int y, int z,
-                          int tileX, int tileY, int corner) {
+                          int tileX, int tileY, int corner, int shade) {
         int p = vertex * 3;
         positions[p] = (short) x;
         positions[p + 1] = (short) y;
         positions[p + 2] = (short) z;
         indices[vertex] = vertex;
-        int shade = terrain.getShadowShade(x, z, y);
         int colorOffset = vertex * 3;
         colors[colorOffset] = (byte) shade;
         colors[colorOffset + 1] = (byte) shade;
