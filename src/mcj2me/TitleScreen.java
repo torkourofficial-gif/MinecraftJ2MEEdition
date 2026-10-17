@@ -83,6 +83,9 @@ final class TitleScreen extends Canvas implements Runnable {
                     skyboxPixels=new int[skyboxWidth*skyboxHeight];
                     skybox.getRGB(skyboxPixels,0,skyboxWidth,0,0,skyboxWidth,skyboxHeight);
                     renderCubeFrame();
+                    // The cube is now a cached Image; release the duplicate
+                    // source-pixel buffer until a resize requires it again.
+                    skyboxPixels=null;
                 } else {
                     // Keep compatibility with a conventional wide panorama asset.
                     panorama=resizeImage(skybox,w*2,h,true);
