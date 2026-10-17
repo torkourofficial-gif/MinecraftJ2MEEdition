@@ -13,6 +13,8 @@ final class HostileMob {
     private final Mob[] mobs = new Mob[COUNT];
     private Appearance zombieAppearance;
     private boolean nightActive;
+    private boolean deathEvent;
+    private float deathX, deathY, deathZ;
 
     HostileMob(Group parent, TerrainGenerator terrain, float startX, float startZ) throws Exception {
         this.terrain = terrain;
@@ -83,9 +85,23 @@ final class HostileMob {
         if (target.health <= 0) {
             target.alive = false;
             group.removeChild(target.mesh);
+            deathX = target.x;
+            deathZ = target.z;
+            deathY = terrain.getHeight((int)target.x, (int)target.z) + target.jumpY + 0.5f;
+            deathEvent = true;
         }
         return true;
     }
+
+    boolean consumeDeathEvent() {
+        if (!deathEvent) return false;
+        deathEvent = false;
+        return true;
+    }
+
+    float getDeathX() { return deathX; }
+    float getDeathY() { return deathY; }
+    float getDeathZ() { return deathZ; }
 
     private static final class Mob {
         final Mesh mesh;
