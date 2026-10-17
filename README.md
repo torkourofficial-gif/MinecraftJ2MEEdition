@@ -1,7 +1,7 @@
 # Minecraft J2ME Edition — Indev terrain prototype
 
 Procedural 128 × 128 terrain using Java ME MIDP 2.0, CLDC 1.1 and M3G
-(JSR-184). This milestone adds acceleration/friction-based movement, jumping with gravity, smoother terrain following, trees with individually breakable leaves and wood textures, block-flat vertex-color shadows, per-block side texture tiling, surface-column block editing, a classic GUI hotbar with grass/dirt/stone/wood/leaves previews, large square-patterned, rigidly scrolling cloud layer, a sea plane reaching beyond the world edge, animated translucent water blocks, exposed shoreline water faces, water-entry splash particles and slower movement in water.
+(JSR-184). This milestone adds acceleration/friction-based movement, jumping with gravity, smoother terrain following, trees with individually breakable leaves and wood textures, block-flat vertex-color shadows, per-block side texture tiling, surface-column block editing, a classic GUI hotbar with grass/dirt/stone/wood/leaves previews, large square-patterned, rigidly scrolling cloud layer, a sea ring outside the playable map reaching toward the horizon, animated translucent water blocks, exposed shoreline water faces, water-entry splash particles and slower movement in water.
 Solid terrain is still height-map based rather than a complete voxel engine, but water is represented as discrete vertical block cells from the terrain surface to the waterline. Movement uses square column collision with one-block stepping, and swimming physics still prevents the player from passing through the solid lake floor.
 
 ## Requirements
