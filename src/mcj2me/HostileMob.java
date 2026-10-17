@@ -137,7 +137,7 @@ final class HostileMob {
                 chooseDirection();
             } else { x = nx; z = nz; }
             if (dx * dx + dz * dz > 0.0001f) {
-                mesh.setOrientation((float)(Math.atan2(dx, dz) * 180.0 / Math.PI), 0.0f, 1.0f, 0.0f);
+                mesh.setOrientation(PassiveMob.directionAngle(dx, dz), 0.0f, 1.0f, 0.0f);
             }
         }
     }
