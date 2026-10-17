@@ -129,15 +129,18 @@ final class TitleScreen extends Canvas implements Runnable {
             g.drawString(help, w/2, h-38, Graphics.BOTTOM|Graphics.HCENTER);
             g.drawString("UP/DOWN: choose control", w/2, h-20, Graphics.BOTTOM|Graphics.HCENTER);
         } else if (settingsOpen) {
-            drawButton(g, 12, h/2-70, w-24, 25,
+            int settingsTop = h/2 - 96;
+            drawButton(g, 12, settingsTop, w-24, 24,
                 "Sensitivity: " + IndevViewerMIDlet.sensitivity, selected==0);
             String fog = IndevViewerMIDlet.fogLevel==0 ? "Near" :
                 (IndevViewerMIDlet.fogLevel==2 ? "Far" : "Normal");
-            drawButton(g, 12, h/2-40, w-24, 25, "Fog: " + fog, selected==1);
-            drawButton(g, 12, h/2-10, w-24, 25,
-                "Modo humilde: " + (IndevViewerMIDlet.humbleMode ? "ON" : "OFF"), selected==2);
-            drawButton(g, 12, h/2+20, w-24, 25, "Controls", selected==3);
-            drawButton(g, 12, h/2+50, w-24, 25, "Back", selected==4);
+            drawButton(g, 12, settingsTop+28, w-24, 24, "Fog: " + fog, selected==1);
+            drawButton(g, 12, settingsTop+56, w-24, 24,
+                "Frameskip: " + IndevViewerMIDlet.frameskip, selected==2);
+            drawButton(g, 12, settingsTop+84, w-24, 24,
+                "Modo humilde: " + (IndevViewerMIDlet.humbleMode ? "ON" : "OFF"), selected==3);
+            drawButton(g, 12, settingsTop+112, w-24, 24, "Controls", selected==4);
+            drawButton(g, 12, settingsTop+140, w-24, 24, "Back", selected==5);
             g.setColor(0xFFFFFF);
             g.drawString("LEFT/RIGHT: change", w/2, h-43, Graphics.BOTTOM|Graphics.HCENTER);
             g.drawString("UP/DOWN: select  FIRE: open", w/2, h-25, Graphics.BOTTOM|Graphics.HCENTER);
@@ -266,20 +269,22 @@ final class TitleScreen extends Canvas implements Runnable {
             return;
         }
         if (settingsOpen) {
-            if (action==UP || keyCode=='2') selected=(selected+4)%5;
-            else if (action==DOWN || keyCode=='8') selected=(selected+1)%5;
+            if (action==UP || keyCode=='2') selected=(selected+5)%6;
+            else if (action==DOWN || keyCode=='8') selected=(selected+1)%6;
             else if (action==LEFT || keyCode=='4') {
                 if (selected==0 && IndevViewerMIDlet.sensitivity>1) IndevViewerMIDlet.sensitivity--;
                 else if (selected==1 && IndevViewerMIDlet.fogLevel>0) IndevViewerMIDlet.fogLevel--;
-                else if (selected==2) { IndevViewerMIDlet.humbleMode=!IndevViewerMIDlet.humbleMode; owner.settingsChanged(); }
+                else if (selected==2 && IndevViewerMIDlet.frameskip>0) { IndevViewerMIDlet.frameskip--; owner.settingsChanged(); }
+                else if (selected==3) { IndevViewerMIDlet.humbleMode=!IndevViewerMIDlet.humbleMode; owner.settingsChanged(); }
             } else if (action==RIGHT || keyCode=='6') {
                 if (selected==0 && IndevViewerMIDlet.sensitivity<6) IndevViewerMIDlet.sensitivity++;
                 else if (selected==1 && IndevViewerMIDlet.fogLevel<2) IndevViewerMIDlet.fogLevel++;
-                else if (selected==2) { IndevViewerMIDlet.humbleMode=!IndevViewerMIDlet.humbleMode; owner.settingsChanged(); }
+                else if (selected==2 && IndevViewerMIDlet.frameskip<5) { IndevViewerMIDlet.frameskip++; owner.settingsChanged(); }
+                else if (selected==3) { IndevViewerMIDlet.humbleMode=!IndevViewerMIDlet.humbleMode; owner.settingsChanged(); }
             } else if (action==FIRE || keyCode=='5' || keyCode==' ' || keyCode=='\n') {
-                if (selected==2) { IndevViewerMIDlet.humbleMode=!IndevViewerMIDlet.humbleMode; owner.settingsChanged(); }
-                else if (selected==3) { controlsOpen=true; controlSelection=0; waitingForBinding=false; }
-                else if (selected==4) { settingsOpen=false; selected=pauseMenu ? 0 : 1; }
+                if (selected==3) { IndevViewerMIDlet.humbleMode=!IndevViewerMIDlet.humbleMode; owner.settingsChanged(); }
+                else if (selected==4) { controlsOpen=true; controlSelection=0; waitingForBinding=false; }
+                else if (selected==5) { settingsOpen=false; selected=pauseMenu ? 0 : 1; }
             } else if (keyCode=='*' || keyCode==42) { settingsOpen=false; selected=pauseMenu ? 0 : 1; }
             repaint();
             return;
