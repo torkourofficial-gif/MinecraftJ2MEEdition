@@ -1,7 +1,6 @@
 package mcj2me;
 
 import javax.microedition.lcdui.Canvas;
-import javax.microedition.lcdui.Font;
 import javax.microedition.lcdui.Graphics;
 
 /** Keeps the UI responsive while terrain and the first M3G scene are prepared. */
@@ -74,11 +73,9 @@ final class WorldLoadingCanvas extends Canvas implements Runnable {
         g.drawString(worldName, w / 2, h / 2 + 2, Graphics.TOP | Graphics.HCENTER);
         String suffix = dots == 0 ? "" : (dots == 1 ? "." : (dots == 2 ? ".." : "..."));
         g.drawString(status + suffix, w / 2, h / 2 + 28, Graphics.TOP | Graphics.HCENTER);
-        int bw = Math.min(w - 32, 180), bx = (w - bw) / 2, by = h / 2 + 52;
-        g.setColor(0xFFFFFF); g.drawRect(bx, by, bw, 8);
-        int fill = (dots + 1) * bw / 4;
-        g.fillRect(bx + 1, by + 1, Math.max(1, fill - 1), 7);
         g.setColor(0xFFFFFF);
-        g.drawString("Preparing nearby chunks", w / 2, by + 20, Graphics.TOP | Graphics.HCENTER);
+        g.drawString("Preparing nearby chunks", w / 2, h / 2 + 54, Graphics.TOP | Graphics.HCENTER);
+        String spinner = dots == 0 ? "[   ]" : (dots == 1 ? "[=  ]" : (dots == 2 ? "[== ]" : "[===]"));
+        g.drawString(spinner, w / 2, h / 2 + 78, Graphics.TOP | Graphics.HCENTER);
     }
 }
