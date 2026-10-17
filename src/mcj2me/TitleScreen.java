@@ -5,14 +5,14 @@ import javax.microedition.lcdui.Font;
 import javax.microedition.lcdui.Graphics;
 import javax.microedition.lcdui.Image;
 
-/** Dedicated animated title screen; world initialization happens after selection. */
+/** Animated title screen with a compact settings page. */
 final class TitleScreen extends Canvas implements Runnable {
     private final IndevViewerMIDlet owner;
     private Image skybox, titleImage, panorama, scaledTitle;
     private int renderWidth=-1, renderHeight=-1, selected=0;
     private float panoramaOffset;
     private Thread animationThread;
-    private boolean running;
+    private boolean running, settingsOpen;
 
     TitleScreen(IndevViewerMIDlet midlet) {
         owner=midlet;
@@ -59,12 +59,27 @@ final class TitleScreen extends Canvas implements Runnable {
         if (scaledTitle!=null) g.drawImage(scaledTitle,(w-scaledTitle.getWidth())/2,
             Math.max(8,h/10),Graphics.TOP|Graphics.LEFT);
         else { g.setColor(0xFFFFFF); g.drawString("Minecraft",w/2,Math.max(8,h/5),Graphics.TOP|Graphics.HCENTER); }
-        int bw=Math.min(w-24,210); if (bw<1) bw=w;
-        int bh=Math.min(28,Math.max(22,h/10)), bx=(w-bw)/2;
-        int y=Math.max(h*3/5,h/2);
-        if (y+bh*2+7>h-24) y=Math.max(8,h-bh*2-30);
-        drawButton(g,bx,y,bw,bh,"Singleplayer",selected==0);
-        drawButton(g,bx,y+bh+7,bw,bh,"Quit Game",selected==1);
+
+        if (settingsOpen) {
+            drawButton(g, 12, h/2-36, w-24, 28,
+                "Sensitivity: " + IndevViewerMIDlet.sensitivity, selected==0);
+            String fog = IndevViewerMIDlet.fogLevel==0 ? "Near" :
+                (IndevViewerMIDlet.fogLevel==2 ? "Far" : "Normal");
+            drawButton(g, 12, h/2, w-24, 28, "Fog: " + fog, selected==1);
+            drawButton(g, 12, h/2+36, w-24, 28, "Back", selected==2);
+            g.setColor(0xFFFFFF);
+            g.drawString("LEFT/RIGHT: change", w/2, h-43, Graphics.BOTTOM|Graphics.HCENTER);
+            g.drawString("UP/DOWN: select  FIRE: back", w/2, h-25, Graphics.BOTTOM|Graphics.HCENTER);
+        } else {
+            int bw=Math.min(w-24,210); if (bw<1) bw=w;
+            int bh=Math.min(27,Math.max(20,h/12)), bx=(w-bw)/2;
+            int total=bh*3+14;
+            int y=Math.max(h*3/5,h/2);
+            if (y+total>h-24) y=Math.max(8,h-total-28);
+            drawButton(g,bx,y,bw,bh,"Singleplayer",selected==0);
+            drawButton(g,bx,y+bh+7,bw,bh,"Settings",selected==1);
+            drawButton(g,bx,y+(bh+7)*2,bw,bh,"Quit Game",selected==2);
+        }
         g.setColor(0xFFFFFF); g.drawString("Minecraft J2ME Edition",5,h-17,Graphics.BOTTOM|Graphics.LEFT);
         g.setColor(0xFFFF55); g.drawString("Indev demake",w-5,h-17,Graphics.BOTTOM|Graphics.RIGHT);
     }
@@ -77,10 +92,31 @@ final class TitleScreen extends Canvas implements Runnable {
     }
     protected void keyPressed(int keyCode) {
         int action=getGameAction(keyCode);
-        if (action==UP || action==DOWN || keyCode=='2' || keyCode=='8') { selected=1-selected; repaint(); return; }
-        if (action==LEFT || action==RIGHT || keyCode=='4' || keyCode=='6') { selected=1-selected; repaint(); return; }
+        if (settingsOpen) {
+            if (action==UP || keyCode=='2') selected=(selected+2)%3;
+            else if (action==DOWN || keyCode=='8') selected=(selected+1)%3;
+            else if (action==LEFT || keyCode=='4') {
+                if (selected==0 && IndevViewerMIDlet.sensitivity>1) IndevViewerMIDlet.sensitivity--;
+                else if (selected==1 && IndevViewerMIDlet.fogLevel>0) IndevViewerMIDlet.fogLevel--;
+            } else if (action==RIGHT || keyCode=='6') {
+                if (selected==0 && IndevViewerMIDlet.sensitivity<6) IndevViewerMIDlet.sensitivity++;
+                else if (selected==1 && IndevViewerMIDlet.fogLevel<2) IndevViewerMIDlet.fogLevel++;
+            } else if (action==FIRE || keyCode=='5' || keyCode==' ' || keyCode=='\n') {
+                if (selected==2) { settingsOpen=false; selected=1; }
+            } else if (keyCode=='*') { settingsOpen=false; selected=1; }
+            repaint();
+            return;
+        }
+        if (action==UP || action==DOWN || keyCode=='2' || keyCode=='8') {
+            selected=(selected+(action==UP || keyCode=='2' ? 2 : 1))%3; repaint(); return;
+        }
+        if (action==LEFT || action==RIGHT || keyCode=='4' || keyCode=='6') {
+            selected=(selected+1)%3; repaint(); return;
+        }
         if (action==FIRE || keyCode=='5' || keyCode==' ' || keyCode=='\n') {
-            if (selected==0) owner.startGame(); else { stop(); owner.quitGame(); }
+            if (selected==0) owner.startGame();
+            else if (selected==1) { settingsOpen=true; selected=0; repaint(); }
+            else { stop(); owner.quitGame(); }
         }
     }
     private Image resizeImage(Image source,int targetW,int targetH,boolean cover) {
