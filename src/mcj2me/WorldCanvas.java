@@ -230,6 +230,45 @@ final class WorldCanvas extends Canvas implements Runnable {
         out.flush();
         return bytes.toByteArray();
     }
+    private void restorePlayerState(byte[] state) throws Exception {
+        DataInputStream in = new DataInputStream(new ByteArrayInputStream(state));
+        int terrainLength = in.readInt();
+        if (terrainLength < 0 || terrainLength > state.length - 4)
+            throw new Exception("Invalid saved world");
+        byte[] terrainData = new byte[terrainLength];
+        in.readFully(terrainData);
+        cameraX = in.readFloat(); cameraY = in.readFloat(); cameraZ = in.readFloat();
+        yaw = in.readFloat(); pitch = in.readFloat();
+        dayTick = in.readInt();
+        selectedSlot = in.readInt();
+        if (selectedSlot < 0 || selectedSlot >= inventory.length) selectedSlot = 0;
+        int invCount = in.readInt();
+        if (invCount != inventory.length) throw new Exception("Invalid saved inventory");
+        for (int i = 0; i < inventory.length; i++) inventory[i] = Math.max(0, in.readInt());
+        int savedCount = in.readInt();
+        if (savedCount < 0 || savedCount > MAX_DECORATIONS)
+            throw new Exception("Invalid saved decorations");
+        decorationCount = 0;
+        for (int i = 0; i < savedCount; i++) {
+            int type = in.readInt();
+            float x = in.readFloat(), y = in.readFloat(), z = in.readFloat();
+            float savedYaw = in.readFloat();
+            boolean opened = in.readBoolean();
+            if (type < BLOCK_TORCH || type > BLOCK_DOOR) continue;
+            yaw = savedYaw;
+            if (placeDecoration(type, x, y, z)) {
+                int at = decorationCount - 1;
+                decorationYaw[at] = savedYaw;
+                decorationOpen[at] = opened;
+                decorationMeshes[at].setOrientation(savedYaw + (opened ? 90.0f : 0.0f), 0.0f, 1.0f, 0.0f);
+            }
+        }
+        in.close();
+        updateCamera();
+        updateTorchLights();
+        reloadEditedChunks();
+    }
+
     boolean hasSetupError() { return errorMessage != null; }
     String getSetupError() { return errorMessage; }
 
