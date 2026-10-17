@@ -77,7 +77,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Camera camera;
 
     private Appearance groundAppearance;
-    private Mesh[][] activeChunks = new Mesh[8][8];
+    private Image terrainAtlasImage;
+    private Appearance[] terrainTileAppearances = new Appearance[256];
+    private Group[][] activeChunks = new Group[8][8];
     // Tracks even empty chunks whose terrain/water builders return no mesh.
     private boolean[][] builtChunks = new boolean[8][8];
     private int loadedCenterX = -99;
@@ -174,6 +176,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         camera = new Camera();
 
         Image atlas = createWoolAtlas(Image.createImage("/mcj2me/textures.png"));
+        terrainAtlasImage = atlas;
         guiImage = Image.createImage("/mcj2me/gui.png");
         guiBlocksImage = Image.createImage("/mcj2me/gui_blocks.png");
         inventoryImage = Image.createImage("/mcj2me/inventory.png");
@@ -850,8 +853,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         for (int x = 0; x < 8; x++) {
             for (int z = 0; z < 8; z++) {
                 boolean visible = isChunkInFront(x, z, forwardX, forwardZ);
-                Mesh terrainMesh = activeChunks[x][z];
-                if (terrainMesh != null) terrainMesh.setRenderingEnable(visible);
+                Group terrainChunk = activeChunks[x][z];
+                if (terrainChunk != null) terrainChunk.setRenderingEnable(visible);
                 Mesh waterMesh = activeWaterChunks[x][z];
                 if (waterMesh != null) waterMesh.setRenderingEnable(visible);
             }
@@ -884,7 +887,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                     && Math.abs(z - centerZ) <= RADIUS;
                 boolean wanted = inRange && isChunkInFront(x, z, forwardX, forwardZ);
                 if (!wanted) {
-                    Mesh old = activeChunks[x][z];
+                    Group old = activeChunks[x][z];
                     if (old != null) {
                         terrainGroup.removeChild(old);
                         activeChunks[x][z] = null;
@@ -927,7 +930,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
 
         if (bestX >= 0) {
-            Mesh mesh = buildChunk(bestX, bestZ);
+            Group mesh = buildChunk(bestX, bestZ);
             if (mesh != null) {
                 activeChunks[bestX][bestZ] = mesh;
                 terrainGroup.addChild(mesh);
@@ -964,7 +967,7 @@ final class WorldCanvas extends Canvas implements Runnable {
              x <= Math.min(7, centerX + RADIUS); x++) {
             for (int z = Math.max(0, centerZ - RADIUS);
                  z <= Math.min(7, centerZ + RADIUS); z++) {
-                Mesh old = activeChunks[x][z];
+                Group old = activeChunks[x][z];
                 if (old != null) {
                     terrainGroup.removeChild(old);
                     activeChunks[x][z] = null;
@@ -1259,7 +1262,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         waterTexture.setTranslation(waterPhase, waterPhase * 0.65f, 0.0f);
     }
 
-    private Mesh buildChunk(int chunkX, int chunkZ) {
+    private Group buildChunk(int chunkX, int chunkZ) {
         int startX = chunkX * CHUNK;
         int startZ = chunkZ * CHUNK;
         int quads = 0;
@@ -1267,7 +1270,6 @@ final class WorldCanvas extends Canvas implements Runnable {
         for (x = startX; x < startX + CHUNK; x++) {
             for (z = startZ; z < startZ + CHUNK; z++) {
                 h = terrain.getHeight(x, z);
-                quads++;
                 int nh = terrain.getHeight(x - 1, z); if (h > nh) quads += h - nh;
                 nh = terrain.getHeight(x + 1, z); if (h > nh) quads += h - nh;
                 nh = terrain.getHeight(x, z - 1); if (h > nh) quads += h - nh;
@@ -1307,14 +1309,6 @@ final class WorldCanvas extends Canvas implements Runnable {
         for (x = startX; x < startX + CHUNK; x++) {
             for (z = startZ; z < startZ + CHUNK; z++) {
                 h = terrain.getHeight(x, z);
-                int topType = terrain.getTopType(x, z);
-                int topTileX = BLOCK_TILE_X[topType], topTileY = BLOCK_TILE_Y[topType];
-                if (topType == TerrainGenerator.BLOCK_TNT && tntFuseTicks > 0
-                        && x == tntX && z == tntZ && tntFlashOn) { topTileX = 9; topTileY = 0; }
-                vertex = addQuad(positions, texCoords, colors, stripLengths,
-                    vertex, strip++, x, h, z, x, h, z + 1,
-                    x + 1, h, z, x + 1, h, z + 1, topTileX, topTileY);
-
                 int neighbor = terrain.getHeight(x - 1, z);
                 for (int sy = neighbor; sy < h; sy++) {
                     vertex = addQuad(positions, texCoords, colors, stripLengths,
@@ -1356,20 +1350,107 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
         }
 
-        VertexArray vertexArray = new VertexArray(vertexCount, 3, 2);
-        vertexArray.set(0, vertexCount, positions);
-        VertexArray texArray = new VertexArray(vertexCount, 2, 2);
-        texArray.set(0, vertexCount, texCoords);
-        VertexBuffer buffer = new VertexBuffer();
-        buffer.setPositions(vertexArray, 1.0f, null);
-        buffer.setTexCoords(0, texArray, 1.0f / 256.0f, null);
-        VertexArray colorArray = new VertexArray(vertexCount, 3, 1);
-        colorArray.set(0, vertexCount, colors);
-        buffer.setColors(colorArray);
-        TriangleStripArray triangles = new TriangleStripArray(0, stripLengths);
-        return new Mesh(buffer, triangles, groundAppearance);
+        Group chunkGroup = new Group();
+        if (vertexCount > 0) {
+            VertexArray vertexArray = new VertexArray(vertexCount, 3, 2);
+            vertexArray.set(0, vertexCount, positions);
+            VertexArray texArray = new VertexArray(vertexCount, 2, 2);
+            texArray.set(0, vertexCount, texCoords);
+            VertexBuffer buffer = new VertexBuffer();
+            buffer.setPositions(vertexArray, 1.0f, null);
+            buffer.setTexCoords(0, texArray, 1.0f / 256.0f, null);
+            VertexArray colorArray = new VertexArray(vertexCount, 3, 1);
+            colorArray.set(0, vertexCount, colors);
+            buffer.setColors(colorArray);
+            TriangleStripArray triangles = new TriangleStripArray(0, stripLengths);
+            chunkGroup.addChild(new Mesh(buffer, triangles, groundAppearance));
+        }
+        buildGreedyTopMeshes(chunkGroup, chunkX, chunkZ);
+        return chunkGroup;
     }
 
+
+
+    /** Merge compatible adjacent top faces while repeating their own 16x16 tile. */
+    private void buildGreedyTopMeshes(Group chunkGroup, int chunkX, int chunkZ) {
+        int startX = chunkX * CHUNK, startZ = chunkZ * CHUNK;
+        int[][] keys = new int[CHUNK][CHUNK], hs = new int[CHUNK][CHUNK];
+        int[][] bases = new int[CHUNK][CHUNK], glows = new int[CHUNK][CHUNK];
+        boolean[][] used = new boolean[CHUNK][CHUNK];
+        int max = CHUNK * CHUNK;
+        int[] rx=new int[max], rz=new int[max], rw=new int[max], rd=new int[max], rh=new int[max];
+        int[] rk=new int[max], rb=new int[max], rg=new int[max];
+        int count=0, x, z;
+        for (x=0;x<CHUNK;x++) for(z=0;z<CHUNK;z++) {
+            int wx=startX+x, wz=startZ+z, h=terrain.getHeight(wx,wz);
+            int type=terrain.getTopType(wx,wz), tx=BLOCK_TILE_X[type], ty=BLOCK_TILE_Y[type];
+            if(type==TerrainGenerator.BLOCK_TNT && tntFuseTicks>0 && wx==tntX && wz==tntZ && tntFlashOn){tx=9;ty=0;}
+            keys[x][z]=ty*16+tx; hs[x][z]=h;
+            bases[x][z]=terrain.getShadowShade(wx,wz,h); glows[x][z]=torchGlowAt(wx,h,wz);
+        }
+        for(x=0;x<CHUNK;x++) for(z=0;z<CHUNK;z++) {
+            if(used[x][z]) continue;
+            int key=keys[x][z], h=hs[x][z], base=bases[x][z], glow=glows[x][z];
+            int depth=1;
+            while(z+depth<CHUNK && !used[x][z+depth] && keys[x][z+depth]==key
+                && hs[x][z+depth]==h && bases[x][z+depth]==base && glows[x][z+depth]==glow) depth++;
+            int width=1; boolean extend=true;
+            while(x+width<CHUNK && extend) {
+                for(int dz=0;dz<depth;dz++) {
+                    int xx=x+width, zz=z+dz;
+                    if(used[xx][zz] || keys[xx][zz]!=key || hs[xx][zz]!=h
+                        || bases[xx][zz]!=base || glows[xx][zz]!=glow){extend=false;break;}
+                }
+                if(extend) width++;
+            }
+            for(int dx=0;dx<width;dx++) for(int dz=0;dz<depth;dz++) used[x+dx][z+dz]=true;
+            rx[count]=x; rz[count]=z; rw[count]=width; rd[count]=depth; rh[count]=h;
+            rk[count]=key; rb[count]=base; rg[count]=glow; count++;
+        }
+        int[] perTile=new int[256];
+        for(int i=0;i<count;i++) perTile[rk[i]]++;
+        for(int key=0;key<256;key++) {
+            int n=perTile[key]; if(n==0) continue;
+            short[] pos=new short[n*12], uv=new short[n*8]; byte[] colors=new byte[n*12];
+            int[] strips=new int[n]; int out=0;
+            for(int i=0;i<count;i++) {
+                if(rk[i]!=key) continue;
+                int wx=startX+rx[i], wz=startZ+rz[i], w=rw[i], d=rd[i], y=rh[i];
+                int base=rb[i], glow=rg[i], shade=base+glow; if(shade>255)shade=255;
+                int green=shade-glow/5, blue=shade-glow/2;
+                if(green<base)green=base; if(blue<base)blue=base;
+                int p=out*12;
+                pos[p]=(short)wx;pos[p+1]=(short)y;pos[p+2]=(short)wz;
+                pos[p+3]=(short)wx;pos[p+4]=(short)y;pos[p+5]=(short)(wz+d);
+                pos[p+6]=(short)(wx+w);pos[p+7]=(short)y;pos[p+8]=(short)wz;
+                pos[p+9]=(short)(wx+w);pos[p+10]=(short)y;pos[p+11]=(short)(wz+d);
+                int t=out*8;
+                uv[t]=0;uv[t+1]=0; uv[t+2]=0;uv[t+3]=(short)(d*16);
+                uv[t+4]=(short)(w*16);uv[t+5]=0; uv[t+6]=(short)(w*16);uv[t+7]=(short)(d*16);
+                for(int v=0;v<4;v++){int c=(out*4+v)*3;colors[c]=(byte)shade;colors[c+1]=(byte)green;colors[c+2]=(byte)blue;}
+                strips[out]=4; out++;
+            }
+            VertexArray pa=new VertexArray(n*4,3,2);pa.set(0,n*4,pos);
+            VertexArray ta=new VertexArray(n*4,2,2);ta.set(0,n*4,uv);
+            VertexArray ca=new VertexArray(n*4,3,1);ca.set(0,n*4,colors);
+            VertexBuffer vb=new VertexBuffer();vb.setPositions(pa,1.0f,null);
+            vb.setTexCoords(0,ta,1.0f/16.0f,null);vb.setColors(ca);
+            chunkGroup.addChild(new Mesh(vb,new TriangleStripArray(0,strips),getTerrainTileAppearance(key)));
+        }
+    }
+
+    private Appearance getTerrainTileAppearance(int key) {
+        if(terrainTileAppearances[key]!=null)return terrainTileAppearances[key];
+        int tx=key&15, ty=key>>4; int[] pixels=new int[256];
+        terrainAtlasImage.getRGB(pixels,0,16,tx*16,ty*16,16,16);
+        Image tile=Image.createRGBImage(pixels,16,16,true);
+        Texture2D tex=new Texture2D(new Image2D(Image2D.RGBA,tile));
+        tex.setFiltering(Texture2D.FILTER_BASE_LEVEL,Texture2D.FILTER_NEAREST);
+        tex.setWrapping(Texture2D.WRAP_REPEAT,Texture2D.WRAP_REPEAT);
+        Appearance app=new Appearance();app.setTexture(0,tex);app.setFog(distanceFog);
+        PolygonMode pm=new PolygonMode();pm.setCulling(PolygonMode.CULL_NONE);pm.setShading(PolygonMode.SHADE_FLAT);
+        app.setPolygonMode(pm);terrainTileAppearances[key]=app;return app;
+    }
 
     private int sideTile(int topType, int layerType, int y, int height) {
         if (topType == TerrainGenerator.BLOCK_GRASS && y == height - 1) return 3;
