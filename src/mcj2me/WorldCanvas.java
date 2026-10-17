@@ -305,9 +305,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void drawNightOverlay(Graphics g) {
-        int alpha = (int)((1.0f - daylightLevel) * 105.0f);
+        int alpha = (int)((1.0f - daylightLevel) * 100.0f);
+        alpha = (alpha / 25) * 25;
         if (alpha < 0) alpha = 0;
-        if (alpha > 105) alpha = 105;
+        if (alpha > 100) alpha = 100;
         if (alpha == 0) return;
         int w = getWidth(), h = getHeight();
         if (nightOverlay == null || nightOverlayWidth != w || nightOverlayHeight != h
