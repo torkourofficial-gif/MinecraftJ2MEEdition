@@ -703,7 +703,7 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     private Mesh buildCloudPlane(Appearance appearance) {
         short[] positions = {-64, 60, -64, -64, 60, 192, 192, 60, -64, 192, 60, 192};
-        short[] texCoords = {0, 0, 0, 16, 16, 0, 16, 16};
+        short[] texCoords = {0, 0, 0, 1, 1, 0, 1, 1};
         int[] indices = {0, 1, 2, 3};
         int[] stripLengths = {4};
         VertexArray positionArray = new VertexArray(4, 3, 2);
@@ -720,7 +720,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private void animateWater() {
         waterPhase += 0.012f;
         if (waterPhase >= 1.0f) waterPhase -= 1.0f;
-        cloudPhase += 0.0008f;
+        cloudPhase += 0.0001f;
         if (cloudPhase >= 1.0f) cloudPhase -= 1.0f;
         cloudTexture.setTranslation(cloudPhase, 0.0f, 0.0f);
         // Texture2D is Transformable in M3G; repeating coordinates make this
