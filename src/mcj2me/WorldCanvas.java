@@ -57,9 +57,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Image guiImage;
     private Image guiBlocksImage;
     private Image inventoryImage;
-    private final Image[] blockIcons = new Image[21];
+    private final Image[] blockIcons = new Image[40];
     private boolean inventoryOpen = false;
     private int inventoryCursor = 0;
+    private int inventoryPageStart = 0;
     private float cloudPhase = 0.0f;
     private Appearance waterAppearance;
     private Fog distanceFog;
@@ -84,16 +85,36 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean lookUp, lookDown, turnLeft, turnRight;
     private boolean jumpHeld;
     // Indev-era terrain atlas tiles: surface blocks, ores, then bedrock.
-    private static final int[] BLOCK_TILE_X = {0, 2, 1, 5, 4, 2, 1, 2, 2, 1, 8, 4, 2, 3, 6, 5, 0, 13, 12, 15, 1};
-    private static final int[] BLOCK_TILE_Y = {0, 0, 0, 1, 3, 1, 2, 2, 3, 1, 0, 1, 4, 1, 0, 3, 5, 0, 0, 0, 5};
+    private static final int[] BLOCK_TILE_X = {
+        0, 2, 1, 5, 4, 2, 1, 2, 2, 1, 8, 4, 2, 3, 6, 5, 0, 13, 12, 15, 1,
+        6, 7, 8,
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+    };
+    private static final int[] BLOCK_TILE_Y = {
+        0, 0, 0, 1, 3, 1, 2, 2, 3, 1, 0, 0, 4, 1, 0, 3, 5, 0, 0, 0, 5,
+        1, 1, 1,
+        6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6
+    };
     // 48x48 block icons in gui_blocks.png, mapped to grass/dirt/stone/log/leaves.
     // 48x48 cells verified against gui_blocks.png: grass, dirt, stone,
     // oak log, and leaves. The sheet is a block-icon atlas, not textures.png.
     private static final int[] GUI_ICON_X = {432, 144, 0, 288, 96};
     private static final int[] GUI_ICON_Y = {0, 288, 0, 48, 288};
     private static final int BLOCK_TORCH = 16, BLOCK_YELLOW_FLOWER = 17, BLOCK_RED_FLOWER = 18, BLOCK_SAPLING = 19, BLOCK_DOOR = 20;
-    private static final String[] BLOCK_NAMES = {"GRASS", "DIRT", "STONE", "WOOD", "LEAVES", "COAL", "IRON", "GOLD", "DIAMOND", "BEDROCK", "TNT", "PLANKS", "SAND", "GRAVEL", "BRICK", "OBSIDIAN", "TORCH", "YELLOW FLOWER", "RED FLOWER", "SAPLING", "DOOR"};
-    private final int[] inventory = {64, 64, 64, 64, 64, 16, 8, 8, 4, 0, 8, 32, 32, 32, 16, 8, 16, 4, 4, 4, 2};
+    private static final String[] BLOCK_NAMES = {
+        "GRASS", "DIRT", "STONE", "WOOD", "LEAVES", "COAL ORE", "IRON ORE", "GOLD ORE", "DIAMOND ORE",
+        "BEDROCK", "TNT", "OAK PLANKS", "SAND", "GRAVEL", "BRICK", "OBSIDIAN",
+        "TORCH", "YELLOW FLOWER", "RED FLOWER", "SAPLING", "DOOR",
+        "IRON BLOCK", "GOLD BLOCK", "DIAMOND BLOCK",
+        "WHITE WOOL", "ORANGE WOOL", "MAGENTA WOOL", "LIGHT BLUE WOOL", "YELLOW WOOL", "LIME WOOL",
+        "PINK WOOL", "GRAY WOOL", "LIGHT GRAY WOOL", "CYAN WOOL", "PURPLE WOOL", "BLUE WOOL",
+        "BROWN WOOL", "GREEN WOOL", "RED WOOL", "BLACK WOOL"
+    };
+    private final int[] inventory = {
+        64, 64, 64, 64, 64, 16, 8, 8, 4, 0, 8, 64, 32, 32, 16, 8,
+        16, 4, 4, 4, 2, 8, 8, 8,
+        16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16
+    };
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
     private int tntFuseTicks = 0, tntX = -1, tntZ = -1, tntFlashCounter = 0;
     private boolean tntFlashOn = false;
@@ -148,7 +169,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         decorationGroup = new Group();
         camera = new Camera();
 
-        Image atlas = Image.createImage("/mcj2me/textures.png");
+        Image atlas = createWoolAtlas(Image.createImage("/mcj2me/textures.png"));
         guiImage = Image.createImage("/mcj2me/gui.png");
         guiBlocksImage = Image.createImage("/mcj2me/gui_blocks.png");
         inventoryImage = Image.createImage("/mcj2me/inventory.png");
@@ -373,14 +394,15 @@ final class WorldCanvas extends Canvas implements Runnable {
         int gridX = panelX + 8;
         int gridY = panelY + 84;
         for (int slot = 0; slot < 27; slot++) {
+            int item = inventoryPageStart + slot;
             int sx = gridX + (slot % 9) * 18;
             int sy = gridY + (slot / 9) * 18;
-            if (slot < blockIcons.length) {
-                g.drawImage(blockIcons[slot], sx + 1, sy + 1,
+            if (item < blockIcons.length) {
+                g.drawImage(blockIcons[item], sx + 1, sy + 1,
                     Graphics.TOP | Graphics.LEFT);
-                if (inventory[slot] > 0) {
+                if (inventory[item] > 0) {
                     g.setColor(0xFFFFFF);
-                    g.drawString(Integer.toString(inventory[slot]), sx + 10,
+                    g.drawString(Integer.toString(inventory[item]), sx + 10,
                         sy + 8, Graphics.TOP | Graphics.LEFT);
                 }
             }
@@ -390,10 +412,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         g.setColor(0xFFFFFF);
         g.drawRect(cursorX - 1, cursorY - 1, 17, 17);
         g.drawRect(cursorX - 2, cursorY - 2, 19, 19);
-        String selectedName = inventoryCursor < BLOCK_NAMES.length
-            ? BLOCK_NAMES[inventoryCursor] : "EMPTY";
+        int selectedItem = inventoryPageStart + inventoryCursor;
+        String selectedName = selectedItem < BLOCK_NAMES.length
+            ? BLOCK_NAMES[selectedItem] : "EMPTY";
         g.setColor(0xFFFFFF);
-        g.drawString(selectedName + "  (5: select, *: close)",
+        g.drawString(selectedName + "  (5: select, 7/9: page, *: close)",
             Math.max(2, panelX), Math.min(getHeight() - 16, panelY + panelH + 2),
             Graphics.TOP | Graphics.LEFT);
     }
@@ -465,6 +488,16 @@ final class WorldCanvas extends Canvas implements Runnable {
                 repaint();
                 return;
             }
+            if (keyCode == '9' && inventoryPageStart == 0) {
+                inventoryPageStart = 13;
+                repaint();
+                return;
+            }
+            if (keyCode == '7' && inventoryPageStart != 0) {
+                inventoryPageStart = 0;
+                repaint();
+                return;
+            }
             int col = inventoryCursor % 9;
             int row = inventoryCursor / 9;
             if (action == LEFT || keyCode == '4') col--;
@@ -477,8 +510,9 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (row > 2) row = 2;
             inventoryCursor = row * 9 + col;
             if (action == FIRE || keyCode == '5' || keyCode == ' ') {
-                if (inventoryCursor < BLOCK_NAMES.length && inventoryCursor != TerrainGenerator.BLOCK_BEDROCK)
-                    selectedSlot = inventoryCursor;
+                int item = inventoryPageStart + inventoryCursor;
+                if (item < BLOCK_NAMES.length && item != TerrainGenerator.BLOCK_BEDROCK)
+                    selectedSlot = item;
             }
             repaint();
             return;
@@ -944,6 +978,40 @@ final class WorldCanvas extends Canvas implements Runnable {
      * Scale one 48x48 pre-rendered inventory block icon to 16x16 using nearest
      * neighbour sampling, preserving the pixel-art look on small J2ME screens.
      */
+    // Generate all 16 classic wool colors from the atlas's white wool tile.
+    // The generated variants occupy unused atlas cells on row 6.
+    private Image createWoolAtlas(Image source) {
+        int width = source.getWidth(), height = source.getHeight();
+        int[] pixels = new int[width * height];
+        source.getRGB(pixels, 0, width, 0, 0, width, height);
+        int[] woolColors = {
+            0xF0F0F0, 0xF2B233, 0xD87FAD, 0x99BBDD,
+            0xE5E533, 0x7FCC19, 0xF2B2CC, 0x4C4C4C,
+            0x999999, 0x4C7F99, 0x7F3FB2, 0x334CB2,
+            0x664C33, 0x667F33, 0x993333, 0x191919
+        };
+        int[] base = new int[256];
+        source.getRGB(base, 0, 16, 0, 4 * 16, 16, 16);
+        for (int color = 0; color < woolColors.length; color++) {
+            int tint = woolColors[color];
+            int tr = (tint >> 16) & 255, tg = (tint >> 8) & 255, tb = tint & 255;
+            int tileX = color * 16;
+            for (int py = 0; py < 16; py++) {
+                for (int px = 0; px < 16; px++) {
+                    int original = base[py * 16 + px];
+                    int a = (original >>> 24) & 255;
+                    int r = (original >> 16) & 255;
+                    int g = (original >> 8) & 255;
+                    int b = original & 255;
+                    int nr = (r * tr) / 255, ng = (g * tg) / 255, nb = (b * tb) / 255;
+                    pixels[(6 * 16 + py) * width + tileX + px] =
+                        (a << 24) | (nr << 16) | (ng << 8) | nb;
+                }
+            }
+        }
+        return Image.createRGBImage(pixels, width, height, true);
+    }
+
     private Image createGuiBlockIcon(int sourceX, int sourceY) {
         int[] source = new int[48 * 48];
         guiBlocksImage.getRGB(source, 0, 48, sourceX, sourceY, 48, 48);
@@ -1593,7 +1661,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         int[] hit = raycastSurface();
         if (hit == null) return;
         int x = hit[0], z = hit[1], h = terrain.getHeight(x, z);
-        if (selectedSlot >= BLOCK_TORCH) {
+        if (selectedSlot >= BLOCK_TORCH && selectedSlot <= BLOCK_DOOR) {
             if (decorationCount >= MAX_DECORATIONS) return;
             if (h >= TerrainGenerator.HEIGHT - 3) return;
             if (placeDecoration(selectedSlot, x + 0.5f, h, z + 0.5f)) {
