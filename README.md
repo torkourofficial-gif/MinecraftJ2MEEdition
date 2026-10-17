@@ -1,8 +1,8 @@
 # Minecraft J2ME Edition — Indev terrain prototype
 
 Procedural 128 × 128 terrain using Java ME MIDP 2.0, CLDC 1.1 and M3G
-(JSR-184). This milestone adds acceleration/friction-based movement, jumping with gravity, smoother terrain following, decorative trees with wood/leaf textures, per-block side texture tiling, surface-column block editing, a hotbar, animated translucent water, water-entry splash particles and slower movement in water.
-It is still height-map based, not a complete voxel engine. Movement uses square column collision with one-block stepping and blocks movement through taller terrain columns; block editing still changes only column tops.
+(JSR-184). This milestone adds acceleration/friction-based movement, jumping with gravity, smoother terrain following, decorative trees with wood/leaf textures, per-block side texture tiling, surface-column block editing, a hotbar, animated translucent water blocks, exposed shoreline water faces, water-entry splash particles and slower movement in water.
+Solid terrain is still height-map based rather than a complete voxel engine, but water is represented as discrete vertical block cells from the terrain surface to the waterline. Movement uses square column collision with one-block stepping, and swimming physics still prevents the player from passing through the solid lake floor.
 
 ## Requirements
 
@@ -22,7 +22,7 @@ It is still height-map based, not a complete voxel engine. Movement uses square 
 - **W / A / S / D:** movement in desktop emulators
 - **Fire / center:** jump (press again after landing)
 
-Water is restricted to broad, bowl-shaped depressions distributed across the terrain; sloping rims help keep the shoreline above the waterline at height 25. The surface texture scrolls, entry triggers a splash, movement slows in water, a translucent blue screen tint appears only when the camera itself is below the waterline, and holding Fire/center strokes upward so the camera can break the surface.
+Water occupies discrete block cells inside generated basins, with a top face and exposed vertical shoreline faces rather than a single shared flat sheet. The water texture scrolls, entry triggers a splash, movement slows in water, a translucent blue screen tint appears only when the camera itself is below the waterline, and holding Fire/center strokes upward so the camera can break the surface. Solid-ground collision remains active underwater.
 
 Block editing currently changes the top of a terrain column; side-face mining,
 caves, persistence, mobs and survival are not implemented. Trees are decorative.
