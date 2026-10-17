@@ -5,6 +5,15 @@ import javax.microedition.lcdui.Display;
 
 /** MIDP entry point. The world is created only after Singleplayer is selected. */
 public final class IndevViewerMIDlet extends MIDlet {
+    static int sensitivity = 3;
+    static int fogLevel = 1;
+
+    static int fogFarDistance() {
+        if (fogLevel == 0) return 32;
+        if (fogLevel == 2) return 80;
+        return 52;
+    }
+
     private TitleScreen titleScreen;
     private WorldCanvas worldCanvas;
 
