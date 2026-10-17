@@ -198,7 +198,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         // Transparent water/clouds keep two-sided rendering below because the
         // camera can see them from underneath.
         PolygonMode terrainPolygonMode = new PolygonMode();
-        terrainPolygonMode.setCulling(PolygonMode.CULL_BACK);
+        // Keep terrain two-sided until every generated tree-face winding is verified.
+        terrainPolygonMode.setCulling(PolygonMode.CULL_NONE);
         terrainPolygonMode.setShading(PolygonMode.SHADE_FLAT);
         groundAppearance.setPolygonMode(terrainPolygonMode);
 
