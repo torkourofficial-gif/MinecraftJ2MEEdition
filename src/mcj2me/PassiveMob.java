@@ -200,7 +200,11 @@ final class PassiveMob {
         VertexBuffer buffer = new VertexBuffer();
         buffer.setPositions(p, 1.0f / 16.0f, null);
         buffer.setTexCoords(0, t, 1.0f / 1024.0f, null);
-        return new Mesh(buffer, new TriangleStripArray(indices, strips), appearance);
+        Mesh result = new Mesh(buffer, new TriangleStripArray(indices, strips), appearance);
+        if (mobType == MOB_COW) result.setScale(1.0f, 0.86f, 1.0f);
+        else if (mobType == MOB_SHEEP) result.setScale(1.0f, 0.80f, 1.0f);
+        else if (mobType == MOB_ZOMBIE) result.setScale(0.80f, 1.0f, 0.80f);
+        return result;
     }
 
     /** Returns UV rectangles for front, back, left, right, top and bottom faces. */
@@ -219,8 +223,8 @@ final class PassiveMob {
             else { x=0; y=16; w=4; h=12; d=4; }                // legs
         } else if (mobType == MOB_PIG) {
             if (part == 0) { x=0; y=0; w=8; h=8; d=8; }          // head
-            else if (part == 1) { x=28; y=8; w=10; h=16; d=8; }// body
-            else { x=0; y=16; w=4; h=6; d=4; }                 // legs
+            else if (part == 1) { x=28; y=8; w=10; h=8; d=8; }// body
+            else { x=0; y=16; w=4; h=6; d=4; }                  // legs
         } else {
             if (part == 0) { x=0; y=0; w=8; h=8; d=6; }          // head
             else if (part == 1) { x=28; y=8; w=8; h=16; d=6; }// body
