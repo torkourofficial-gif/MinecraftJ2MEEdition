@@ -233,9 +233,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         while (running) {
             if (!paused) {
                 if (menuScreen) {
-                    int maxPan = Math.max(0, menuPanorama.getWidth() - Math.max(1, getWidth()));
-                    menuPanoramaPhase += 0.35f;
-                    if (menuPanoramaPhase > maxPan) menuPanoramaPhase = 0.0f;
+                    if (menuPanorama != null) {
+                        int maxPan = Math.max(0, menuPanorama.getWidth() - Math.max(1, getWidth()));
+                        menuPanoramaPhase += 0.35f;
+                        if (menuPanoramaPhase > maxPan) menuPanoramaPhase = 0.0f;
+                    }
                 } else {
                     updateMovement();
                     animateWater();
@@ -327,12 +329,6 @@ final class WorldCanvas extends Canvas implements Runnable {
         int panX = Math.min(maxPan, (int) menuPanoramaPhase);
         g.drawRegion(menuPanorama, panX, 0, w, h, 0, 0, 0,
                      Graphics.TOP | Graphics.LEFT);
-
-        // Darken the lower half so the classic gray menu buttons stay legible.
-        g.setColor(0x101820);
-        g.fillRect(0, h / 2, w, h - h / 2);
-        g.setColor(0x000000);
-        g.fillRect(0, h / 2, w, 2);
 
         int titleX = (w - menuTitle.getWidth()) / 2;
         int titleY = Math.max(8, h / 10);
@@ -488,8 +484,13 @@ final class WorldCanvas extends Canvas implements Runnable {
         int action = getGameAction(keyCode);
 
         if (menuScreen) {
-            if (action == UP || keyCode == '2' || action == DOWN || keyCode == '8') {
-                menuSelected = 1 - menuSelected;
+            if (action == UP || keyCode == '2') {
+                menuSelected = 0;
+                repaint();
+                return;
+            }
+            if (action == DOWN || keyCode == '8') {
+                menuSelected = 1;
                 repaint();
                 return;
             }
