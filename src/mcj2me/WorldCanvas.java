@@ -1961,30 +1961,30 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         // Front and back: two separately textured 1x1 panels per side.
         v = appendDoorQuad(positions, texCoords, v,
-            -8,0,-1, -8,16,-1, 8,0,-1, 8,16,-1, doorX,doorY);
+            -16,0,-3, -16,32,-3, 16,0,-3, 16,32,-3, doorX,doorY);
         v = appendDoorQuad(positions, texCoords, v,
-            -8,16,-1, -8,32,-1, 8,16,-1, 8,32,-1, doorX+1,doorY);
+            -16,32,-3, -16,64,-3, 16,32,-3, 16,64,-3, doorX+1,doorY);
         v = appendDoorQuad(positions, texCoords, v,
-            8,0,1, 8,16,1, -8,0,1, -8,16,1, doorX,doorY);
+            16,0,3, 16,32,3, -16,0,3, -16,32,3, doorX,doorY);
         v = appendDoorQuad(positions, texCoords, v,
-            8,16,1, 8,32,1, -8,16,1, -8,32,1, doorX+1,doorY);
+            16,32,3, 16,64,3, -16,32,3, -16,64,3, doorX+1,doorY);
 
         // Narrow edges use the plank tile, with the top/bottom capped.
         v = appendDoorQuad(positions, texCoords, v,
-            -8,0,1, -8,32,1, -8,0,-1, -8,32,-1, plankX,plankY);
+            -16,0,3, -16,64,3, -16,0,-3, -16,64,-3, plankX,plankY);
         v = appendDoorQuad(positions, texCoords, v,
-            8,0,-1, 8,32,-1, 8,0,1, 8,32,1, plankX,plankY);
+            16,0,-3, 16,64,-3, 16,0,3, 16,64,3, plankX,plankY);
         v = appendDoorQuad(positions, texCoords, v,
-            -8,32,-1, -8,32,1, 8,32,-1, 8,32,1, plankX,plankY);
+            -16,64,-3, -16,64,3, 16,64,-3, 16,64,3, plankX,plankY);
         v = appendDoorQuad(positions, texCoords, v,
-            -8,0,1, -8,0,-1, 8,0,1, 8,0,-1, plankX,plankY);
+            -16,0,3, -16,0,-3, 16,0,3, 16,0,-3, plankX,plankY);
 
         VertexArray pa = new VertexArray(v, 3, 2);
         pa.set(0, v, positions);
         VertexArray ta = new VertexArray(v, 2, 2);
         ta.set(0, v, texCoords);
         VertexBuffer vb = new VertexBuffer();
-        vb.setPositions(pa, 1.0f / 16.0f, null);
+        vb.setPositions(pa, 1.0f / 32.0f, null);
         vb.setTexCoords(0, ta, 1.0f / 256.0f, null);
         int[] stripLengths = {4,4,4,4,4,4,4,4};
         int[] indices = new int[v];
