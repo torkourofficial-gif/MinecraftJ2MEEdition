@@ -49,11 +49,11 @@ final class TitleScreen extends Canvas implements Runnable {
     }
     public void run() {
         while (running) {
-            if (panorama==null && skyboxPixels!=null) {
-                cubeYaw += 0.004f;
-                if (cubeYaw > Math.PI * 2.0) cubeYaw -= (float)(Math.PI * 2.0);
-                renderCubeFrame();
-            } else if (panorama!=null) {
+            // The cube frame is intentionally rendered once per screen size.
+            // Recreating several full-screen Images every 80 ms caused heavy
+            // heap churn on small CLDC/M3G devices. Keep the generated frame
+            // cached until the display dimensions change.
+            if (panorama!=null) {
                 panoramaOffset+=0.35f;
                 int max=Math.max(0,panorama.getWidth()-Math.max(1,getWidth()));
                 if (panoramaOffset>max) panoramaOffset=0;
