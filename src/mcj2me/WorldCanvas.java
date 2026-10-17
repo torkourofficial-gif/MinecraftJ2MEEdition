@@ -112,6 +112,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Thread thread;
     private boolean running;
     private int frameSkipCounter = 0;
+    private final int[] surfaceHitResult = new int[4];
+    private final int[] leafHitResult = new int[3];
     private boolean paused;
     private boolean forward, backward, strafeLeft, strafeRight;
     private boolean lookUp, lookDown, turnLeft, turnRight;
@@ -1119,6 +1121,32 @@ final class WorldCanvas extends Canvas implements Runnable {
     /** Force a fresh terrain/water mesh rebuild after an edit, even if the
      * player remains inside the same chunk. Synchronization prevents the game
      * loop from racing the key handler while meshes are removed and recreated. */
+    private synchronized void invalidateEditedArea(int minX, int maxX, int minZ, int maxZ) {
+        minX = Math.max(1, minX - 1);
+        maxX = Math.min(TerrainGenerator.SIZE - 2, maxX + 1);
+        minZ = Math.max(1, minZ - 1);
+        maxZ = Math.min(TerrainGenerator.SIZE - 2, maxZ + 1);
+        int minChunkX = minX / CHUNK, maxChunkX = maxX / CHUNK;
+        int minChunkZ = minZ / CHUNK, maxChunkZ = maxZ / CHUNK;
+        for (int x = minChunkX; x <= maxChunkX; x++) {
+            for (int z = minChunkZ; z <= maxChunkZ; z++) {
+                Group old = activeChunks[x][z];
+                if (old != null) {
+                    terrainGroup.removeChild(old);
+                    activeChunks[x][z] = null;
+                }
+                Mesh oldWater = activeWaterChunks[x][z];
+                if (oldWater != null) {
+                    waterGroup.removeChild(oldWater);
+                    activeWaterChunks[x][z] = null;
+                }
+                builtChunks[x][z] = false;
+            }
+        }
+        // Let the normal game loop rebuild at most one chunk per tick.
+        chunksDirty = true;
+    }
+
     private synchronized void reloadEditedChunks() {
         // An edit invalidates the currently visible terrain meshes, but not
         // chunks elsewhere in the world. Drop only the active window; the
@@ -1877,7 +1905,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (tntFlashCounter >= 12) {
             tntFlashCounter = 0;
             tntFlashOn = !tntFlashOn;
-            reloadEditedChunks();
+            // Only the TNT's chunk needs new UVs for the flashing tile.
+            invalidateEditedArea(tntX, tntX, tntZ, tntZ);
         }
         if (tntFuseTicks == 0) explodeTnt();
     }
@@ -1921,7 +1950,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
         }
         spawnExplosionDebris(debrisTypes, debrisX, debrisY, debrisZ);
-        reloadEditedChunks();
+        invalidateEditedArea(cx - radius, cx + radius, cz - radius, cz + radius);
         resolvePlayerAfterTerrainEdit();
     }
 
@@ -1955,7 +1984,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (leafHit != null && terrain.removeLeafBlock(leafHit[0], leafHit[1], leafHit[2])) {
             spawnBlockParticles(4, leafHit[0] + 0.5f, leafHit[1] + 0.5f,
                 leafHit[2] + 0.5f);
-            reloadEditedChunks();
+            invalidateEditedArea(leafHit[0], leafHit[0], leafHit[2], leafHit[2]);
             updateCamera();
             return;
         }
@@ -1974,7 +2003,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (type == TerrainGenerator.BLOCK_TNT) {
             if (tntFuseTicks == 0) {
                 tntX=x; tntZ=z; tntFuseTicks=125; tntFlashCounter=0; tntFlashOn=true;
-                reloadEditedChunks();
+                invalidateEditedArea(x, x, z, z);
             }
             return;
         }
@@ -1993,7 +2022,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             terrain.setHeight(x, z, h - 1);
             terrain.setTopType(x, z, nextType);
         }
-        reloadEditedChunks();
+        invalidateEditedArea(x, x, z, z);
         resolvePlayerAfterTerrainEdit();
     }
 
@@ -2262,7 +2291,10 @@ final class WorldCanvas extends Canvas implements Runnable {
             int x = (int) (cameraX + dx * d);
             int y = (int) (cameraY + dy * d);
             int z = (int) (cameraZ + dz * d);
-            if (terrain.isLeafBlockAt(x, y, z)) return new int[] {x, y, z};
+            if (terrain.isLeafBlockAt(x, y, z)) {
+                leafHitResult[0] = x; leafHitResult[1] = y; leafHitResult[2] = z;
+                return leafHitResult;
+            }
         }
         return null;
     }
@@ -2291,7 +2323,9 @@ final class WorldCanvas extends Canvas implements Runnable {
             int surface = terrain.getHeight(x, z);
             // Top-face hit, including a small tolerance around the surface.
             if (fy <= surface + 0.25f && fy >= surface - 1.0f) {
-                return new int[] {x, z, surface - 1, 0};
+                surfaceHitResult[0] = x; surfaceHitResult[1] = z;
+                surfaceHitResult[2] = surface - 1; surfaceHitResult[3] = 0;
+                return surfaceHitResult;
             }
 
             // Side-face hit: this column rises above the ray while at least one
@@ -2301,7 +2335,9 @@ final class WorldCanvas extends Canvas implements Runnable {
                         || terrain.getHeight(x + 1, z) <= blockY
                         || terrain.getHeight(x, z - 1) <= blockY
                         || terrain.getHeight(x, z + 1) <= blockY) {
-                    return new int[] {x, z, blockY, 1};
+                    surfaceHitResult[0] = x; surfaceHitResult[1] = z;
+                    surfaceHitResult[2] = blockY; surfaceHitResult[3] = 1;
+                    return surfaceHitResult;
                 }
             }
         }
