@@ -895,29 +895,43 @@ final class WorldCanvas extends Canvas implements Runnable {
         loadedCenterZ = centerZ;
         loadedFacingSector = sector;
 
-        // Build only one missing chunk per tick. builtChunks also records empty
-        // water meshes, so a chunk with no water isn't rebuilt every frame.
+        // Prioritize the nearest missing chunk so the area around the player
+        // becomes usable first instead of filling the cache in array order.
+        int bestX = -1;
+        int bestZ = -1;
+        float bestDistance = Float.MAX_VALUE;
         for (int x = 0; x < 8; x++) {
             for (int z = 0; z < 8; z++) {
                 boolean inRange = Math.abs(x - centerX) <= RADIUS
                     && Math.abs(z - centerZ) <= RADIUS;
                 boolean wanted = inRange && isChunkInFront(x, z, forwardX, forwardZ);
                 if (wanted && !builtChunks[x][z]) {
-                    Mesh mesh = buildChunk(x, z);
-                    if (mesh != null) {
-                        activeChunks[x][z] = mesh;
-                        terrainGroup.addChild(mesh);
+                    float dx = x * CHUNK + CHUNK * 0.5f - cameraX;
+                    float dz = z * CHUNK + CHUNK * 0.5f - cameraZ;
+                    float distance = dx * dx + dz * dz;
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        bestX = x;
+                        bestZ = z;
                     }
-                    Mesh waterMesh = buildWaterChunk(x, z);
-                    if (waterMesh != null) {
-                        activeWaterChunks[x][z] = waterMesh;
-                        waterGroup.addChild(waterMesh);
-                    }
-                    builtChunks[x][z] = true;
-                    updateChunkVisibility();
-                    return; // chunksDirty remains true; continue next tick
                 }
             }
+        }
+
+        if (bestX >= 0) {
+            Mesh mesh = buildChunk(bestX, bestZ);
+            if (mesh != null) {
+                activeChunks[bestX][bestZ] = mesh;
+                terrainGroup.addChild(mesh);
+            }
+            Mesh waterMesh = buildWaterChunk(bestX, bestZ);
+            if (waterMesh != null) {
+                activeWaterChunks[bestX][bestZ] = waterMesh;
+                waterGroup.addChild(waterMesh);
+            }
+            builtChunks[bestX][bestZ] = true;
+            updateChunkVisibility();
+            return; // chunksDirty remains true; continue next tick
         }
 
         chunksDirty = false;
