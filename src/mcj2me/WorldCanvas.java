@@ -275,10 +275,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         else if (keyCode == '9') { selectedSlot++; if (selectedSlot > 2) selectedSlot = 0; }
         // In water, Fire/center is the swim-up control and can be held/re-tapped
         // while already airborne. On land it remains the normal jump button.
-        if (action == FIRE) {
+        if (action == FIRE || keyCode == '5' || keyCode == ' ') {
             jumpHeld = true;
             if (isSwimming()) {
-                verticalVelocity = 0.20f;
+                // Give the player an immediate upward stroke, then let held
+                // jump keep accelerating toward and through the water surface.
+                verticalVelocity = Math.max(verticalVelocity, 0.24f);
                 airborne = true;
             } else if (!airborne) {
                 verticalVelocity = JUMP_SPEED;
@@ -289,7 +291,7 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     protected synchronized void keyReleased(int keyCode) {
         int action = getGameAction(keyCode);
-        if (action == FIRE) jumpHeld = false;
+        if (action == FIRE || keyCode == '5' || keyCode == ' ') jumpHeld = false;
 
         if (keyCode == '2') {
             forward = false;
@@ -406,10 +408,10 @@ final class WorldCanvas extends Canvas implements Runnable {
             // continuously strokes upward; the camera can cross the surface
             // instead of being clamped just beneath it.
             if (!airborne) airborne = true;
-            if (jumpHeld) verticalVelocity += 0.035f;
+            if (jumpHeld) verticalVelocity += 0.055f;
             cameraY += verticalVelocity;
-            verticalVelocity -= GRAVITY * 0.18f;
-            verticalVelocity += 0.004f;
+            verticalVelocity -= GRAVITY * 0.12f;
+            verticalVelocity += 0.006f;
             if (verticalVelocity < -0.045f) verticalVelocity = -0.045f;
             if (verticalVelocity > 0.24f) verticalVelocity = 0.24f;
 
