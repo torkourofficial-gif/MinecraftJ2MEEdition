@@ -8,9 +8,12 @@ import javax.microedition.lcdui.Image;
 /** Animated title screen with a compact settings page. */
 final class TitleScreen extends Canvas implements Runnable {
     private final IndevViewerMIDlet owner;
-    private Image skybox, titleImage, panorama, scaledTitle;
+    private Image skybox, titleImage, panorama, scaledTitle, cubeFrame;
     private int renderWidth=-1, renderHeight=-1, selected=0;
+    private int[] skyboxPixels;
+    private int skyboxWidth, skyboxHeight;
     private float panoramaOffset;
+    private float cubeYaw;
     private Thread animationThread;
     private boolean running, settingsOpen, controlsOpen, waitingForBinding, pauseMenu;
     private int controlSelection = 0;
@@ -45,7 +48,11 @@ final class TitleScreen extends Canvas implements Runnable {
     }
     public void run() {
         while (running) {
-            if (panorama!=null) {
+            if (panorama==null && skyboxPixels!=null) {
+                cubeYaw += 0.012f;
+                if (cubeYaw > Math.PI * 2.0) cubeYaw -= (float)(Math.PI * 2.0);
+                renderCubeFrame();
+            } else if (panorama!=null) {
                 panoramaOffset+=0.35f;
                 int max=Math.max(0,panorama.getWidth()-Math.max(1,getWidth()));
                 if (panoramaOffset>max) panoramaOffset=0;
@@ -58,16 +65,30 @@ final class TitleScreen extends Canvas implements Runnable {
         int w=Math.max(1,getWidth()), h=Math.max(1,getHeight());
         if (renderWidth!=w || renderHeight!=h || panorama==null) {
             renderWidth=w; renderHeight=h;
-            if (skybox!=null) panorama=resizeImage(skybox,w*2,h,true);
+            if (skybox!=null) {
+                skyboxWidth=skybox.getWidth(); skyboxHeight=skybox.getHeight();
+                // Minecraft's classic title panorama is a cube map: four side faces,
+                // plus top and bottom, arranged as a 4-by-3 cross.
+                if (Math.abs((skyboxWidth/(float)skyboxHeight)-(4.0f/3.0f)) < 0.07f) {
+                    skyboxPixels=new int[skyboxWidth*skyboxHeight];
+                    skybox.getRGB(skyboxPixels,0,skyboxWidth,0,0,skyboxWidth,skyboxHeight);
+                    renderCubeFrame();
+                } else {
+                    // Keep compatibility with a conventional wide panorama asset.
+                    panorama=resizeImage(skybox,w*2,h,true);
+                }
+            }
             if (titleImage!=null) {
-                int maxW=Math.max(1,Math.min(w-20,512)), maxH=Math.max(1,Math.min(h/3,128));
+                int maxW=Math.max(1,Math.min(w-12,600)), maxH=Math.max(1,Math.min((h*2)/5,160));
                 float scale=Math.min((float)maxW/titleImage.getWidth(),(float)maxH/titleImage.getHeight());
                 scaledTitle=resizeImage(titleImage,Math.max(1,(int)(titleImage.getWidth()*scale)),
                     Math.max(1,(int)(titleImage.getHeight()*scale)),false);
             }
             panoramaOffset=0;
         }
-        if (panorama!=null) {
+        if (cubeFrame!=null) {
+            g.drawImage(cubeFrame,0,0,Graphics.TOP|Graphics.LEFT);
+        } else if (panorama!=null) {
             int px=Math.min(Math.max(0,panorama.getWidth()-w),(int)panoramaOffset);
             g.drawRegion(panorama,px,0,w,h,0,0,0,Graphics.TOP|Graphics.LEFT);
         } else { g.setColor(0x87BFEA); g.fillRect(0,0,w,h); }
@@ -126,6 +147,53 @@ final class TitleScreen extends Canvas implements Runnable {
         }
         g.setColor(0xFFFFFF); g.drawString("Minecraft J2ME Edition",5,h-17,Graphics.BOTTOM|Graphics.LEFT);
         g.setColor(0xFFFF55); g.drawString("Indev demake",w-5,h-17,Graphics.BOTTOM|Graphics.RIGHT);
+    }
+    /**
+     * Render a low-resolution view from inside a cubemap cross. The source layout is:
+     *             +Y
+     *       -X    +Z    +X    -Z
+     *             -Y
+     * A small software-rendered frame keeps this practical on CLDC-era phones.
+     */
+    private void renderCubeFrame() {
+        if (skyboxPixels==null || skyboxWidth<4 || skyboxHeight<3) return;
+        final int outW=120, outH=80;
+        int[] out=new int[outW*outH];
+        float aspect=(float)outW/outH;
+        float tanHalf=(float)Math.tan(Math.PI/4.0);
+        float cy=(float)Math.cos(cubeYaw), sy=(float)Math.sin(cubeYaw);
+        int cellW=skyboxWidth/4, cellH=skyboxHeight/3;
+        for (int py=0;py<outH;py++) {
+            float v=(1.0f-2.0f*(py+0.5f)/outH)*tanHalf;
+            for (int px=0;px<outW;px++) {
+                float u=(2.0f*(px+0.5f)/outW-1.0f)*aspect*tanHalf;
+                float dx=u*cy+sy, dy=v, dz=-u*sy+cy;
+                float ax=Math.abs(dx), ay=Math.abs(dy), az=Math.abs(dz);
+                int faceX,faceY;
+                float fu,fv,major;
+                if (ay>=ax && ay>=az) {
+                    major=ay;
+                    if (dy>=0) { faceX=1; faceY=0; fu=dx/major; fv=-dz/major; }
+                    else { faceX=1; faceY=2; fu=dx/major; fv=dz/major; }
+                } else if (ax>=az) {
+                    major=ax;
+                    if (dx>=0) { faceX=2; faceY=1; fu=-dz/major; fv=-dy/major; }
+                    else { faceX=0; faceY=1; fu=dz/major; fv=-dy/major; }
+                } else {
+                    major=az;
+                    if (dz>=0) { faceX=1; faceY=1; fu=dx/major; fv=-dy/major; }
+                    else { faceX=3; faceY=1; fu=-dx/major; fv=-dy/major; }
+                }
+                int sx=faceX*cellW+(int)((fu+1.0f)*0.5f*(cellW-1));
+                int syy=faceY*cellH+(int)((fv+1.0f)*0.5f*(cellH-1));
+                if (sx<faceX*cellW) sx=faceX*cellW;
+                if (sx>faceX*cellW+cellW-1) sx=faceX*cellW+cellW-1;
+                if (syy<faceY*cellH) syy=faceY*cellH;
+                if (syy>faceY*cellH+cellH-1) syy=faceY*cellH+cellH-1;
+                out[py*outW+px]=skyboxPixels[syy*skyboxWidth+sx];
+            }
+        }
+        cubeFrame=Image.createRGBImage(out,outW,outH,false);
     }
     private void drawButton(Graphics g,int x,int y,int w,int h,String label,boolean active) {
         g.setColor(active?0x777777:0x555555); g.fillRect(x,y,w,h);
