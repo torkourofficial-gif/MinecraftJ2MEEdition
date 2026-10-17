@@ -1,7 +1,7 @@
 # Minecraft J2ME Edition — Indev terrain prototype
 
 Procedural 128 × 128 terrain using Java ME MIDP 2.0, CLDC 1.1 and M3G
-(JSR-184). This milestone adds acceleration/friction-based movement, jumping with gravity, smoother terrain following, trees with individually breakable leaves and wood textures, simple vertex-color block shadows, per-block side texture tiling, surface-column block editing, a hotbar, animated translucent water blocks, exposed shoreline water faces, water-entry splash particles and slower movement in water.
+(JSR-184). This milestone adds acceleration/friction-based movement, jumping with gravity, smoother terrain following, trees with individually breakable leaves and wood textures, block-flat vertex-color shadows, per-block side texture tiling, surface-column block editing, a classic GUI hotbar with grass/dirt/stone/wood/leaves previews, slowly scrolling Indev-style clouds, animated translucent water blocks, exposed shoreline water faces, water-entry splash particles and slower movement in water.
 Solid terrain is still height-map based rather than a complete voxel engine, but water is represented as discrete vertical block cells from the terrain surface to the waterline. Movement uses square column collision with one-block stepping, and swimming physics still prevents the player from passing through the solid lake floor.
 
 ## Requirements
@@ -9,7 +9,7 @@ Solid terrain is still height-map based rather than a complete voxel engine, but
 - Java ME / MIDP 2.0
 - CLDC 1.1
 - JSR-184 Mobile 3D API
-- Texture atlas packaged at `/mcj2me/textures.png` inside the JAR
+- Resource images packaged inside the JAR at `/mcj2me/textures.png`, `/mcj2me/clouds.png`, `/mcj2me/gui.png` and `/mcj2me/gui_blocks.png`
 
 ## Controls
 
@@ -18,7 +18,7 @@ Solid terrain is still height-map based rather than a complete voxel engine, but
 - **D-pad left / right:** turn; **up / down:** look (nearly vertical, ±88°)
 - **1:** break targeted surface block
 - **3:** place selected block on the targeted column
-- **7 / 9:** cycle hotbar slot
+- **7 / 9:** cycle through the five hotbar blocks (grass, dirt, stone, wood, leaves)
 - **W / A / S / D:** movement in desktop emulators
 - **Fire / center:** jump (press again after landing)
 
@@ -26,5 +26,4 @@ Each new world gets a random seed, which changes both the procedural terrain and
 
 Terrain mining still changes the top of a terrain column; side-face mining, caves, persistence, mobs and survival are not implemented. Tree leaves are separate breakable canopy blocks. A lightweight Indev-style shadow approximation darkens surfaces beneath leaves and beside higher terrain.
 
-Package the atlas at `/mcj2me/textures.png` and set
-`mcj2me.IndevViewerMIDlet` as the MIDlet class.
+Package all four PNG resources under the `mcj2me` resource package (`/mcj2me/`) and set `mcj2me.IndevViewerMIDlet` as the MIDlet class. The repository keeps copies in `src/mcj2me/` so NetBeans can package them as classpath resources.
