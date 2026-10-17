@@ -14,6 +14,8 @@ final class TerrainGenerator {
     private final boolean[][] waterBasins = new boolean[SIZE][SIZE];
 
     TerrainGenerator() {
+        // Build the land first. Lakes are discovered from the resulting
+        // terrain instead of stamping circular bowls at predetermined points.
         for (int x = 0; x < SIZE; x++) {
             for (int z = 0; z < SIZE; z++) {
                 int broad = valueNoise(x, z, 32);
@@ -22,52 +24,74 @@ final class TerrainGenerator {
                 int h = 27 + broad * 12 / 1024
                            + medium * 5 / 1024
                            + fine * 2 / 1024;
-
-                // Generate a small number of large, deterministic basin bowls.
-                // Candidate lakes are distributed on a coarse grid; some cells
-                // are skipped so land remains between lakes. Their sloped rims
-                // stay above the waterline while the broad inner bowl is filled.
-                int depth = basinDepthAt(x, z);
-                if (depth > 0) h -= depth;
                 if (h < 3) h = 3;
                 if (h > HEIGHT - 8) h = HEIGHT - 8;
                 heights[x][z] = (short) h;
-                waterBasins[x][z] = depth >= 3 && h < WATER_LEVEL;
+            }
+        }
+        markEnclosedBasins();
+    }
+
+    /**
+     * Finds naturally enclosed lowland regions in the generated height map.
+     * A flood fill marks connected columns below the waterline. Regions that
+     * reach the map edge are treated as open lowlands, not inland lakes.
+     * Keeping only sizeable, sufficiently deep regions avoids tiny puddles.
+     *
+     * The existing waterBasins array doubles as the visited mask, and a short
+     * queue stores packed column indices to keep memory use modest on CLDC.
+     */
+    private void markEnclosedBasins() {
+        short[] queue = new short[SIZE * SIZE];
+        final int minimumArea = 18;
+        final int minimumDepth = 3;
+
+        for (int sx = 0; sx < SIZE; sx++) {
+            for (int sz = 0; sz < SIZE; sz++) {
+                if (waterBasins[sx][sz] || heights[sx][sz] >= WATER_LEVEL) continue;
+
+                int head = 0;
+                int tail = 0;
+                int lowest = HEIGHT;
+                boolean touchesEdge = false;
+                int start = sx * SIZE + sz;
+                queue[tail++] = (short) start;
+                waterBasins[sx][sz] = true;
+
+                while (head < tail) {
+                    int index = queue[head++] & 0xFFFF;
+                    int x = index / SIZE;
+                    int z = index % SIZE;
+                    int h = heights[x][z];
+                    if (h < lowest) lowest = h;
+                    if (x == 0 || z == 0 || x == SIZE - 1 || z == SIZE - 1) {
+                        touchesEdge = true;
+                    }
+
+                    if (x > 0) tail = enqueueLowland(x - 1, z, queue, tail);
+                    if (x + 1 < SIZE) tail = enqueueLowland(x + 1, z, queue, tail);
+                    if (z > 0) tail = enqueueLowland(x, z - 1, queue, tail);
+                    if (z + 1 < SIZE) tail = enqueueLowland(x, z + 1, queue, tail);
+                }
+
+                boolean basin = !touchesEdge && tail >= minimumArea
+                    && lowest <= WATER_LEVEL - minimumDepth;
+                if (!basin) {
+                    for (int i = 0; i < tail; i++) {
+                        int index = queue[i] & 0xFFFF;
+                        waterBasins[index / SIZE][index % SIZE] = false;
+                    }
+                }
             }
         }
     }
 
-    /**
-     * Bowl-shaped depressions on a coarse grid create broad lakes with
-     * sloping shorelines. The result is deterministic and uses no extra
-     * world-sized temporary arrays.
-     */
-    private int basinDepthAt(int x, int z) {
-        int cellX = x / 48;
-        int cellZ = z / 48;
-        int bestDepth = 0;
-        for (int gx = cellX - 1; gx <= cellX + 1; gx++) {
-            for (int gz = cellZ - 1; gz <= cellZ + 1; gz++) {
-                if (gx < 0 || gz < 0 || gx > 2 || gz > 2) continue;
-                int seed = hash(gx * 17 + 31, gz * 23 - 19);
-                // Omit some grid cells to avoid turning the map into one ocean.
-                if ((seed & 3) == 0) continue;
-                int centerX = gx * 48 + 24 + ((seed >> 3) % 7);
-                int centerZ = gz * 48 + 24 + ((seed >> 6) % 7);
-                if (centerX < 8) centerX = 8;
-                if (centerZ < 8) centerZ = 8;
-                int radius = 19 + ((seed >>> 9) & 7);
-                int dx = x - centerX;
-                int dz = z - centerZ;
-                int distanceSquared = dx * dx + dz * dz;
-                int radiusSquared = radius * radius;
-                if (distanceSquared >= radiusSquared) continue;
-                int distance = (int) Math.sqrt(distanceSquared);
-                int depth = (radius - distance) * 20 / radius;
-                if (depth > bestDepth) bestDepth = depth;
-            }
+    private int enqueueLowland(int x, int z, short[] queue, int tail) {
+        if (!waterBasins[x][z] && heights[x][z] < WATER_LEVEL) {
+            waterBasins[x][z] = true;
+            queue[tail++] = (short) (x * SIZE + z);
         }
-        return bestDepth;
+        return tail;
     }
 
     int getHeight(int x, int z) {
