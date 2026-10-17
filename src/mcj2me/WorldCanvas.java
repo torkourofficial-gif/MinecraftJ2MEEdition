@@ -197,8 +197,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 updateMovement();
                 animateWater();
                 repaint();
-                serviceRepaints();            }
-            try {
+                serviceRepaints();            }            try {
                 Thread.sleep(40);
             } catch (InterruptedException e) {
                 // Re-check running on the next loop.
@@ -397,8 +396,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (turnRight) { yaw += TURN_SPEED; changed = true; }
         if (lookUp) {
             pitch += TURN_SPEED;            if (pitch > 88.0f) pitch = 88.0f;
-            changed = true;
-        }
+            changed = true;        }
         if (lookDown) {
             pitch -= TURN_SPEED;
             if (pitch < -88.0f) pitch = -88.0f;
@@ -597,8 +595,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         for (int cx = centerX - RADIUS; cx <= centerX + RADIUS; cx++) {
             for (int cz = centerZ - RADIUS; cz <= centerZ + RADIUS; cz++) {
-                if (cx >= 0 && cz >= 0 && cx < 8 && cz < 8) {
-                    Mesh mesh = buildChunk(cx, cz);
+                if (cx >= 0 && cz >= 0 && cx < 8 && cz < 8) {                    Mesh mesh = buildChunk(cx, cz);
                     if (mesh != null) {
                         activeChunks[cx][cz] = mesh;
                         terrainGroup.addChild(mesh);
@@ -635,7 +632,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         // plane cannot intersect valleys or make the whole world look flooded.
         short edge = (short) (TerrainGenerator.SIZE - 1);
         short far = 1024;
-        short negativeFar = (short) (negativeFar);
+        short negativeFar = (short) (-far);
         short y = (short) WATER_LEVEL;
         short[] positions = {
             // north, z < 0
@@ -797,8 +794,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         short[] texCoords = {0, 0, 0, 1, 1, 0, 1, 1};
         int[] indices = {0, 1, 2, 3};        int[] stripLengths = {4};
         VertexArray positionArray = new VertexArray(4, 3, 2);
-        positionArray.set(0, 4, positions);
-        VertexArray texArray = new VertexArray(4, 2, 2);
+        positionArray.set(0, 4, positions);        VertexArray texArray = new VertexArray(4, 2, 2);
         texArray.set(0, 4, texCoords);
         VertexBuffer buffer = new VertexBuffer();
         buffer.setPositions(positionArray, 1.0f, null);
