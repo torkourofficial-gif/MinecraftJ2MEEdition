@@ -15,6 +15,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final float JUMP_SPEED = 0.38f;
     private static final int DAY_TICKS = 10500; // 7 minutes at the 40 ms game tick.
     private int dayTick = 0;
+    private float daylightLevel = 1.0f;
+    private Image nightOverlay;
+    private int nightOverlayWidth = -1, nightOverlayHeight = -1, nightOverlayAlpha = -1;
     private static final int WATER_LEVEL = TerrainGenerator.WATER_LEVEL;
     // Keep the distant ocean below the terrain skyline; inland lakes retain WATER_LEVEL.
     private static final int HORIZON_SEA_LEVEL = 10;
@@ -281,6 +284,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             g.drawString("M3G render error", 4, 4, Graphics.TOP | Graphics.LEFT);
             g.drawString(e.toString(), 4, 24, Graphics.TOP | Graphics.LEFT);
         } finally { if (targetBound) graphics3D.releaseTarget(); }
+        drawNightOverlay(g);
         drawUnderwaterOverlay(g);
         drawHud(g);
     }
@@ -298,6 +302,25 @@ final class WorldCanvas extends Canvas implements Runnable {
             overlayHeight = h;
         }
         g.drawImage(underwaterOverlay, 0, 0, Graphics.TOP | Graphics.LEFT);
+    }
+
+    private void drawNightOverlay(Graphics g) {
+        int alpha = (int)((1.0f - daylightLevel) * 105.0f);
+        if (alpha < 0) alpha = 0;
+        if (alpha > 105) alpha = 105;
+        if (alpha == 0) return;
+        int w = getWidth(), h = getHeight();
+        if (nightOverlay == null || nightOverlayWidth != w || nightOverlayHeight != h
+                || nightOverlayAlpha != alpha) {
+            int[] pixels = new int[w * h];
+            int color = alpha << 24;
+            for (int i = 0; i < pixels.length; i++) pixels[i] = color;
+            nightOverlay = Image.createRGBImage(pixels, w, h, true);
+            nightOverlayWidth = w;
+            nightOverlayHeight = h;
+            nightOverlayAlpha = alpha;
+        }
+        g.drawImage(nightOverlay, 0, 0, Graphics.TOP | Graphics.LEFT);
     }
 
     private boolean isCameraUnderwater() {
@@ -353,6 +376,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         g.fillRect(3, 3, Math.min(w - 6, 112), 15);
         g.setColor(0xFFFFFF);
         g.drawString("MC J2ME", 7, 4, Graphics.TOP | Graphics.LEFT);
+        g.setColor(0xFFFFFF);
+        g.drawString(daylightLevel > 0.42f ? "DAY" : "NIGHT", w - 5, 4,
+            Graphics.TOP | Graphics.RIGHT);
         if (inventoryOpen) {
             drawInventory(g);
             return;
@@ -958,6 +984,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (dayTick >= DAY_TICKS) dayTick = 0;
         float phase = (float)(dayTick * (Math.PI * 2.0 / DAY_TICKS));
         float daylight = 0.15f + 0.85f * (0.5f + 0.5f * (float)Math.cos(phase));
+        daylightLevel = daylight;
         skyBackground.setColor(blendColor(0x10182D, 0x87BFEA, daylight));
         distanceFog.setColor(blendColor(0x151923, 0xB6CBE0, daylight));
         ambientLight.setColor(blendColor(0x22283D, 0xFFFFFF, daylight));
