@@ -47,6 +47,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private TriangleStripArray decorationTriangles;
     private static final int MAX_DECORATIONS = 32;
     private final Mesh[] decorationMeshes = new Mesh[MAX_DECORATIONS];
+    // Doors are children of a hinge pivot, so their panel sweeps an arc around one edge.
+    private final Group[] decorationPivots = new Group[MAX_DECORATIONS];
     private final int[] decorationTypes = new int[MAX_DECORATIONS];
     private final float[] decorationX = new float[MAX_DECORATIONS];
     private final float[] decorationY = new float[MAX_DECORATIONS];
@@ -265,7 +267,8 @@ final class WorldCanvas extends Canvas implements Runnable {
                 int at = decorationCount - 1;
                 decorationYaw[at] = savedYaw;
                 decorationOpen[at] = opened;
-                decorationMeshes[at].setOrientation(savedYaw + (opened ? 90.0f : 0.0f), 0.0f, 1.0f, 0.0f);
+                if (type == BLOCK_DOOR && decorationPivots[at] != null)
+                    decorationPivots[at].setOrientation(savedYaw + (opened ? 90.0f : 0.0f), 0.0f, 1.0f, 0.0f);
             }
         }
         yaw = savedPlayerYaw;
@@ -1963,10 +1966,13 @@ final class WorldCanvas extends Canvas implements Runnable {
             inventory[type]++;
             spawnBlockParticles(type, decorationX[decorationHit], decorationY[decorationHit] + 0.35f,
                 decorationZ[decorationHit]);
-            decorationGroup.removeChild(decorationMeshes[decorationHit]);
+            if (decorationTypes[decorationHit] == BLOCK_DOOR && decorationPivots[decorationHit] != null)
+                decorationGroup.removeChild(decorationPivots[decorationHit]);
+            else decorationGroup.removeChild(decorationMeshes[decorationHit]);
             int last = decorationCount - 1;
             if (decorationHit != last) {
                 decorationMeshes[decorationHit] = decorationMeshes[last];
+                decorationPivots[decorationHit] = decorationPivots[last];
                 decorationTypes[decorationHit] = decorationTypes[last];
                 decorationX[decorationHit] = decorationX[last];
                 decorationY[decorationHit] = decorationY[last];
@@ -1975,6 +1981,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 decorationOpen[decorationHit] = decorationOpen[last];
             }
             decorationMeshes[last] = null;
+            decorationPivots[last] = null;
             decorationOpen[last] = false;
             decorationCount--;
             updateTorchLights();
@@ -2088,13 +2095,24 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (type == BLOCK_TORCH) mesh.setScale(0.18f, 0.58f, 1.0f);
         else if (type == BLOCK_SAPLING) mesh.setScale(0.48f, 0.62f, 1.0f);
         else if (type != BLOCK_DOOR) mesh.setScale(0.38f, 0.48f, 1.0f);
-        mesh.setOrientation(yaw, 0.0f, 1.0f, 0.0f);
-        // Door geometry's local origin is its hinge; other decorations stay centered.
-        if (type == BLOCK_DOOR) mesh.setTranslation(x - 0.5f, y, z);
-        else mesh.setTranslation(x, y, z);
-        decorationGroup.addChild(mesh);
+        Group pivot = null;
+        if (type == BLOCK_DOOR) {
+            // Put the panel under a separate transform whose origin is the hinge.
+            // Rotating this parent makes the far edge travel along a semicircular arc.
+            pivot = new Group();
+            pivot.setOrientation(yaw, 0.0f, 1.0f, 0.0f);
+            pivot.setTranslation(x - 0.5f, y, z);
+            mesh.setTranslation(0.0f, 0.0f, 0.0f);
+            pivot.addChild(mesh);
+            decorationGroup.addChild(pivot);
+        } else {
+            mesh.setOrientation(yaw, 0.0f, 1.0f, 0.0f);
+            mesh.setTranslation(x, y, z);
+            decorationGroup.addChild(mesh);
+        }
         int at = decorationCount++;
         decorationMeshes[at] = mesh;
+        decorationPivots[at] = pivot;
         decorationTypes[at] = type;
         decorationX[at] = x;
         decorationY[at] = y;
@@ -2175,7 +2193,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (index < 0 || index >= decorationCount || decorationTypes[index] != BLOCK_DOOR) return;
         decorationOpen[index] = !decorationOpen[index];
         float angle = decorationYaw[index] + (decorationOpen[index] ? 90.0f : 0.0f);
-        decorationMeshes[index].setOrientation(angle, 0.0f, 1.0f, 0.0f);
+        Group pivot = decorationPivots[index];
+        if (pivot != null) pivot.setOrientation(angle, 0.0f, 1.0f, 0.0f);
     }
 
     private int raycastDecoration() {
