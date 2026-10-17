@@ -1958,6 +1958,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         int decorationHit = raycastDecoration();
         if (decorationHit >= 0) {
             int type = decorationTypes[decorationHit];
+            int removedDecorationX = (int)decorationX[decorationHit];
+            int removedDecorationZ = (int)decorationZ[decorationHit];
             inventory[type]++;
             spawnBlockParticles(type, decorationX[decorationHit], decorationY[decorationHit] + 0.35f,
                 decorationZ[decorationHit]);
@@ -1977,9 +1979,8 @@ final class WorldCanvas extends Canvas implements Runnable {
             decorationCount--;
             updateTorchLights();
             if (type == BLOCK_TORCH) {
-                int tx = (int)decorationX[decorationHit];
-                int tz = (int)decorationZ[decorationHit];
-                invalidateEditedArea(tx, tx, tz, tz);
+                invalidateEditedArea(removedDecorationX, removedDecorationX,
+                    removedDecorationZ, removedDecorationZ);
             }
             return;
         }
