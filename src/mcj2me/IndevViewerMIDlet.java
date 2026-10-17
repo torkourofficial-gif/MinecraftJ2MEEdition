@@ -2,6 +2,8 @@ package mcj2me;
 
 import javax.microedition.midlet.MIDlet;
 import javax.microedition.lcdui.Display;
+import javax.microedition.lcdui.Alert;
+import javax.microedition.lcdui.AlertType;
 import javax.microedition.rms.RecordStore;
 import javax.microedition.rms.RecordStoreException;
 
@@ -113,6 +115,8 @@ public final class IndevViewerMIDlet extends MIDlet {
 
     private TitleScreen titleScreen;
     private WorldCanvas worldCanvas;
+    private WorldSelectScreen worldSelectScreen;
+    private WorldLoadingCanvas loadingCanvas;
 
     public void startApp() {
         loadControls();
@@ -125,11 +129,42 @@ public final class IndevViewerMIDlet extends MIDlet {
         Display.getDisplay(this).setCurrent(titleScreen);
         titleScreen.start();
     }
-    public void startGame() {
-        if (titleScreen!=null) titleScreen.stop();
-        if (worldCanvas==null) worldCanvas=new WorldCanvas(this);
+    void openWorldSelect() {
+        if (titleScreen != null) titleScreen.stop();
+        if (worldSelectScreen == null) worldSelectScreen = new WorldSelectScreen(this);
+        worldSelectScreen.show();
+    }
+
+    void startGame(String worldName, int seed) {
+        if (titleScreen != null) titleScreen.stop();
+        if (worldCanvas != null) { worldCanvas.stop(); worldCanvas = null; }
+        loadingCanvas = new WorldLoadingCanvas(this, worldName, seed);
+        Display.getDisplay(this).setCurrent(loadingCanvas);
+        loadingCanvas.start();
+    }
+
+    void worldLoaded(WorldCanvas loaded) {
+        if (loadingCanvas != null) loadingCanvas.stopLoading();
+        loadingCanvas = null;
+        worldCanvas = loaded;
         Display.getDisplay(this).setCurrent(worldCanvas);
         worldCanvas.start();
+    }
+
+    void worldLoadFailed(String message) {
+        if (loadingCanvas != null) loadingCanvas.stopLoading();
+        loadingCanvas = null;
+        if (titleScreen == null) titleScreen = new TitleScreen(this);
+        titleScreen.showMainMenu();
+        Display.getDisplay(this).setCurrent(titleScreen);
+        titleScreen.start();
+        showWorldError(message);
+    }
+
+    void showWorldError(String message) {
+        Alert alert = new Alert("Worlds", message, null, AlertType.ERROR);
+        alert.setTimeout(Alert.FOREVER);
+        Display.getDisplay(this).setCurrent(alert, titleScreen);
     }
     void showPauseMenu() {
         if (titleScreen==null) titleScreen=new TitleScreen(this);
@@ -155,6 +190,7 @@ public final class IndevViewerMIDlet extends MIDlet {
     public void quitGame() {
         if (titleScreen!=null) titleScreen.stop();
         if (worldCanvas!=null) worldCanvas.stop();
+        if (loadingCanvas!=null) loadingCanvas.stopLoading();
         notifyDestroyed();
     }
     public void pauseApp() {
@@ -164,5 +200,6 @@ public final class IndevViewerMIDlet extends MIDlet {
     public void destroyApp(boolean unconditional) {
         if (titleScreen!=null) titleScreen.stop();
         if (worldCanvas!=null) worldCanvas.stop();
+        if (loadingCanvas!=null) loadingCanvas.stopLoading();
     }
 }
