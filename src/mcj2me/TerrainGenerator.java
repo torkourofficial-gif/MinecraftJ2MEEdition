@@ -14,6 +14,9 @@ final class TerrainGenerator {
     private final short[][] heights = new short[SIZE][SIZE];
     private final byte[][] topTypes = new byte[SIZE][SIZE];
     private final boolean[][] waterBasins = new boolean[SIZE][SIZE];
+    // Sparse storage avoids a full 128x64x128 voxel array on the MIDP heap.
+    private int[] removedLeafIds = new int[64];
+    private int removedLeafCount;
     private final int seed;
 
     TerrainGenerator() {
@@ -165,6 +168,77 @@ final class TerrainGenerator {
         return max - min <= 2 && (hash(x, z) & 3) != 0;
     }
     int getTreeHeight(int x, int z) { return 3 + ((hash(x + 19, z - 7) >>> 3) & 1); }
+
+    /** True when a generated canopy leaf still occupies this block cell. */
+    boolean isLeafBlockAt(int x, int y, int z) {
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE || y < 0 || y >= HEIGHT) return false;
+        int id = leafId(x, y, z);
+        for (int i = 0; i < removedLeafCount; i++) if (removedLeafIds[i] == id) return false;
+        for (int tx = Math.max(5, x - 2); tx <= Math.min(SIZE - 6, x + 2); tx++) {
+            if (tx % 11 != 5) continue;
+            for (int tz = Math.max(5, z - 2); tz <= Math.min(SIZE - 6, z + 2); tz++) {
+                if (tz % 13 != 6 || !isTreeAt(tx, tz)) continue;
+                int crown = getHeight(tx, tz) + getTreeHeight(tx, tz) - 1;
+                for (int layer = 0; layer < 3; layer++) {
+                    int leafY = crown - 1 + layer;
+                    int radius = layer == 2 ? 1 : 2;
+                    if (y != leafY || Math.abs(x - tx) > radius || Math.abs(z - tz) > radius) continue;
+                    if (x == tx && z == tz && y <= crown) continue;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    boolean removeLeafBlock(int x, int y, int z) {
+        if (!isLeafBlockAt(x, y, z)) return false;
+        if (removedLeafCount == removedLeafIds.length) {
+            int[] expanded = new int[removedLeafIds.length * 2];
+            System.arraycopy(removedLeafIds, 0, expanded, 0, removedLeafCount);
+            removedLeafIds = expanded;
+        }
+        removedLeafIds[removedLeafCount++] = leafId(x, y, z);
+        return true;
+    }
+
+    private int leafId(int x, int y, int z) {
+        return y * SIZE * SIZE + z * SIZE + x;
+    }
+
+    int countTreeLeaves(int tx, int tz) {
+        if (!isTreeAt(tx, tz)) return 0;
+        int crown = getHeight(tx, tz) + getTreeHeight(tx, tz) - 1;
+        int count = 0;
+        for (int layer = 0; layer < 3; layer++) {
+            int y = crown - 1 + layer;
+            int radius = layer == 2 ? 1 : 2;
+            for (int x = tx - radius; x <= tx + radius; x++) {
+                for (int z = tz - radius; z <= tz + radius; z++) {
+                    if (isLeafBlockAt(x, y, z)) count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    /** Lightweight Indev-like shadow levels used as M3G vertex colors. */
+    int getShadowShade(int x, int z, int y) {
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return 220;
+        int overheadLeaves = 0;
+        for (int above = y + 2; above <= y + 5 && above < HEIGHT; above++) {
+            if (isLeafBlockAt(x, above, z)) overheadLeaves++;
+        }
+        int shade = 255;
+        if (overheadLeaves >= 2) shade = 142;
+        else if (overheadLeaves == 1) shade = 190;
+        int h;
+        h = getHeight(x - 1, z); if (h >= y + 2 && shade > 178) shade = 178;
+        h = getHeight(x + 1, z); if (h >= y + 2 && shade > 178) shade = 178;
+        h = getHeight(x, z - 1); if (h >= y + 2 && shade > 178) shade = 178;
+        h = getHeight(x, z + 1); if (h >= y + 2 && shade > 178) shade = 178;
+        return shade;
+    }
 
     private int valueNoise(int x, int z, int scale) {
         int gx = x / scale;
