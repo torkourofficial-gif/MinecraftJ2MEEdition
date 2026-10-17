@@ -72,7 +72,9 @@ public final class IndevViewerMIDlet extends MIDlet {
         }
     }
 
-    static int directionalKey(int gameAction) {
+    static int directionalKey(int keyCode, int gameAction) {
+        // Numeric keypad keys must remain numeric even on phones that also map them to D-pad actions.
+        if (keyCode == '2' || keyCode == '4' || keyCode == '6' || keyCode == '8') return -1;
         if (gameAction == javax.microedition.lcdui.Canvas.UP) return KEY_UP;
         if (gameAction == javax.microedition.lcdui.Canvas.DOWN) return KEY_DOWN;
         if (gameAction == javax.microedition.lcdui.Canvas.LEFT) return KEY_LEFT;
@@ -82,10 +84,13 @@ public final class IndevViewerMIDlet extends MIDlet {
 
     static boolean controlPressed(int control, int keyCode, int gameAction) {
         int binding = controlKeys[control];
-        if (binding == KEY_UP) return gameAction == javax.microedition.lcdui.Canvas.UP;
-        if (binding == KEY_DOWN) return gameAction == javax.microedition.lcdui.Canvas.DOWN;
-        if (binding == KEY_LEFT) return gameAction == javax.microedition.lcdui.Canvas.LEFT;
-        if (binding == KEY_RIGHT) return gameAction == javax.microedition.lcdui.Canvas.RIGHT;
+        if (binding == KEY_UP || binding == KEY_DOWN || binding == KEY_LEFT || binding == KEY_RIGHT) {
+            if (keyCode == '2' || keyCode == '4' || keyCode == '6' || keyCode == '8') return false;
+            if (binding == KEY_UP) return gameAction == javax.microedition.lcdui.Canvas.UP;
+            if (binding == KEY_DOWN) return gameAction == javax.microedition.lcdui.Canvas.DOWN;
+            if (binding == KEY_LEFT) return gameAction == javax.microedition.lcdui.Canvas.LEFT;
+            return gameAction == javax.microedition.lcdui.Canvas.RIGHT;
+        }
         return keyCode == binding;
     }
 
