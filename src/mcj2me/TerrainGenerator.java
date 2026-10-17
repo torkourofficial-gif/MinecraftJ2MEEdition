@@ -12,6 +12,8 @@ final class TerrainGenerator {
     static final int HEIGHT = 64;
     static final int WATER_LEVEL = 25;
     private final short[][] heights = new short[SIZE][SIZE];
+    // Original generated surface is retained so strata do not reset when mined.
+    private final short[][] originalHeights = new short[SIZE][SIZE];
     private final byte[][] topTypes = new byte[SIZE][SIZE];
     private final boolean[][] waterBasins = new boolean[SIZE][SIZE];
     // Sparse storage avoids a full 128x64x128 voxel array on the MIDP heap.
@@ -42,6 +44,9 @@ final class TerrainGenerator {
         }
         generateWaterBasinStructures(random);
         lowerWorldEdgesTowardSea();
+        for (int x = 0; x < SIZE; x++) {
+            System.arraycopy(heights[x], 0, originalHeights[x], 0, SIZE);
+        }
     }
 
     /**
@@ -177,9 +182,57 @@ final class TerrainGenerator {
         return a * (1.0f - fz) + b * fz;
     }
 
-    int getTopType(int x, int z) { if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return 0; return topTypes[x][z]; }
-    void setTopType(int x, int z, int type) { if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return; if (type < 0 || type > 4) type = 0; topTypes[x][z] = (byte) type; }
-    void setHeight(int x, int z, int height) { if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return; if (height < 1) height = 1; if (height > HEIGHT - 3) height = HEIGHT - 3; heights[x][z] = (short) height; }
+    static final int BLOCK_GRASS = 0;
+    static final int BLOCK_DIRT = 1;
+    static final int BLOCK_STONE = 2;
+    static final int BLOCK_WOOD = 3;
+    static final int BLOCK_LEAVES = 4;
+    static final int BLOCK_COAL_ORE = 5;
+    static final int BLOCK_IRON_ORE = 6;
+    static final int BLOCK_GOLD_ORE = 7;
+    static final int BLOCK_DIAMOND_ORE = 8;
+    static final int BLOCK_BEDROCK = 9;
+
+    int getTopType(int x, int z) {
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return BLOCK_BEDROCK;
+        return topTypes[x][z];
+    }
+
+    void setTopType(int x, int z, int type) {
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return;
+        if (type < BLOCK_GRASS || type > BLOCK_BEDROCK) type = BLOCK_GRASS;
+        topTypes[x][z] = (byte) type;
+    }
+
+    void setHeight(int x, int z, int height) {
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return;
+        if (height < 1) height = 1;
+        if (height > HEIGHT - 3) height = HEIGHT - 3;
+        heights[x][z] = (short) height;
+    }
+
+    /** Returns the block occupying a vertical side-wall cell. */
+    int getBlockTypeAt(int x, int y, int z) {
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE || y < 0) return BLOCK_BEDROCK;
+        if (y >= heights[x][z] - 1) return topTypes[x][z];
+        return getSubsurfaceType(x, y, z);
+    }
+
+    /** Geological block below the current top; deterministic and sparse. */
+    int getSubsurfaceType(int x, int y, int z) {
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE || y < 0) return BLOCK_BEDROCK;
+        int bedrockTop = 1 + (hash(x + 73, z - 41) & 3);
+        if (y <= bedrockTop) return BLOCK_BEDROCK;
+
+        int depth = originalHeights[x][z] - y;
+        if (depth <= 3) return BLOCK_DIRT;
+        int oreHash = hash(x + y * 37 + 101, z - y * 19 - 53) & 2047;
+        if (y < 18 && oreHash < 4) return BLOCK_DIAMOND_ORE;
+        if (y < 27 && oreHash < 15) return BLOCK_GOLD_ORE;
+        if (oreHash < 58) return BLOCK_IRON_ORE;
+        if (oreHash < 170) return BLOCK_COAL_ORE;
+        return BLOCK_STONE;
+    }
     boolean isTreeAt(int x, int z) {
         if (x < 5 || z < 5 || x >= SIZE - 5 || z >= SIZE - 5 || x % 11 != 5 || z % 13 != 6) return false;
         int h = getHeight(x, z), min = h, max = h, n; if (h < 12 || h > HEIGHT - 10) return false;
