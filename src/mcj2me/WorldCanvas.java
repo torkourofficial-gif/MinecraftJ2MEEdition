@@ -999,4 +999,73 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         updateCamera();
     }
+    private int[] raycastLeafBlock() {
+        double yr = Math.PI * pitch / 180.0;
+        double xr = Math.PI * yaw / 180.0;
+        float dx = (float) (Math.sin(xr) * Math.cos(yr));
+        float dz = (float) (-Math.cos(xr) * Math.cos(yr));
+        float dy = (float) Math.sin(yr);
+        for (float d = 0.35f; d <= 5.0f; d += 0.08f) {
+            int x = (int) (cameraX + dx * d);
+            int y = (int) (cameraY + dy * d);
+            int z = (int) (cameraZ + dz * d);
+            if (terrain.isLeafBlockAt(x, y, z)) return new int[] {x, y, z};
+        }
+        return null;
+    }
+
+    private int[] raycastSurface() {
+        double yr=Math.PI*pitch/180.0,xr=Math.PI*yaw/180.0; float dx=(float)(Math.sin(xr)*Math.cos(yr)),dz=(float)(-Math.cos(xr)*Math.cos(yr)),dy=(float)Math.sin(yr);
+        for(float d=0.5f;d<=5.0f;d+=0.15f){int x=(int)(cameraX+dx*d),z=(int)(cameraZ+dz*d);if(x<1||z<1||x>=TerrainGenerator.SIZE-1||z>=TerrainGenerator.SIZE-1)continue;float y=cameraY+dy*d;int surface=terrain.getHeight(x,z);if(y<=surface+0.25f&&y>=surface-1.0f)return new int[]{x,z};}return null;
+    }
+
+    private int addQuad(short[] positions, short[] texCoords, byte[] colors, int[] indices,
+                        int[] stripLengths, int vertex, int strip,
+                        int x0, int y0, int z0, int x1, int y1, int z1,
+                        int x2, int y2, int z2, int x3, int y3, int z3,
+                        int tileX, int tileY) {
+        // Indev-style lighting is block-flat: all four vertices of a face
+        // share one shade, preventing M3G from interpolating triangular gradients.
+        int shade = terrain.getShadowShade(
+            (x0 + x1 + x2 + x3) / 4,
+            (z0 + z1 + z2 + z3) / 4,
+            (y0 + y1 + y2 + y3) / 4);
+        vertex = addVertex(positions, texCoords, colors, indices, vertex, x0, y0, z0,
+                           tileX, tileY, 0, shade);
+        vertex = addVertex(positions, texCoords, colors, indices, vertex, x1, y1, z1,
+                           tileX, tileY, 1, shade);
+        vertex = addVertex(positions, texCoords, colors, indices, vertex, x2, y2, z2,
+                           tileX, tileY, 2, shade);
+        vertex = addVertex(positions, texCoords, colors, indices, vertex, x3, y3, z3,
+                           tileX, tileY, 3, shade);
+        stripLengths[strip] = 4;
+        return vertex;
+    }
+
+    private int addVertex(short[] positions, short[] texCoords, byte[] colors, int[] indices,
+                          int vertex, int x, int y, int z,
+                          int tileX, int tileY, int corner, int shade) {
+        int p = vertex * 3;
+        positions[p] = (short) x;
+        positions[p + 1] = (short) y;
+        positions[p + 2] = (short) z;
+        indices[vertex] = vertex;
+        int colorOffset = vertex * 3;
+        colors[colorOffset] = (byte) shade;
+        colors[colorOffset + 1] = (byte) shade;
+        colors[colorOffset + 2] = (byte) shade;
+
+        // Slight inset avoids sampling adjacent tiles at atlas boundaries.
+        int left = tileX * 16 + 1;
+        int right = (tileX + 1) * 16 - 1;
+        int top = tileY * 16 + 1;
+        int bottom = (tileY + 1) * 16 - 1;
+        int u, v;
+        if (tileX == 3 || tileX == 4) { u = (corner == 0 || corner == 1) ? left : right; v = (corner == 0 || corner == 2) ? bottom : top; }
+        else { u = (corner == 0 || corner == 2) ? left : right; v = (corner == 0 || corner == 1) ? bottom : top; }
+        int t = vertex * 2;
+        texCoords[t] = (short) u;
+        texCoords[t + 1] = (short) v;
+        return vertex + 1;
+    }
 }
