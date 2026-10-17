@@ -50,7 +50,7 @@ final class TitleScreen extends Canvas implements Runnable {
     public void run() {
         while (running) {
             if (panorama==null && skyboxPixels!=null) {
-                cubeYaw += 0.012f;
+                cubeYaw += 0.004f;
                 if (cubeYaw > Math.PI * 2.0) cubeYaw -= (float)(Math.PI * 2.0);
                 renderCubeFrame();
             } else if (panorama!=null) {
@@ -59,7 +59,7 @@ final class TitleScreen extends Canvas implements Runnable {
                 if (panoramaOffset>max) panoramaOffset=0;
             }
             repaint(); serviceRepaints();
-            try { Thread.sleep(40); } catch (InterruptedException e) { /* loop checks running */ }
+            try { Thread.sleep(80); } catch (InterruptedException e) { /* loop checks running */ }
         }
     }
     protected void paint(Graphics g) {
