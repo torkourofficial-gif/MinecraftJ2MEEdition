@@ -89,6 +89,22 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean lastHumbleMode = IndevViewerMIDlet.humbleMode;
     private final int[] shadeCacheKeys = new int[512];
     private final int[] shadeCacheValues = new int[512];
+    // Reuse the small greedy-meshing workspace instead of allocating roughly
+    // 13 KB of temporary grids/rectangle lists for every streamed chunk.
+    private final int[][] greedyKeys = new int[CHUNK][CHUNK];
+    private final int[][] greedyHeights = new int[CHUNK][CHUNK];
+    private final int[][] greedyBases = new int[CHUNK][CHUNK];
+    private final int[][] greedyGlows = new int[CHUNK][CHUNK];
+    private final boolean[][] greedyUsed = new boolean[CHUNK][CHUNK];
+    private final int[] greedyRectX = new int[CHUNK * CHUNK];
+    private final int[] greedyRectZ = new int[CHUNK * CHUNK];
+    private final int[] greedyRectW = new int[CHUNK * CHUNK];
+    private final int[] greedyRectD = new int[CHUNK * CHUNK];
+    private final int[] greedyRectH = new int[CHUNK * CHUNK];
+    private final int[] greedyRectKey = new int[CHUNK * CHUNK];
+    private final int[] greedyRectBase = new int[CHUNK * CHUNK];
+    private final int[] greedyRectGlow = new int[CHUNK * CHUNK];
+    private final int[] greedyPerTile = new int[256];
     private Thread thread;
     private boolean running;
     private boolean paused;
@@ -1406,13 +1422,15 @@ final class WorldCanvas extends Canvas implements Runnable {
     /** Merge compatible adjacent top faces while repeating their own 16x16 tile. */
     private void buildGreedyTopMeshes(Group chunkGroup, int chunkX, int chunkZ) {
         int startX = chunkX * CHUNK, startZ = chunkZ * CHUNK;
-        int[][] keys = new int[CHUNK][CHUNK], hs = new int[CHUNK][CHUNK];
-        int[][] bases = new int[CHUNK][CHUNK], glows = new int[CHUNK][CHUNK];
-        boolean[][] used = new boolean[CHUNK][CHUNK];
-        int max = CHUNK * CHUNK;
-        int[] rx=new int[max], rz=new int[max], rw=new int[max], rd=new int[max], rh=new int[max];
-        int[] rk=new int[max], rb=new int[max], rg=new int[max];
+        int[][] keys = greedyKeys, hs = greedyHeights;
+        int[][] bases = greedyBases, glows = greedyGlows;
+        boolean[][] used = greedyUsed;
+        int[] rx=greedyRectX, rz=greedyRectZ, rw=greedyRectW, rd=greedyRectD, rh=greedyRectH;
+        int[] rk=greedyRectKey, rb=greedyRectBase, rg=greedyRectGlow;
+        int[] perTile=greedyPerTile;
         int count=0, x, z;
+        for (x=0;x<CHUNK;x++) for (z=0;z<CHUNK;z++) used[x][z]=false;
+        for (x=0;x<256;x++) perTile[x]=0;
         for (x=0;x<CHUNK;x++) for(z=0;z<CHUNK;z++) {
             int wx=startX+x, wz=startZ+z, h=terrain.getHeight(wx,wz);
             int type=terrain.getTopType(wx,wz), tx=BLOCK_TILE_X[type], ty=BLOCK_TILE_Y[type];
@@ -1440,7 +1458,6 @@ final class WorldCanvas extends Canvas implements Runnable {
             rx[count]=x; rz[count]=z; rw[count]=width; rd[count]=depth; rh[count]=h;
             rk[count]=key; rb[count]=base; rg[count]=glow; count++;
         }
-        int[] perTile=new int[256];
         for(int i=0;i<count;i++) perTile[rk[i]]++;
         for(int key=0;key<256;key++) {
             int n=perTile[key]; if(n==0) continue;
