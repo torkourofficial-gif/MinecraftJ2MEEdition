@@ -48,8 +48,7 @@ final class TerrainGenerator {
     private void generateWaterBasinStructures(Random random) {
         int basinCount = 7 + random.nextInt(6);
         for (int b = 0; b < basinCount; b++) {
-            // Keep one guaranteed test lake in the spawn area's loaded
-            // chunks, in front of the player. The remaining lakes stay random.
+            // Keep one test lake near spawn; the rest are distributed randomly.
             int cx;
             int cz;
             if (b == 0) {
@@ -59,14 +58,14 @@ final class TerrainGenerator {
                 cx = 12 + random.nextInt(SIZE - 24);
                 cz = 12 + random.nextInt(SIZE - 24);
             }
-            int radiusX = 5 + random.nextInt(6);
-            int radiusZ = 5 + random.nextInt(6);
+
+            int radiusX = 6 + random.nextInt(6);
+            int radiusZ = 6 + random.nextInt(6);
             int depth = 3 + random.nextInt(5);
-            int minX = Math.max(1, cx - radiusX - 2);
-            int maxX = Math.min(SIZE - 2, cx + radiusX + 2);
-            int minZ = Math.max(1, cz - radiusZ - 2);
-            int maxZ = Math.min(SIZE - 2, cz + radiusZ + 2);
-            int baseHeight = heights[cx][cz];
+            int minX = Math.max(1, cx - radiusX - 1);
+            int maxX = Math.min(SIZE - 2, cx + radiusX + 1);
+            int minZ = Math.max(1, cz - radiusZ - 1);
+            int maxZ = Math.min(SIZE - 2, cz + radiusZ + 1);
             int floor = WATER_LEVEL - depth;
             if (floor < 3) floor = 3;
 
@@ -76,38 +75,36 @@ final class TerrainGenerator {
                     float dz = (float) (z - cz) / (float) radiusZ;
                     float distance = dx * dx + dz * dz;
                     int edgeJitter = hash(x + b * 17, z - b * 11) & 3;
-                    float edge = 1.0f + (edgeJitter - 1) * 0.055f;
+                    float edge = 1.0f + (edgeJitter - 1) * 0.045f;
                     if (distance > edge * edge) continue;
 
-                    float normalized = (float) Math.sqrt(distance);
-                    boolean insideWater = distance <= 0.72f;
+                    float normalized = (float) Math.sqrt(distance) / edge;
+                    int originalHeight = heights[x][z];
                     int h;
-                    if (insideWater) {
-                        // Force the entire marked interior below the waterline.
-                        // The previous slope formula could raise much of the
-                        // supposed lake above WATER_LEVEL, leaving only a tiny
-                        // central patch (or none after later structures overlap).
-                        h = floor + (int) (normalized * (depth - 1));
-                        h += hash(x + b * 29, z + b * 7) & 1;
+
+                    if (normalized <= 0.72f) {
+                        // Shape the underwater bowl gradually from its floor
+                        // to the shoreline. The whole inner bowl stays below
+                        // the shared waterline, without a raised volcanic rim.
+                        float t = normalized / 0.72f;
+                        float smooth = t * t * (3.0f - 2.0f * t);
+                        h = floor + (int) ((WATER_LEVEL - 1 - floor) * smooth);
                         if (h >= WATER_LEVEL) h = WATER_LEVEL - 1;
-                    } else {
-                        // Build the sloped bank and a lip above the waterline.
-                        h = floor + (int) (normalized * (depth + 4));
-                        if (normalized > 0.82f) {
-                            h += (int) ((normalized - 0.82f) * 11.0f);
-                        }
-                        h += hash(x + b * 29, z + b * 7) & 1;
-                        int rimHeight = Math.max(WATER_LEVEL + 1, baseHeight);
-                        if (h > rimHeight) h = rimHeight;
-                    }
-                    if (h < 2) h = 2;
-                    // A later shoreline must not overwrite an existing lake
-                    // interior with dry ground when two structures overlap.
-                    if (insideWater) {
+                        if (h < 2) h = 2;
                         heights[x][z] = (short) h;
                         waterBasins[x][z] = true;
-                    } else if (!waterBasins[x][z]) {
-                        heights[x][z] = (short) h;
+                    } else {
+                        // Blend the outer bank back into the untouched local
+                        // terrain height. At the edge the basin disappears
+                        // into the landscape instead of forming a mountain.
+                        float t = (normalized - 0.72f) / 0.28f;
+                        if (t < 0.0f) t = 0.0f;
+                        if (t > 1.0f) t = 1.0f;
+                        float smooth = t * t * (3.0f - 2.0f * t);
+                        h = WATER_LEVEL - 1
+                            + (int) ((originalHeight - (WATER_LEVEL - 1)) * smooth);
+                        if (h < 2) h = 2;
+                        if (!waterBasins[x][z]) heights[x][z] = (short) h;
                     }
                 }
             }
