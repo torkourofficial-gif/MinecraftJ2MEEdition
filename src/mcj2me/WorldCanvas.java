@@ -159,6 +159,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         world.addChild(waterGroup);
         Mesh clouds = buildCloudPlane(cloudAppearance);
         if (clouds != null) cloudGroup.addChild(clouds);
+        // A separate, very large sea surface continues beyond the finite map.
+        Mesh horizonSea = buildHorizonSea();
+        if (horizonSea != null) waterGroup.addChild(horizonSea);
         world.addChild(cloudGroup);
         updateCamera();
         updateChunks();
@@ -331,6 +334,11 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         if (keyCode == '1' && actionCooldown == 0) { breakBlock(); actionCooldown = 4; }
         else if (keyCode == '3' && actionCooldown == 0) { placeBlock(); actionCooldown = 4; }
+        else if (keyCode == '*' || keyCode == 42) {
+            // The physical * key sits above the call-accept key on many J2ME phones.
+            selectedSlot++;
+            if (selectedSlot >= BLOCK_NAMES.length) selectedSlot = 0;
+        }
         else if (keyCode == '7') { selectedSlot--; if (selectedSlot < 0) selectedSlot = BLOCK_NAMES.length - 1; }
         else if (keyCode == '9') { selectedSlot++; if (selectedSlot >= BLOCK_NAMES.length) selectedSlot = 0; }
         // In water, Fire/center is the swim-up control and can be held/re-tapped
@@ -562,7 +570,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         camera.setTransform(transform);
     }
 
-    private void updateChunks() {
+    private synchronized void updateChunks() {
         int centerX = ((int) cameraX) / CHUNK;
         int centerZ = ((int) cameraZ) / CHUNK;
         if (centerX == loadedCenterX && centerZ == loadedCenterZ) return;
@@ -607,6 +615,37 @@ final class WorldCanvas extends Canvas implements Runnable {
      * water cells from its ground surface up to WATER_LEVEL; tops and shoreline
      * walls are emitted as block faces instead of one continuous flat sheet.
      */
+    /** Force a fresh terrain/water mesh rebuild after an edit, even if the
+     * player remains inside the same chunk. Synchronization prevents the game
+     * loop from racing the key handler while meshes are removed and recreated. */
+    private synchronized void reloadEditedChunks() {
+        loadedCenterX = -99;
+        loadedCenterZ = -99;
+        updateChunks();
+    }
+
+    private Mesh buildHorizonSea() {
+        // The plane is intentionally far larger than the 128x128 playable map.
+        short[] positions = {
+            -1024, WATER_LEVEL, -1024,
+            -1024, WATER_LEVEL, 1024,
+             1024, WATER_LEVEL, -1024,
+             1024, WATER_LEVEL, 1024
+        };
+        short[] texCoords = {0, 0, 0, 1, 1, 0, 1, 1};
+        int[] indices = {0, 1, 2, 3};
+        int[] stripLengths = {4};
+        VertexArray positionArray = new VertexArray(4, 3, 2);
+        positionArray.set(0, 4, positions);
+        VertexArray texArray = new VertexArray(4, 2, 2);
+        texArray.set(0, 4, texCoords);
+        VertexBuffer buffer = new VertexBuffer();
+        buffer.setPositions(positionArray, 1.0f, null);
+        buffer.setTexCoords(0, texArray, 512.0f, null);
+        TriangleStripArray triangles = new TriangleStripArray(indices, stripLengths);
+        return new Mesh(buffer, triangles, waterAppearance);
+    }
+
     private Mesh buildWaterChunk(int chunkX, int chunkZ) {
         int startX = chunkX * CHUNK;
         int startZ = chunkZ * CHUNK;
@@ -726,7 +765,15 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private Mesh buildCloudPlane(Appearance appearance) {
-        short[] positions = {-64, 60, -64, -64, 60, 192, 192, 60, -64, 192, 60, 192};
+        // Keep one perfectly flat quad with fixed corners. The texture repeats
+        // at 1/8 UV scale, making cloud masses many blocks wide instead of tiny
+        // pixel-art speckles. Moving cloudGroup animates it without warping UVs.
+        short[] positions = {
+            -1024, 50, -1024,
+            -1024, 50, 1024,
+             1024, 50, -1024,
+             1024, 50, 1024
+        };
         short[] texCoords = {0, 0, 0, 1, 1, 0, 1, 1};
         int[] indices = {0, 1, 2, 3};
         int[] stripLengths = {4};
@@ -736,7 +783,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         texArray.set(0, 4, texCoords);
         VertexBuffer buffer = new VertexBuffer();
         buffer.setPositions(positionArray, 1.0f, null);
-        buffer.setTexCoords(0, texArray, 1.0f, null);
+        buffer.setTexCoords(0, texArray, 0.125f, null);
         TriangleStripArray triangles = new TriangleStripArray(indices, stripLengths);
         return new Mesh(buffer, triangles, appearance);
     }
@@ -744,9 +791,11 @@ final class WorldCanvas extends Canvas implements Runnable {
     private void animateWater() {
         waterPhase += 0.012f;
         if (waterPhase >= 1.0f) waterPhase -= 1.0f;
-        cloudPhase += 0.0001f;
-        if (cloudPhase >= 1.0f) cloudPhase -= 1.0f;
-        cloudTexture.setTranslation(cloudPhase, 0.0f, 0.0f);
+        cloudPhase += 0.025f;
+        if (cloudPhase >= 64.0f) cloudPhase -= 64.0f;
+        // Translate the complete rigid cloud mesh. The mesh vertices and UVs
+        // stay fixed, so animation cannot stretch or shear the cloud pattern.
+        cloudGroup.setTranslation(-cloudPhase, 0.0f, 0.0f);
         // Texture2D is Transformable in M3G; repeating coordinates make this
         // a cheap scrolling-water animation without rebuilding terrain meshes.
         waterTexture.setTranslation(waterPhase, waterPhase * 0.65f, 0.0f);
@@ -874,8 +923,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         int[] leafHit = raycastLeafBlock();
         if (leafHit != null && terrain.removeLeafBlock(leafHit[0], leafHit[1], leafHit[2])) {
             particleTicks = 8;
-            loadedCenterX = -99;
-            updateChunks();
+            reloadEditedChunks();
             updateCamera();
             return;
         }
@@ -890,8 +938,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         terrain.setHeight(x, z, h - 1);
         terrain.setTopType(x, z, 1);
         particleTicks = 8;
-        loadedCenterX = -99;
-        updateChunks();
+        reloadEditedChunks();
         resolvePlayerAfterTerrainEdit();
     }
 
