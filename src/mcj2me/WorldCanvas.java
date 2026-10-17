@@ -412,6 +412,13 @@ final class WorldCanvas extends Canvas implements Runnable {
             verticalVelocity += 0.004f;
             if (verticalVelocity < -0.045f) verticalVelocity = -0.045f;
             if (verticalVelocity > 0.24f) verticalVelocity = 0.24f;
+
+            // Water never disables solid-ground collision. Keep the player's
+            // feet above the terrain even while buoyancy/gravity is active.
+            if (cameraY < groundY) {
+                cameraY = groundY;
+                if (verticalVelocity < 0.0f) verticalVelocity = 0.0f;
+            }
             changed = true;
         } else if (airborne) {
             cameraY += verticalVelocity;
@@ -532,6 +539,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         loadedCenterZ = centerZ;
     }
 
+    /**
+     * Builds exposed faces of the water block volume. Each wet column contains
+     * water cells from its ground surface up to WATER_LEVEL; tops and shoreline
+     * walls are emitted as block faces instead of one continuous flat sheet.
+     */
     private Mesh buildWaterChunk(int chunkX, int chunkZ) {
         int startX = chunkX * CHUNK;
         int startZ = chunkZ * CHUNK;
@@ -539,7 +551,14 @@ final class WorldCanvas extends Canvas implements Runnable {
         int x, z;
         for (x = startX; x < startX + CHUNK; x++) {
             for (z = startZ; z < startZ + CHUNK; z++) {
-                if (terrain.isWaterAt(x, z)) quads++;
+                if (!terrain.isWaterBlockAt(x, WATER_LEVEL - 1, z)) continue;
+                quads++; // top face of the uppermost water block
+                int h = terrain.getHeight(x, z);
+                int nh;
+                if (!terrain.isWaterAt(x - 1, z)) { nh = terrain.getHeight(x - 1, z); if (Math.max(h, nh) < WATER_LEVEL) quads++; }
+                if (!terrain.isWaterAt(x + 1, z)) { nh = terrain.getHeight(x + 1, z); if (Math.max(h, nh) < WATER_LEVEL) quads++; }
+                if (!terrain.isWaterAt(x, z - 1)) { nh = terrain.getHeight(x, z - 1); if (Math.max(h, nh) < WATER_LEVEL) quads++; }
+                if (!terrain.isWaterAt(x, z + 1)) { nh = terrain.getHeight(x, z + 1); if (Math.max(h, nh) < WATER_LEVEL) quads++; }
             }
         }
         if (quads == 0) return null;
@@ -552,12 +571,42 @@ final class WorldCanvas extends Canvas implements Runnable {
         int vertex = 0, strip = 0;
         for (x = startX; x < startX + CHUNK; x++) {
             for (z = startZ; z < startZ + CHUNK; z++) {
-                if (!terrain.isWaterAt(x, z)) continue;
+                if (!terrain.isWaterBlockAt(x, WATER_LEVEL - 1, z)) continue;
+                int h = terrain.getHeight(x, z);
                 vertex = addWaterQuad(positions, texCoords, indices, stripLengths,
                     vertex, strip++, x, WATER_LEVEL, z,
                     x, WATER_LEVEL, z + 1,
                     x + 1, WATER_LEVEL, z,
                     x + 1, WATER_LEVEL, z + 1);
+
+                int nh = terrain.getHeight(x - 1, z);
+                if (!terrain.isWaterAt(x - 1, z) && Math.max(h, nh) < WATER_LEVEL) {
+                    int y0 = Math.max(h, nh);
+                    vertex = addWaterQuad(positions, texCoords, indices, stripLengths,
+                        vertex, strip++, x, y0, z + 1, x, WATER_LEVEL, z + 1,
+                        x, y0, z, x, WATER_LEVEL, z);
+                }
+                nh = terrain.getHeight(x + 1, z);
+                if (!terrain.isWaterAt(x + 1, z) && Math.max(h, nh) < WATER_LEVEL) {
+                    int y0 = Math.max(h, nh);
+                    vertex = addWaterQuad(positions, texCoords, indices, stripLengths,
+                        vertex, strip++, x + 1, y0, z, x + 1, WATER_LEVEL, z,
+                        x + 1, y0, z + 1, x + 1, WATER_LEVEL, z + 1);
+                }
+                nh = terrain.getHeight(x, z - 1);
+                if (!terrain.isWaterAt(x, z - 1) && Math.max(h, nh) < WATER_LEVEL) {
+                    int y0 = Math.max(h, nh);
+                    vertex = addWaterQuad(positions, texCoords, indices, stripLengths,
+                        vertex, strip++, x, y0, z, x, WATER_LEVEL, z,
+                        x + 1, y0, z, x + 1, WATER_LEVEL, z);
+                }
+                nh = terrain.getHeight(x, z + 1);
+                if (!terrain.isWaterAt(x, z + 1) && Math.max(h, nh) < WATER_LEVEL) {
+                    int y0 = Math.max(h, nh);
+                    vertex = addWaterQuad(positions, texCoords, indices, stripLengths,
+                        vertex, strip++, x + 1, y0, z + 1, x + 1, WATER_LEVEL, z + 1,
+                        x, y0, z + 1, x, WATER_LEVEL, z + 1);
+                }
             }
         }
 
