@@ -71,18 +71,30 @@ final class TerrainGenerator {
                     if (distance > edge * edge) continue;
 
                     float normalized = (float) Math.sqrt(distance);
-                    // The inner bowl rises toward the waterline, creating a
-                    // broad pool instead of a tiny puddle at the center.
-                    int h = floor + (int) (normalized * (depth + 2));
-                    if (normalized > 0.82f) {
-                        h += (int) ((normalized - 0.82f) * 11.0f);
+                    boolean insideWater = distance <= 0.72f;
+                    int h;
+                    if (insideWater) {
+                        // Force the entire marked interior below the waterline.
+                        // The previous slope formula could raise much of the
+                        // supposed lake above WATER_LEVEL, leaving only a tiny
+                        // central patch (or none after later structures overlap).
+                        h = floor + (int) (normalized * (depth - 1));
+                        h += hash(x + b * 29, z + b * 7) & 1;
+                        if (h >= WATER_LEVEL) h = WATER_LEVEL - 1;
+                    } else {
+                        // Build the sloped bank and a lip above the waterline.
+                        h = floor + (int) (normalized * (depth + 4));
+                        if (normalized > 0.82f) {
+                            h += (int) ((normalized - 0.82f) * 11.0f);
+                        }
+                        h += hash(x + b * 29, z + b * 7) & 1;
+                        int rimHeight = Math.max(WATER_LEVEL + 1, baseHeight);
+                        if (h > rimHeight) h = rimHeight;
                     }
-                    h += hash(x + b * 29, z + b * 7) & 1;
-                    int rimHeight = Math.max(WATER_LEVEL + 1, baseHeight);
-                    if (h > rimHeight) h = rimHeight;
                     if (h < 2) h = 2;
                     heights[x][z] = (short) h;
-                    waterBasins[x][z] = h < WATER_LEVEL && distance <= 0.82f;
+                    // Never clear another lake's water when structures overlap.
+                    if (insideWater) waterBasins[x][z] = true;
                 }
             }
         }
