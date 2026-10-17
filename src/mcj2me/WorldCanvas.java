@@ -31,15 +31,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Image guiImage;
     private Image guiBlocksImage;
     private Image inventoryImage;
-    private Image titleImage;
-    private Image skyboxImage;
-    private Image menuPanorama;
-    private Image menuTitle;
-    private int menuRenderWidth = -1, menuRenderHeight = -1;
-    private float menuPanoramaPhase = 0.0f;
-    private boolean menuScreen = true;
-    private int menuSelected = 0;
-    private final Image[] blockIcons = new Image[9];
+    private final Image[] blockIcons = new Image[BLOCK_NAMES.length];
     private boolean inventoryOpen = false;
     private int inventoryCursor = 0;
     private float cloudPhase = 0.0f;
@@ -61,16 +53,19 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean lookUp, lookDown, turnLeft, turnRight;
     private boolean jumpHeld;
     // Indev-era terrain atlas tiles: surface blocks, ores, then bedrock.
-    private static final int[] BLOCK_TILE_X = {0, 2, 1, 5, 4, 2, 1, 2, 2, 1};
-    private static final int[] BLOCK_TILE_Y = {0, 0, 0, 1, 3, 1, 2, 2, 3, 1};
+    private static final int[] BLOCK_TILE_X = {0, 2, 1, 5, 4, 2, 1, 2, 2, 1, 8, 4, 2, 3, 6, 5};
+    private static final int[] BLOCK_TILE_Y = {0, 0, 0, 1, 3, 1, 2, 2, 3, 1, 0, 1, 4, 1, 0, 3};
     // 48x48 block icons in gui_blocks.png, mapped to grass/dirt/stone/log/leaves.
     // 48x48 cells verified against gui_blocks.png: grass, dirt, stone,
     // oak log, and leaves. The sheet is a block-icon atlas, not textures.png.
     private static final int[] GUI_ICON_X = {432, 144, 0, 288, 96};
     private static final int[] GUI_ICON_Y = {0, 288, 0, 48, 288};
-    private static final String[] BLOCK_NAMES = {"GRASS", "DIRT", "STONE", "WOOD", "LEAVES", "COAL", "IRON ORE", "GOLD ORE", "DIAMOND"};
-    private final int[] inventory = {64, 64, 64, 64, 64, 0, 0, 0, 0};
+    private static final String[] BLOCK_NAMES = {"GRASS", "DIRT", "STONE", "WOOD", "LEAVES", "COAL", "IRON", "GOLD", "DIAMOND", "BEDROCK", "TNT", "PLANKS", "SAND", "GRAVEL", "BRICK", "OBSIDIAN"};
+    private final int[] inventory = {64, 64, 64, 64, 64, 0, 0, 0, 0, 0, 8, 32, 32, 32, 16, 8};
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
+    private int tntFuseTicks = 0, tntX = -1, tntZ = -1, tntFlashCounter = 0;
+    private boolean tntFlashOn = false;
+    private int explosionFlashTicks = 0;
     private static final int BLOCK_PARTICLE_COUNT = 12;
     private static final int BLOCK_PARTICLE_LIFE = 20;
     private final float[] blockParticleX = new float[BLOCK_PARTICLE_COUNT];
@@ -124,17 +119,14 @@ final class WorldCanvas extends Canvas implements Runnable {
         guiImage = Image.createImage("/mcj2me/gui.png");
         guiBlocksImage = Image.createImage("/mcj2me/gui_blocks.png");
         inventoryImage = Image.createImage("/mcj2me/inventory.png");
-        titleImage = Image.createImage("/mcj2me/title.png");
-        skyboxImage = Image.createImage("/mcj2me/skybox.png");
         blockIcons[0] = createGuiBlockIcon(GUI_ICON_X[0], GUI_ICON_Y[0]);
         blockIcons[1] = createGuiBlockIcon(GUI_ICON_X[1], GUI_ICON_Y[1]);
         blockIcons[2] = createGuiBlockIcon(GUI_ICON_X[2], GUI_ICON_Y[2]);
         blockIcons[3] = createGuiBlockIcon(GUI_ICON_X[3], GUI_ICON_Y[3]);
         blockIcons[4] = createGuiBlockIcon(GUI_ICON_X[4], GUI_ICON_Y[4]);
-        blockIcons[5] = createTerrainBlockIcon(atlas, BLOCK_TILE_X[5], BLOCK_TILE_Y[5]);
-        blockIcons[6] = createTerrainBlockIcon(atlas, BLOCK_TILE_X[6], BLOCK_TILE_Y[6]);
-        blockIcons[7] = createTerrainBlockIcon(atlas, BLOCK_TILE_X[7], BLOCK_TILE_Y[7]);
-        blockIcons[8] = createTerrainBlockIcon(atlas, BLOCK_TILE_X[8], BLOCK_TILE_Y[8]);
+        for (int bi = 5; bi < BLOCK_NAMES.length; bi++) {
+            blockIcons[bi] = createTerrainBlockIcon(atlas, BLOCK_TILE_X[bi], BLOCK_TILE_Y[bi]);
+        }
         Image cloudsImage = Image.createImage("/mcj2me/clouds.png");
         Image2D image2D = new Image2D(Image2D.RGBA, atlas);
         Texture2D texture = new Texture2D(image2D);
@@ -183,6 +175,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         Background background = new Background();
         background.setColor(0x87BFEA);
         world.setBackground(background);
+        Fog distanceFog = new Fog();
+        distanceFog.setColor(0xB6CBE0);
+        distanceFog.setLinear(38.0f, 118.0f);
+        world.setFog(distanceFog);
 
         Light ambient = new Light();
         ambient.setMode(Light.AMBIENT);
@@ -232,16 +228,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     public void run() {
         while (running) {
             if (!paused) {
-                if (menuScreen) {
-                    if (menuPanorama != null) {
-                        int maxPan = Math.max(0, menuPanorama.getWidth() - Math.max(1, getWidth()));
-                        menuPanoramaPhase += 0.35f;
-                        if (menuPanoramaPhase > maxPan) menuPanoramaPhase = 0.0f;
-                    }
-                } else {
-                    updateMovement();
-                    animateWater();
-                }
+                updateMovement();
+                animateWater();
+                updateTntFuse();
                 repaint();
                 serviceRepaints();
             }
@@ -264,10 +253,6 @@ final class WorldCanvas extends Canvas implements Runnable {
                          Graphics.TOP | Graphics.LEFT);
             return;
         }
-        if (menuScreen) {
-            drawTitleScreen(g);
-            return;
-        }
         boolean targetBound = false;
         try {
             camera.setPerspective(70.0f,
@@ -284,6 +269,10 @@ final class WorldCanvas extends Canvas implements Runnable {
             g.drawString(e.toString(), 4, 24, Graphics.TOP | Graphics.LEFT);
         } finally { if (targetBound) graphics3D.releaseTarget(); }
         drawUnderwaterOverlay(g);
+        if (explosionFlashTicks > 0) {
+            g.setColor(0xFFF1B0);
+            g.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
+        }
         drawHud(g);
     }
 
@@ -305,97 +294,6 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean isCameraUnderwater() {
         return terrain.isWaterAt((int) cameraX, (int) cameraZ)
             && cameraY < WATER_LEVEL;
-    }
-
-    private void drawTitleScreen(Graphics g) {
-        int w = Math.max(1, getWidth());
-        int h = Math.max(1, getHeight());
-        if (menuRenderWidth != w || menuRenderHeight != h || menuPanorama == null) {
-            menuRenderWidth = w;
-            menuRenderHeight = h;
-            // A double-width panorama lets the old Java title-screen backdrop drift slowly.
-            menuPanorama = resizeImage(skyboxImage, w * 2, h, true);
-            int maxTitleW = Math.max(1, Math.min(w - 20, 512));
-            int maxTitleH = Math.max(1, Math.min(h / 3, 128));
-            float scale = Math.min((float) maxTitleW / titleImage.getWidth(),
-                                   (float) maxTitleH / titleImage.getHeight());
-            int titleW = Math.max(1, (int) (titleImage.getWidth() * scale));
-            int titleH = Math.max(1, (int) (titleImage.getHeight() * scale));
-            menuTitle = resizeImage(titleImage, titleW, titleH, false);
-            menuPanoramaPhase = 0.0f;
-        }
-
-        int maxPan = Math.max(0, menuPanorama.getWidth() - w);
-        int panX = Math.min(maxPan, (int) menuPanoramaPhase);
-        g.drawRegion(menuPanorama, panX, 0, w, h, 0, 0, 0,
-                     Graphics.TOP | Graphics.LEFT);
-
-        int titleX = (w - menuTitle.getWidth()) / 2;
-        int titleY = Math.max(8, h / 10);
-        g.drawImage(menuTitle, titleX, titleY, Graphics.TOP | Graphics.LEFT);
-
-        int buttonW = Math.min(w - 24, 210);
-        if (buttonW < 1) buttonW = w;
-        int buttonH = Math.min(28, Math.max(22, h / 10));
-        int buttonX = (w - buttonW) / 2;
-        int firstY = Math.max(titleY + menuTitle.getHeight() + 10, h * 3 / 5);
-        if (firstY + buttonH * 2 + 7 > h - 26) firstY = Math.max(titleY + menuTitle.getHeight() + 4, h - buttonH * 2 - 31);
-        drawMenuButton(g, buttonX, firstY, buttonW, buttonH, "Singleplayer", menuSelected == 0);
-        drawMenuButton(g, buttonX, firstY + buttonH + 7, buttonW, buttonH, "Quit Game", menuSelected == 1);
-
-        g.setColor(0xFFFFFF);
-        g.drawString("Minecraft J2ME Edition", 5, h - 17, Graphics.BOTTOM | Graphics.LEFT);
-        g.setColor(0xFFFF55);
-        g.drawString("Indev demake", w - 5, h - 17, Graphics.BOTTOM | Graphics.RIGHT);
-    }
-
-    private void drawMenuButton(Graphics g, int x, int y, int w, int h,
-                                String label, boolean selected) {
-        g.setColor(selected ? 0x777777 : 0x555555);
-        g.fillRect(x, y, w, h);
-        g.setColor(selected ? 0xFFFFAA : 0xAAAAAA);
-        g.drawRect(x, y, w - 1, h - 1);
-        g.setColor(0x222222);
-        g.drawLine(x + 1, y + h - 2, x + w - 2, y + h - 2);
-        g.drawLine(x + w - 2, y + 1, x + w - 2, y + h - 2);
-        g.setColor(selected ? 0xFFFF55 : 0xFFFFFF);
-        javax.microedition.lcdui.Font font = javax.microedition.lcdui.Font.getDefaultFont();
-        g.drawString(label, x + (w - font.stringWidth(label)) / 2,
-                     y + (h - font.getHeight()) / 2,
-                     Graphics.TOP | Graphics.LEFT);
-    }
-
-    /**
-     * Nearest-neighbor scaling compatible with MIDP 2.0. In cover mode, crop
-     * the source to the target aspect ratio before scaling; scanline storage
-     * avoids allocating a full-size source pixel buffer on small Java heaps.
-     */
-    private Image resizeImage(Image source, int targetW, int targetH, boolean cover) {
-        int sw = source.getWidth(), sh = source.getHeight();
-        int cropX = 0, cropY = 0, cropW = sw, cropH = sh;
-        if (cover) {
-            long lhs = (long) sw * targetH;
-            long rhs = (long) sh * targetW;
-            if (lhs > rhs) {
-                cropW = (int) ((long) sh * targetW / targetH);
-                cropX = (sw - cropW) / 2;
-            } else if (lhs < rhs) {
-                cropH = (int) ((long) sw * targetH / targetW);
-                cropY = (sh - cropH) / 2;
-            }
-        }
-        int[] row = new int[sw];
-        int[] pixels = new int[targetW * targetH];
-        for (int y = 0; y < targetH; y++) {
-            int sy = cropY + (int) ((long) y * cropH / targetH);
-            source.getRGB(row, 0, sw, 0, sy, sw, 1);
-            int dest = y * targetW;
-            for (int x = 0; x < targetW; x++) {
-                int sx = cropX + (int) ((long) x * cropW / targetW);
-                pixels[dest + x] = row[sx];
-            }
-        }
-        return Image.createRGBImage(pixels, targetW, targetH, true);
     }
 
     private void drawInventory(Graphics g) {
@@ -453,15 +351,19 @@ final class WorldCanvas extends Canvas implements Runnable {
         int barX = (w - 182) / 2;
         int barY = h - 23;
         g.drawRegion(guiImage, 0, 0, 182, 22, 0, barX, barY, Graphics.TOP | Graphics.LEFT);
-        for (int i = 0; i < BLOCK_NAMES.length; i++) {
+        int firstBlock = selectedSlot - 4;
+        if (firstBlock < 0) firstBlock = 0;
+        if (firstBlock > BLOCK_NAMES.length - 9) firstBlock = BLOCK_NAMES.length - 9;
+        for (int i = 0; i < 9; i++) {
+            int block = firstBlock + i;
             int slotX = barX + 1 + i * 20;
-            if (i == selectedSlot) g.drawRegion(guiImage, 0, 22, 24, 22, 0,
+            if (block == selectedSlot) g.drawRegion(guiImage, 0, 22, 24, 22, 0,
                 slotX, barY, Graphics.TOP | Graphics.LEFT);
-            g.drawImage(blockIcons[i], slotX + 4, barY + 3,
+            g.drawImage(blockIcons[block], slotX + 4, barY + 3,
                 Graphics.TOP | Graphics.LEFT);
-            if (inventory[i] > 1) {
+            if (inventory[block] > 1) {
                 g.setColor(0xFFFFFF);
-                g.drawString(Integer.toString(inventory[i]), slotX + 11, barY + 10,
+                g.drawString(Integer.toString(inventory[block]), slotX + 11, barY + 10,
                     Graphics.TOP | Graphics.LEFT);
             }
         }
@@ -482,46 +384,6 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     protected synchronized void keyPressed(int keyCode) {
         int action = getGameAction(keyCode);
-
-        if (menuScreen) {
-            if (action == UP || keyCode == '2') {
-                menuSelected = 0;
-                repaint();
-                return;
-            }
-            if (action == DOWN || keyCode == '8') {
-                menuSelected = 1;
-                repaint();
-                return;
-            }
-            if (action == LEFT || action == RIGHT || keyCode == '4' || keyCode == '6') {
-                menuSelected = 1 - menuSelected;
-                repaint();
-                return;
-            }
-            if (action == FIRE || keyCode == '5' || keyCode == ' ' || keyCode == '\n') {
-                if (menuSelected == 0) {
-                    menuScreen = false;
-                } else {
-                    stop();
-                    midlet.notifyDestroyed();
-                    return;
-                }
-                repaint();
-                return;
-            }
-            if (keyCode == '1') {
-                menuScreen = false;
-                repaint();
-                return;
-            }
-            if (keyCode == '3') {
-                stop();
-                midlet.notifyDestroyed();
-                return;
-            }
-            return;
-        }
 
         if (keyCode == '#') {
             inventoryOpen = true;
@@ -549,7 +411,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (row > 2) row = 2;
             inventoryCursor = row * 9 + col;
             if (action == FIRE || keyCode == '5' || keyCode == ' ') {
-                if (inventoryCursor < BLOCK_NAMES.length) selectedSlot = inventoryCursor;
+                if (inventoryCursor < BLOCK_NAMES.length && inventoryCursor != TerrainGenerator.BLOCK_BEDROCK) selectedSlot = inventoryCursor;
             }
             repaint();
             return;
@@ -583,12 +445,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (keyCode == '1' && actionCooldown == 0) { breakBlock(); actionCooldown = 4; }
         else if (keyCode == '3' && actionCooldown == 0) { placeBlock(); actionCooldown = 4; }
         else if (keyCode == '*' || keyCode == 42) {
-            // The physical * key sits above the call-accept key on many J2ME phones.
-            selectedSlot++;
-            if (selectedSlot >= BLOCK_NAMES.length) selectedSlot = 0;
+            cycleSelectedBlock(1);
         }
-        else if (keyCode == '7') { selectedSlot--; if (selectedSlot < 0) selectedSlot = BLOCK_NAMES.length - 1; }
-        else if (keyCode == '9') { selectedSlot++; if (selectedSlot >= BLOCK_NAMES.length) selectedSlot = 0; }
+        else if (keyCode == '7') { cycleSelectedBlock(-1); }
+        else if (keyCode == '9') { cycleSelectedBlock(1); }
         // In water, Fire/center is the swim-up control and can be held/re-tapped
         // while already airborne. On land it remains the normal jump button.
         if (action == FIRE || keyCode == '5' || keyCode == ' ') {
@@ -602,6 +462,16 @@ final class WorldCanvas extends Canvas implements Runnable {
                 verticalVelocity = JUMP_SPEED;
                 airborne = true;
             }
+        }
+    }
+
+    private void cycleSelectedBlock(int direction) {
+        int next = selectedSlot;
+        for (int tries = 0; tries < BLOCK_NAMES.length; tries++) {
+            next += direction;
+            if (next < 0) next = BLOCK_NAMES.length - 1;
+            if (next >= BLOCK_NAMES.length) next = 0;
+            if (next != TerrainGenerator.BLOCK_BEDROCK) { selectedSlot = next; return; }
         }
     }
 
@@ -1105,10 +975,12 @@ final class WorldCanvas extends Canvas implements Runnable {
             for (z = startZ; z < startZ + CHUNK; z++) {
                 h = terrain.getHeight(x, z);
                 int topType = terrain.getTopType(x, z);
+                int topTileX = BLOCK_TILE_X[topType], topTileY = BLOCK_TILE_Y[topType];
+                if (topType == TerrainGenerator.BLOCK_TNT && tntFuseTicks > 0
+                        && x == tntX && z == tntZ && tntFlashOn) { topTileX = 9; topTileY = 0; }
                 vertex = addQuad(positions, texCoords, colors, indices, stripLengths,
                     vertex, strip++, x, h, z, x, h, z + 1,
-                    x + 1, h, z, x + 1, h, z + 1,
-                    BLOCK_TILE_X[topType], BLOCK_TILE_Y[topType]);
+                    x + 1, h, z, x + 1, h, z + 1, topTileX, topTileY);
 
                 int neighbor = terrain.getHeight(x - 1, z);
                 for (int sy = neighbor; sy < h; sy++) {
@@ -1293,6 +1165,42 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
     }
 
+    private void updateTntFuse() {
+        if (explosionFlashTicks > 0) explosionFlashTicks--;
+        if (tntFuseTicks <= 0) return;
+        tntFuseTicks--;
+        tntFlashCounter++;
+        if (tntFlashCounter >= 12) {
+            tntFlashCounter = 0;
+            tntFlashOn = !tntFlashOn;
+            reloadEditedChunks();
+        }
+        if (tntFuseTicks == 0) explodeTnt();
+    }
+
+    private void explodeTnt() {
+        int cx = tntX, cz = tntZ;
+        tntX = -1; tntZ = -1; tntFlashOn = false; tntFlashCounter = 0;
+        explosionFlashTicks = 8;
+        if (cx < 0 || cz < 0) return;
+        int radius = 4;
+        for (int x = Math.max(1, cx-radius); x <= Math.min(TerrainGenerator.SIZE-2, cx+radius); x++) {
+            for (int z = Math.max(1, cz-radius); z <= Math.min(TerrainGenerator.SIZE-2, cz+radius); z++) {
+                int dx=x-cx, dz=z-cz, d2=dx*dx+dz*dz;
+                if (d2 > radius*radius) continue;
+                int depth = 1 + radius - (int)Math.sqrt(d2);
+                int nh = terrain.getHeight(x,z)-depth;
+                if (nh < 2) nh = 2;
+                terrain.setHeight(x,z,nh);
+                terrain.setTopType(x,z,(x==cx && z==cz) ? TerrainGenerator.BLOCK_STONE :
+                    (nh < 20 ? TerrainGenerator.BLOCK_STONE : TerrainGenerator.BLOCK_DIRT));
+            }
+        }
+        spawnBlockParticles(TerrainGenerator.BLOCK_TNT,cx+0.5f,terrain.getHeight(cx,cz)+0.5f,cz+0.5f);
+        reloadEditedChunks();
+        resolvePlayerAfterTerrainEdit();
+    }
+
     private void breakBlock() {
         int[] leafHit = raycastLeafBlock();
         if (leafHit != null && terrain.removeLeafBlock(leafHit[0], leafHit[1], leafHit[2])) {
@@ -1314,7 +1222,14 @@ final class WorldCanvas extends Canvas implements Runnable {
         int type = sideHit ? terrain.getBlockTypeAt(x, blockY, z)
                            : terrain.getTopType(x, z);
         if (type == TerrainGenerator.BLOCK_BEDROCK) return;
-        if (type >= 0 && type < inventory.length) inventory[type]++;
+        if (type == TerrainGenerator.BLOCK_TNT) {
+            if (tntFuseTicks == 0) {
+                tntX=x; tntZ=z; tntFuseTicks=125; tntFlashCounter=0; tntFlashOn=true;
+                reloadEditedChunks();
+            }
+            return;
+        }
+        if (type >= 0 && type < inventory.length && type != TerrainGenerator.BLOCK_BEDROCK) inventory[type]++;
         spawnBlockParticles(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
 
         if (sideHit) {
