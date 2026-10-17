@@ -998,3 +998,5 @@ final class WorldCanvas extends Canvas implements Runnable {
             airborne = true;
         }
         updateCamera();
+    }
+}
