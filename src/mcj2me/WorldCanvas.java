@@ -1484,7 +1484,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private void setupTorchLights() {
         for (int i = 0; i < torchLights.length; i++) {
             Light light = new Light();
-            light.setMode(Light.POINT);
+            light.setMode(Light.OMNI);
             light.setColor(0xFFB45A);
             light.setIntensity(1.0f);
             light.setAttenuation(1.0f, 0.08f, 0.025f);
