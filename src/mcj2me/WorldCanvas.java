@@ -239,6 +239,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         in.readFully(terrainData);
         cameraX = in.readFloat(); cameraY = in.readFloat(); cameraZ = in.readFloat();
         yaw = in.readFloat(); pitch = in.readFloat();
+        float savedPlayerYaw = yaw;
         dayTick = in.readInt();
         selectedSlot = in.readInt();
         if (selectedSlot < 0 || selectedSlot >= inventory.length) selectedSlot = 0;
@@ -263,6 +264,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 decorationMeshes[at].setOrientation(savedYaw + (opened ? 90.0f : 0.0f), 0.0f, 1.0f, 0.0f);
             }
         }
+        yaw = savedPlayerYaw;
         in.close();
         updateCamera();
         updateTorchLights();
