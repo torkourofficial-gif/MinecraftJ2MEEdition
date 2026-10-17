@@ -6,6 +6,12 @@ import javax.microedition.lcdui.Image;
 import javax.microedition.m3g.*;
 
 final class WorldCanvas extends Canvas implements Runnable {
+    // Keep the movement IDs local so this class does not depend on MIDlet constant visibility.
+    private static final int CONTROL_FORWARD = 0, CONTROL_BACKWARD = 1;
+    private static final int CONTROL_STRAFE_LEFT = 2, CONTROL_STRAFE_RIGHT = 3;
+    private static final int CONTROL_LOOK_UP = 4, CONTROL_LOOK_DOWN = 5;
+    private static final int CONTROL_TURN_LEFT = 6, CONTROL_TURN_RIGHT = 7;
+    private static final int CONTROL_JUMP = 8, CONTROL_BREAK = 9, CONTROL_PLACE = 10;
     private static final int CHUNK = 16;
     private static final int RADIUS = 1;
     private static final float MOVE_SPEED = 0.20f;
@@ -478,20 +484,20 @@ final class WorldCanvas extends Canvas implements Runnable {
             return;
         }
 
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_FORWARD,keyCode,action)) forward=true;
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_BACKWARD,keyCode,action)) backward=true;
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_STRAFE_LEFT,keyCode,action)) strafeLeft=true;
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_STRAFE_RIGHT,keyCode,action)) strafeRight=true;
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_LOOK_UP,keyCode,action)) lookUp=true;
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_LOOK_DOWN,keyCode,action)) lookDown=true;
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_TURN_LEFT,keyCode,action)) turnLeft=true;
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_TURN_RIGHT,keyCode,action)) turnRight=true;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_FORWARD,keyCode,action)) forward=true;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_BACKWARD,keyCode,action)) backward=true;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_STRAFE_LEFT,keyCode,action)) strafeLeft=true;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_STRAFE_RIGHT,keyCode,action)) strafeRight=true;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_LOOK_UP,keyCode,action)) lookUp=true;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_LOOK_DOWN,keyCode,action)) lookDown=true;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_TURN_LEFT,keyCode,action)) turnLeft=true;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_TURN_RIGHT,keyCode,action)) turnRight=true;
 
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_BREAK,keyCode,action)
+        if (IndevViewerMIDlet.controlPressed(CONTROL_BREAK,keyCode,action)
                 && actionCooldown == 0) {
             if (!attackMobs()) breakBlock();
             actionCooldown = 4;
-        } else if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_PLACE,keyCode,action)
+        } else if (IndevViewerMIDlet.controlPressed(CONTROL_PLACE,keyCode,action)
                 && actionCooldown == 0) {
             placeBlock();
             actionCooldown = 4;
@@ -503,7 +509,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             cycleSelectedBlock(1);
         }
 
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_JUMP,keyCode,action)) {
+        if (IndevViewerMIDlet.controlPressed(CONTROL_JUMP,keyCode,action)) {
             jumpHeld = true;
             if (isSwimming()) {
                 verticalVelocity = Math.max(verticalVelocity, 0.24f);
@@ -527,16 +533,16 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     protected synchronized void keyReleased(int keyCode) {
         int action = getGameAction(keyCode);
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_JUMP,keyCode,action))
+        if (IndevViewerMIDlet.controlPressed(CONTROL_JUMP,keyCode,action))
             jumpHeld = false;
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_FORWARD,keyCode,action)) forward=false;
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_BACKWARD,keyCode,action)) backward=false;
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_STRAFE_LEFT,keyCode,action)) strafeLeft=false;
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_STRAFE_RIGHT,keyCode,action)) strafeRight=false;
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_LOOK_UP,keyCode,action)) lookUp=false;
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_LOOK_DOWN,keyCode,action)) lookDown=false;
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_TURN_LEFT,keyCode,action)) turnLeft=false;
-        if (IndevViewerMIDlet.controlPressed(IndevViewerMIDlet.CONTROL_TURN_RIGHT,keyCode,action)) turnRight=false;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_FORWARD,keyCode,action)) forward=false;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_BACKWARD,keyCode,action)) backward=false;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_STRAFE_LEFT,keyCode,action)) strafeLeft=false;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_STRAFE_RIGHT,keyCode,action)) strafeRight=false;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_LOOK_UP,keyCode,action)) lookUp=false;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_LOOK_DOWN,keyCode,action)) lookDown=false;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_TURN_LEFT,keyCode,action)) turnLeft=false;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_TURN_RIGHT,keyCode,action)) turnRight=false;
     }
 
     private synchronized void clearKeys() {
