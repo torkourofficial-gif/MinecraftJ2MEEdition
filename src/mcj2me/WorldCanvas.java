@@ -170,14 +170,21 @@ final class WorldCanvas extends Canvas implements Runnable {
     private String errorMessage;
     private final String worldName;
     private final int worldSeed;
+    private final int worldId;
 
     WorldCanvas(IndevViewerMIDlet owner, String name, int seed) {
+        this(owner, name, seed, 0, null);
+    }
+
+    WorldCanvas(IndevViewerMIDlet owner, String name, int seed, int id, byte[] savedTerrain) {
         midlet = owner;
         worldName = name;
         worldSeed = seed;
+        worldId = id;
         terrain = new TerrainGenerator(seed);
         setFullScreenMode(true);
         try {
+            if (savedTerrain != null) terrain.loadState(savedTerrain);
             setupScene();
         } catch (OutOfMemoryError e) {
             errorMessage = "Not enough Java heap for M3G.";
@@ -188,6 +195,8 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     String getWorldName() { return worldName; }
     int getWorldSeed() { return worldSeed; }
+    int getWorldId() { return worldId; }
+    byte[] saveTerrainState() throws Exception { return terrain.saveState(); }
     boolean hasSetupError() { return errorMessage != null; }
     String getSetupError() { return errorMessage; }
 
