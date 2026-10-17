@@ -86,6 +86,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int loadedCenterZ = -99;
     private int loadedFacingSector = -99;
     private boolean chunksDirty = true;
+    private boolean lastHumbleMode = IndevViewerMIDlet.humbleMode;
+    private final int[] shadeCacheKeys = new int[512];
+    private final int[] shadeCacheValues = new int[512];
     private Thread thread;
     private boolean running;
     private boolean paused;
@@ -323,8 +326,11 @@ final class WorldCanvas extends Canvas implements Runnable {
                 updateChunks();
                 updateDayNight();
                 animateWater();
-                if (passiveMobs != null) passiveMobs.update(cameraX, cameraZ);
-                if (hostileMobs != null) hostileMobs.update(cameraX, cameraZ, daylightLevel <= 0.42f);
+                applyMobVisibility();
+                if (!IndevViewerMIDlet.humbleMode) {
+                    if (passiveMobs != null) passiveMobs.update(cameraX, cameraZ);
+                    if (hostileMobs != null) hostileMobs.update(cameraX, cameraZ, daylightLevel <= 0.42f);
+                }
                 updateTntFuse();
                 if (++torchLightUpdateTicks >= 10) {
                     torchLightUpdateTicks = 0;
@@ -387,6 +393,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void drawNightOverlay(Graphics g) {
+        if (IndevViewerMIDlet.humbleMode) return;
         int alpha = (int)((1.0f - daylightLevel) * 100.0f);
         alpha = (alpha / 25) * 25;
         if (alpha < 0) alpha = 0;
@@ -866,6 +873,23 @@ final class WorldCanvas extends Canvas implements Runnable {
      * and released for GC. Rebuilding is incremental (one terrain/water pair
      * per game tick), avoiding a large allocation spike when turning around.
      */
+    void applySettingsChange() {
+        if (lastHumbleMode != IndevViewerMIDlet.humbleMode) {
+            lastHumbleMode = IndevViewerMIDlet.humbleMode;
+            applyMobVisibility();
+            reloadEditedChunks();
+            updateDayNight();
+            updateTorchLights();
+            repaint();
+        }
+    }
+
+    private void applyMobVisibility() {
+        boolean showMobs = !IndevViewerMIDlet.humbleMode;
+        if (passiveMobs != null) passiveMobs.setEnabled(showMobs);
+        if (hostileMobs != null) hostileMobs.setEnabled(showMobs);
+    }
+
     private synchronized void updateChunks() {
         int centerX = ((int) cameraX) / CHUNK;
         int centerZ = ((int) cameraZ) / CHUNK;
@@ -885,8 +909,8 @@ final class WorldCanvas extends Canvas implements Runnable {
             for (int z = 0; z < 8; z++) {
                 boolean inRange = Math.abs(x - centerX) <= RADIUS
                     && Math.abs(z - centerZ) <= RADIUS;
-                boolean wanted = inRange && isChunkInFront(x, z, forwardX, forwardZ);
-                if (!wanted) {
+                // Retain nearby chunks behind the camera; unload only outside range.
+                if (!inRange) {
                     Group old = activeChunks[x][z];
                     if (old != null) {
                         terrainGroup.removeChild(old);
@@ -1205,6 +1229,13 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void updateDayNight() {
+        if (IndevViewerMIDlet.humbleMode) {
+            daylightLevel = 1.0f;
+            skyBackground.setColor(0x87BFEA);
+            distanceFog.setColor(0xB6CBE0);
+            ambientLight.setColor(0xFFFFFF);
+            return;
+        }
         dayTick++;
         if (dayTick >= DAY_TICKS) dayTick = 0;
         // Recompute lighting/color state every fourth tick to reduce per-frame work
@@ -1263,6 +1294,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private Group buildChunk(int chunkX, int chunkZ) {
+        for (int i = 0; i < shadeCacheKeys.length; i++) shadeCacheKeys[i] = -1;
         int startX = chunkX * CHUNK;
         int startZ = chunkZ * CHUNK;
         int quads = 0;
@@ -1386,7 +1418,8 @@ final class WorldCanvas extends Canvas implements Runnable {
             int type=terrain.getTopType(wx,wz), tx=BLOCK_TILE_X[type], ty=BLOCK_TILE_Y[type];
             if(type==TerrainGenerator.BLOCK_TNT && tntFuseTicks>0 && wx==tntX && wz==tntZ && tntFlashOn){tx=9;ty=0;}
             keys[x][z]=ty*16+tx; hs[x][z]=h;
-            bases[x][z]=terrain.getShadowShade(wx,wz,h); glows[x][z]=torchGlowAt(wx,h,wz);
+            bases[x][z]=IndevViewerMIDlet.humbleMode ? 255 : terrain.getShadowShade(wx,wz,h);
+            glows[x][z]=IndevViewerMIDlet.humbleMode ? 0 : torchGlowAt(wx,h,wz);
         }
         for(x=0;x<CHUNK;x++) for(z=0;z<CHUNK;z++) {
             if(used[x][z]) continue;
@@ -1666,7 +1699,13 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void updateBlockParticles() {
-        if (particleTicks <= 0) return;
+        if (IndevViewerMIDlet.humbleMode || particleTicks <= 0) {
+            if (particleTicks > 0) {
+                particleTicks = 0;
+                for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) blockParticleMeshes[i].setRenderingEnable(false);
+            }
+            return;
+        }
         for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
             blockParticleX[i] += blockParticleVX[i];
             blockParticleY[i] += blockParticleVY[i];
@@ -1917,6 +1956,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void updateTorchLights() {
+        if (IndevViewerMIDlet.humbleMode) {
+            for (int i = 0; i < torchLights.length; i++) torchLights[i].setIntensity(0.0f);
+            return;
+        }
         int[] nearest = {-1, -1, -1, -1};
         float[] distances = {Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE};
         for (int i = 0; i < decorationCount; i++) {
@@ -2066,8 +2109,15 @@ final class WorldCanvas extends Canvas implements Runnable {
         int centerX = (x0 + x1 + x2 + x3) / 4;
         int centerY = (y0 + y1 + y2 + y3) / 4;
         int centerZ = (z0 + z1 + z2 + z3) / 4;
-        int baseShade = terrain.getShadowShade(centerX, centerZ, centerY);
-        int glow = torchGlowAt(centerX, centerY, centerZ);
+        int baseShade;
+        if (IndevViewerMIDlet.humbleMode) baseShade = 255;
+        else {
+            int cacheKey = centerY * TerrainGenerator.SIZE * TerrainGenerator.SIZE + centerZ * TerrainGenerator.SIZE + centerX;
+            int cacheSlot = (cacheKey ^ (cacheKey >>> 9)) & (shadeCacheKeys.length - 1);
+            if (shadeCacheKeys[cacheSlot] == cacheKey) baseShade = shadeCacheValues[cacheSlot];
+            else { baseShade = terrain.getShadowShade(centerX, centerZ, centerY); shadeCacheKeys[cacheSlot] = cacheKey; shadeCacheValues[cacheSlot] = baseShade; }
+        }
+        int glow = IndevViewerMIDlet.humbleMode ? 0 : torchGlowAt(centerX, centerY, centerZ);
         int shade = baseShade + glow;
         if (shade > 255) shade = 255;
         int firstVertex = vertex;
