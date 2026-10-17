@@ -111,6 +111,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private final int[] greedyPerTile = new int[256];
     private Thread thread;
     private boolean running;
+    private int frameSkipCounter = 0;
     private boolean paused;
     private boolean forward, backward, strafeLeft, strafeRight;
     private boolean lookUp, lookDown, turnLeft, turnRight;
@@ -463,7 +464,16 @@ final class WorldCanvas extends Canvas implements Runnable {
                     torchLightUpdateTicks = 0;
                     updateTorchLights();
                 }
-                repaint();
+                // Frameskip affects rendering only; simulation and chunk streaming keep running every tick.
+                int skip = IndevViewerMIDlet.frameskip;
+                if (skip < 0) skip = 0;
+                if (skip > 5) skip = 5;
+                if (frameSkipCounter >= skip) {
+                    frameSkipCounter = 0;
+                    repaint();
+                } else {
+                    frameSkipCounter++;
+                }
             }
             try {
                 Thread.sleep(40);
@@ -1001,6 +1011,7 @@ final class WorldCanvas extends Canvas implements Runnable {
      * per game tick), avoiding a large allocation spike when turning around.
      */
     void applySettingsChange() {
+        frameSkipCounter = 0;
         if (lastHumbleMode != IndevViewerMIDlet.humbleMode) {
             lastHumbleMode = IndevViewerMIDlet.humbleMode;
             applyMobVisibility();
