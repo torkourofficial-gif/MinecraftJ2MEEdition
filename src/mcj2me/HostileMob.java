@@ -29,7 +29,6 @@ final class HostileMob {
             Mesh mesh = PassiveMob.createMobMesh(zombieAppearance, PassiveMob.MOB_ZOMBIE);
             Mob mob = new Mob(mesh, zombieAppearance, x + 0.5f, z + 0.5f, random);
             mobs[i] = mob;
-            mesh.setScale(0.80f, 1.0f, 0.80f);
             mesh.setTranslation(mob.x, terrain.getHeight(x, z), mob.z);
         }
     }
