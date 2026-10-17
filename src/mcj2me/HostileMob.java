@@ -29,6 +29,7 @@ final class HostileMob {
             Mesh mesh = PassiveMob.createMobMesh(zombieAppearance, PassiveMob.MOB_ZOMBIE);
             Mob mob = new Mob(mesh, zombieAppearance, x + 0.5f, z + 0.5f, random);
             mobs[i] = mob;
+            mesh.setScale(0.80f, 1.0f, 0.80f);
             mesh.setTranslation(mob.x, terrain.getHeight(x, z), mob.z);
         }
     }
@@ -71,8 +72,9 @@ final class HostileMob {
             if (!mob.alive) continue;
             // Match the ray-hit target to the classic zombie's 2x8x2
             // overall silhouette instead of the old oversized 0.9 radius.
+            // Zombie hitbox: 0.6 blocks wide and about 1.95 blocks tall.
             float score = PassiveMob.hitDistance(px, py, pz, yaw, pitch, mob.x,
-                terrain.getHeight((int)mob.x, (int)mob.z) + 0.75f, mob.z, 0.55f);
+                terrain.getHeight((int)mob.x, (int)mob.z) + 0.98f, mob.z, 0.30f);
             if (score >= 0.0f && score < best) { best = score; target = mob; }
         }
         if (target == null) return false;
@@ -124,7 +126,8 @@ final class HostileMob {
                 if (len > 0.0f) { dx /= len; dz /= len; }
                 move(terrain, dx, dz, 0.022f, random);
             }
-            mesh.setTranslation(x, terrain.getHeight((int)x, (int)z), z);
+            float bob = (float)Math.sin(wanderTicks * 0.25f) * 0.008f;
+            mesh.setTranslation(x, terrain.getHeight((int)x, (int)z) + bob, z);
         }
 
         void move(TerrainGenerator terrain, float dx, float dz, float speed, Random random) {
@@ -133,6 +136,9 @@ final class HostileMob {
                     || terrain.isWaterAt((int)nx, (int)nz)) {
                 chooseDirection();
             } else { x = nx; z = nz; }
+            if (dx * dx + dz * dz > 0.0001f) {
+                mesh.setOrientation((float)(Math.atan2(dx, dz) * 180.0 / Math.PI), 0.0f, 1.0f, 0.0f);
+            }
         }
     }
 }
