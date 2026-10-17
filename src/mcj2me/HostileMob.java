@@ -27,7 +27,7 @@ final class HostileMob {
             if (z > TerrainGenerator.SIZE - 4) z = TerrainGenerator.SIZE - 4;
             if (terrain.isWaterAt(x, z)) z = Math.min(TerrainGenerator.SIZE - 4, z + 3);
             Mesh mesh = PassiveMob.createMobMesh(zombieAppearance, true);
-            Mob mob = new Mob(mesh, zombieAppearance, x + 0.5f, z + 0.5f);
+            Mob mob = new Mob(mesh, zombieAppearance, x + 0.5f, z + 0.5f, random);
             mobs[i] = mob;
             group.addChild(mesh);
             mesh.setTranslation(mob.x, terrain.getHeight(x, z), mob.z);
@@ -69,21 +69,20 @@ final class HostileMob {
         float x, z, homeX, homeZ, dirX, dirZ;
         int health = 3, hurtTicks, wanderTicks;
         boolean alive = true;
+        final Random random;
 
-        Mob(Mesh mesh, Appearance normal, float x, float z) {
-            this.mesh = mesh; this.normal = normal;
+        Mob(Mesh mesh, Appearance normal, float x, float z, Random random) {
+            this.mesh = mesh; this.normal = normal; this.random = random;
             this.x = this.homeX = x; this.z = this.homeZ = z;
             chooseDirection();
         }
 
         void chooseDirection() {
-            dirX = randomDirection();
-            dirZ = randomDirection();
+            dirX = random.nextInt(3) - 1;
+            dirZ = random.nextInt(3) - 1;
             if (dirX == 0.0f && dirZ == 0.0f) dirZ = 1.0f;
-            wanderTicks = 25 + (int)(Math.random() * 45.0);
+            wanderTicks = 25 + random.nextInt(45);
         }
-
-        float randomDirection() { return (int)(Math.random() * 3.0) - 1; }
 
         void update(TerrainGenerator terrain, Random random, float playerX, float playerZ) {
             if (hurtTicks > 0 && --hurtTicks == 0) mesh.setAppearance(0, normal);
