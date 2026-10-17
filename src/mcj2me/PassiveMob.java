@@ -256,12 +256,28 @@ final class PassiveMob {
     }
 
     static float directionAngle(float dx, float dz) {
-        if (dx > -0.001f && dx < 0.001f && dz > -0.001f && dz < 0.001f) {
+        if (dx > -0.001f && dx < 0.001f &&
+            dz > -0.001f && dz < 0.001f) {
             return 0.0f;
         }
-        // Models face -Z by default. Invert X for M3G's Y-axis rotation
-        // so the mob looks where its movement vector points, not behind it.
-        return (float)(Math.atan2(-dx, -dz) * 180.0 / Math.PI);
+
+        // CLDC 1.1 has no Math.atan2(), so approximate with eight directions.
+        float ax = dx < 0.0f ? -dx : dx;
+        float az = dz < 0.0f ? -dz : dz;
+
+        if (ax < az * 0.4142f) {
+            return dz < 0.0f ? 0.0f : 180.0f;
+        }
+
+        if (az < ax * 0.4142f) {
+            return dx > 0.0f ? -90.0f : 90.0f;
+        }
+
+        if (dx > 0.0f) {
+            return dz < 0.0f ? -45.0f : -135.0f;
+        }
+
+        return dz < 0.0f ? 45.0f : 135.0f;
     }
 
     static float hitDistance(float px, float py, float pz, float yaw, float pitch,
