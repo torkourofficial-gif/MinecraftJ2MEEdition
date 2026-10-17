@@ -41,6 +41,28 @@ final class TerrainGenerator {
             }
         }
         generateWaterBasinStructures(random);
+        lowerWorldEdgesTowardSea();
+    }
+
+    /**
+     * Lower the outer ring into the sea so the horizon water plane can be
+     * seen beyond the finite 128x128 terrain instead of ending at a cliff.
+     * The last 12 columns slope down toward the shared waterline.
+     */
+    private void lowerWorldEdgesTowardSea() {
+        for (int x = 0; x < SIZE; x++) {
+            for (int z = 0; z < SIZE; z++) {
+                int edge = x;
+                if (z < edge) edge = z;
+                int oppositeX = SIZE - 1 - x;
+                int oppositeZ = SIZE - 1 - z;
+                if (oppositeX < edge) edge = oppositeX;
+                if (oppositeZ < edge) edge = oppositeZ;
+                if (edge >= 12) continue;
+                int target = WATER_LEVEL - 7 + edge;
+                if (heights[x][z] > target) heights[x][z] = (short) target;
+            }
+        }
     }
 
     /**
