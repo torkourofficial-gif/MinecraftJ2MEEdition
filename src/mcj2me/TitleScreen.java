@@ -77,11 +77,8 @@ final class TitleScreen extends Canvas implements Runnable {
     }
     protected void keyPressed(int keyCode) {
         int action=getGameAction(keyCode);
-        if (action==UP || keyCode=='2') { selected=0; repaint(); return; }
-        if (action==DOWN || keyCode=='8') { selected=1; repaint(); return; }
+        if (action==UP || action==DOWN || keyCode=='2' || keyCode=='8') { selected=1-selected; repaint(); return; }
         if (action==LEFT || action==RIGHT || keyCode=='4' || keyCode=='6') { selected=1-selected; repaint(); return; }
-        if (keyCode=='1') { owner.startGame(); return; }
-        if (keyCode=='3') { stop(); owner.quitGame(); return; }
         if (action==FIRE || keyCode=='5' || keyCode==' ' || keyCode=='\n') {
             if (selected==0) owner.startGame(); else { stop(); owner.quitGame(); }
         }
