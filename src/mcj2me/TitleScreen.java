@@ -12,6 +12,7 @@ final class TitleScreen extends Canvas implements Runnable {
     private int renderWidth=-1, renderHeight=-1, selected=0;
     private int[] skyboxPixels;
     private int skyboxWidth, skyboxHeight;
+    private int cubeLayout, cubeTop, cubeCellW, cubeCellH;
     private float panoramaOffset;
     private float cubeYaw;
     private Thread animationThread;
@@ -67,9 +68,18 @@ final class TitleScreen extends Canvas implements Runnable {
             renderWidth=w; renderHeight=h;
             if (skybox!=null) {
                 skyboxWidth=skybox.getWidth(); skyboxHeight=skybox.getHeight();
-                // Minecraft's classic title panorama is a cube map: four side faces,
-                // plus top and bottom, arranged as a 4-by-3 cross.
-                if (Math.abs((skyboxWidth/(float)skyboxHeight)-(4.0f/3.0f)) < 0.07f) {
+                float sourceRatio=skyboxWidth/(float)skyboxHeight;
+                // This project's skybox.png is a 3x2 cubemap sheet with a 12px
+                // header and 44px footer around the six square faces.
+                if (Math.abs(sourceRatio-1.3544f) < 0.015f) {
+                    cubeLayout=1; cubeTop=12;
+                    cubeCellW=skyboxWidth/3; cubeCellH=(skyboxHeight-56)/2;
+                } else if (Math.abs(sourceRatio-(4.0f/3.0f)) < 0.035f) {
+                    // Also accept a conventional 4x3 cubemap cross.
+                    cubeLayout=2; cubeTop=0;
+                    cubeCellW=skyboxWidth/4; cubeCellH=skyboxHeight/3;
+                }
+                if (cubeLayout!=0) {
                     skyboxPixels=new int[skyboxWidth*skyboxHeight];
                     skybox.getRGB(skyboxPixels,0,skyboxWidth,0,0,skyboxWidth,skyboxHeight);
                     renderCubeFrame();
@@ -149,11 +159,9 @@ final class TitleScreen extends Canvas implements Runnable {
         g.setColor(0xFFFF55); g.drawString("Indev demake",w-5,h-17,Graphics.BOTTOM|Graphics.RIGHT);
     }
     /**
-     * Render a low-resolution view from inside a cubemap cross. The source layout is:
-     *             +Y
-     *       -X    +Z    +X    -Z
-     *             -Y
-     * A small software-rendered frame keeps this practical on CLDC-era phones.
+     * Render a low-resolution view from inside the six-face title skybox.
+     * The bundled sheet stores side faces across the first row, then the last
+     * side, top and bottom in the second row. A 4x3 cross is also supported.
      */
     private void renderCubeFrame() {
         if (skyboxPixels==null || skyboxWidth<4 || skyboxHeight<3) return;
@@ -164,7 +172,7 @@ final class TitleScreen extends Canvas implements Runnable {
         float aspect=(float)outW/outH;
         float tanHalf=(float)Math.tan(Math.PI/4.0);
         float cy=(float)Math.cos(cubeYaw), sy=(float)Math.sin(cubeYaw);
-        int cellW=skyboxWidth/4, cellH=skyboxHeight/3;
+        int cellW=cubeCellW, cellH=cubeCellH;
         for (int py=0;py<outH;py++) {
             float v=(1.0f-2.0f*(py+0.5f)/outH)*tanHalf;
             for (int px=0;px<outW;px++) {
@@ -175,23 +183,31 @@ final class TitleScreen extends Canvas implements Runnable {
                 float fu,fv,major;
                 if (ay>=ax && ay>=az) {
                     major=ay;
-                    if (dy>=0) { faceX=1; faceY=0; fu=dx/major; fv=-dz/major; }
-                    else { faceX=1; faceY=2; fu=dx/major; fv=dz/major; }
+                    if (dy>=0) {
+                        faceX=1; faceY=(cubeLayout==1?1:0);
+                        fu=dx/major; fv=-dz/major;
+                    } else {
+                        faceX=(cubeLayout==1?2:1); faceY=(cubeLayout==1?1:2);
+                        fu=dx/major; fv=dz/major;
+                    }
                 } else if (ax>=az) {
                     major=ax;
-                    if (dx>=0) { faceX=2; faceY=1; fu=-dz/major; fv=-dy/major; }
-                    else { faceX=0; faceY=1; fu=dz/major; fv=-dy/major; }
+                    if (dx>=0) { faceX=2; faceY=(cubeLayout==1?0:1); fu=-dz/major; fv=-dy/major; }
+                    else { faceX=0; faceY=(cubeLayout==1?0:1); fu=dz/major; fv=-dy/major; }
                 } else {
                     major=az;
-                    if (dz>=0) { faceX=1; faceY=1; fu=dx/major; fv=-dy/major; }
-                    else { faceX=3; faceY=1; fu=-dx/major; fv=-dy/major; }
+                    if (dz>=0) { faceX=1; faceY=0; fu=dx/major; fv=-dy/major; }
+                    else {
+                        faceX=(cubeLayout==1?0:3); faceY=(cubeLayout==1?1:1);
+                        fu=-dx/major; fv=-dy/major;
+                    }
                 }
                 int sx=faceX*cellW+(int)((fu+1.0f)*0.5f*(cellW-1));
-                int syy=faceY*cellH+(int)((fv+1.0f)*0.5f*(cellH-1));
+                int syy=cubeTop+faceY*cellH+(int)((fv+1.0f)*0.5f*(cellH-1));
                 if (sx<faceX*cellW) sx=faceX*cellW;
                 if (sx>faceX*cellW+cellW-1) sx=faceX*cellW+cellW-1;
-                if (syy<faceY*cellH) syy=faceY*cellH;
-                if (syy>faceY*cellH+cellH-1) syy=faceY*cellH+cellH-1;
+                if (syy<cubeTop+faceY*cellH) syy=cubeTop+faceY*cellH;
+                if (syy>cubeTop+faceY*cellH+cellH-1) syy=cubeTop+faceY*cellH+cellH-1;
                 out[py*outW+px]=skyboxPixels[syy*skyboxWidth+sx];
             }
         }
