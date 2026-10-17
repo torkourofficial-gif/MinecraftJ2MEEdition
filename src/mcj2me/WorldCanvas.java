@@ -2326,16 +2326,19 @@ final class WorldCanvas extends Canvas implements Runnable {
                     || z >= TerrainGenerator.SIZE - 1 || blockY < 0) continue;
 
             int surface = terrain.getHeight(x, z);
-            // Top-face hit, including a small tolerance around the surface.
-            if (fy <= surface + 0.25f && fy >= surface - 1.0f) {
+            // Only count a top hit when the ray actually crosses the surface
+            // from above. A broad Y tolerance incorrectly selected the top
+            // block while the player was aiming at an exposed lower side.
+            float previousY = fy - dy * 0.04f;
+            if (dy < 0.0f && previousY > surface && fy <= surface) {
                 surfaceHitResult[0] = x; surfaceHitResult[1] = z;
                 surfaceHitResult[2] = surface - 1; surfaceHitResult[3] = 0;
                 return surfaceHitResult;
             }
 
-            // Side-face hit: this column rises above the ray while at least one
-            // neighboring column leaves the sampled block layer exposed.
-            if (blockY < surface - 1 && blockY >= 0) {
+            // Any exposed side layer can be mined, including the block directly
+            // below the top layer (previously excluded by the surface - 1 test).
+            if (blockY < surface && blockY >= 0) {
                 if (terrain.getHeight(x - 1, z) <= blockY
                         || terrain.getHeight(x + 1, z) <= blockY
                         || terrain.getHeight(x, z - 1) <= blockY
