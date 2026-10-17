@@ -9,15 +9,17 @@ final class WorldLoadingCanvas extends Canvas implements Runnable {
     private final IndevViewerMIDlet owner;
     private final String worldName;
     private final int seed;
+    private final int worldId;
     private Thread worker;
     private volatile boolean running;
     private volatile String status = "Generating terrain";
     private volatile int dots;
 
-    WorldLoadingCanvas(IndevViewerMIDlet midlet, String name, int worldSeed) {
+    WorldLoadingCanvas(IndevViewerMIDlet midlet, String name, int worldSeed, int id) {
         owner = midlet;
         worldName = name;
         seed = worldSeed;
+        worldId = id;
         setFullScreenMode(true);
     }
 
@@ -48,7 +50,8 @@ final class WorldLoadingCanvas extends Canvas implements Runnable {
         String failure = null;
         try {
             status = "Building terrain";
-            canvas = new WorldCanvas(owner, worldName, seed);
+            byte[] savedTerrain = WorldStore.loadState(worldId);
+            canvas = new WorldCanvas(owner, worldName, seed, worldId, savedTerrain);
             if (canvas.hasSetupError()) failure = canvas.getSetupError();
         } catch (OutOfMemoryError oom) {
             failure = "Not enough memory to load this world.";
