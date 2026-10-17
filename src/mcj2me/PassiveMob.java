@@ -118,7 +118,7 @@ final class PassiveMob {
                 {-3, 2, -1, -2, 6, 1}, {2, 2, -1, 3, 6, 1},
                 {-1, 0, -1, 0, 2, 1}, {0, 0, -1, 1, 2, 1}
             };
-            parts = new int[] {1, 0, 2, 2, 3, 3};
+            parts = new int[] {1, 0, 4, 2, 5, 3};
         } else {
             boxes = new int[][] {
                 {-2, 2, -3, 2, 4, 3}, {-1, 3, -5, 1, 5, -3},
@@ -191,8 +191,10 @@ final class PassiveMob {
         if (mobType == MOB_ZOMBIE) {
             if (part == 0) { x=0; y=0; w=8; h=8; d=8; }          // head
             else if (part == 1) { x=16; y=16; w=8; h=12; d=4; } // torso
-            else if (part == 2) { x=40; y=16; w=4; h=12; d=4; }// arms
-            else { x=0; y=16; w=4; h=12; d=4; }                // legs
+            else if (part == 2) { x=40; y=16; w=4; h=12; d=4; }// right arm
+            else if (part == 4) { x=32; y=16; w=4; h=12; d=4; }// left arm
+            else if (part == 5) { x=16; y=16; w=4; h=12; d=4; }// left leg
+            else { x=0; y=16; w=4; h=12; d=4; }                // right leg
         } else if (mobType == MOB_COW) {
             if (part == 0) { x=0; y=0; w=8; h=8; d=6; }          // head
             else if (part == 1) { x=18; y=4; w=12; h=18; d=10; }// body
