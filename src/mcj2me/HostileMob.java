@@ -93,7 +93,7 @@ final class HostileMob {
                 if (dist > 0.01f) { dx /= dist; dz /= dist; }
                 move(terrain, dx, dz, 0.032f, random);
             } else {
-                if (wanderTicks-- <= 0) chooseDirection(random);
+                if (wanderTicks-- <= 0) chooseDirection();
                 dx = dirX; dz = dirZ;
                 float homeDx = x - homeX, homeDz = z - homeZ;
                 if (homeDx * homeDx + homeDz * homeDz > 144.0f) { dx = -homeDx; dz = -homeDz; }
