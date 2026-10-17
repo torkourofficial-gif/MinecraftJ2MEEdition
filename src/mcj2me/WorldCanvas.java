@@ -271,7 +271,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         drawUnderwaterOverlay(g);
         if (explosionFlashTicks > 0) {
             g.setColor(0xFFF1B0);
-            g.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
+            g.fillRect(0, 0, getWidth(), getHeight());
         }
         drawHud(g);
     }
@@ -1040,6 +1040,7 @@ final class WorldCanvas extends Canvas implements Runnable {
 
 
     private int sideTile(int topType, int layerType, int y, int height) {
+        if (topType == TerrainGenerator.BLOCK_TNT && tntFuseTicks > 0 && tntFlashOn) return 9;
         if (topType == TerrainGenerator.BLOCK_GRASS && y == height - 1) return 3;
         if (layerType == TerrainGenerator.BLOCK_WOOD) return 4;
         if (layerType < 0 || layerType >= BLOCK_TILE_X.length) layerType = TerrainGenerator.BLOCK_STONE;
@@ -1047,6 +1048,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private int sideTileY(int topType, int layerType, int y, int height) {
+        if (topType == TerrainGenerator.BLOCK_TNT && tntFuseTicks > 0 && tntFlashOn) return 0;
         if (topType == TerrainGenerator.BLOCK_GRASS && y == height - 1) return 0;
         if (layerType == TerrainGenerator.BLOCK_WOOD) return 1;
         if (layerType < 0 || layerType >= BLOCK_TILE_Y.length) layerType = TerrainGenerator.BLOCK_STONE;
