@@ -24,9 +24,11 @@ final class TerrainGenerator {
     private final int seed;
 
     TerrainGenerator() {
-        // Each new world receives a random seed.
-        long now = System.currentTimeMillis();
-        seed = (int) (now ^ (now >>> 32) ^ new Random(now).nextInt());
+        this(makeSeed());
+    }
+
+    TerrainGenerator(int worldSeed) {
+        seed = worldSeed;
         Random random = new Random(seed);
 
         // Generate natural terrain, cut caves first, then carve/fill lakes last.
@@ -50,6 +52,11 @@ final class TerrainGenerator {
         for (int x = 0; x < SIZE; x++) {
             System.arraycopy(heights[x], 0, originalHeights[x], 0, SIZE);
         }
+    }
+
+    private static int makeSeed() {
+        long now = System.currentTimeMillis();
+        return (int)(now ^ (now >>> 32) ^ new Random(now).nextInt());
     }
 
     /**
