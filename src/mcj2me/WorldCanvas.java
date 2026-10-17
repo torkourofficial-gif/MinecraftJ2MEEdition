@@ -1508,16 +1508,19 @@ final class WorldCanvas extends Canvas implements Runnable {
                 x, y, z+1, x, y+1, z+1, x+1, y, z+1, x+1, y+1, z+1, tx, ty);
         }
         if (!isTreeVoxelAt(x + 1, y, z)) {
+            // +X face: all four vertices must lie on x + 1; z spans the block.
             vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
-                x+1, y, z, x+1, y+1, z, x, y, z, x, y+1, z, tx, ty);
+                x+1, y, z, x+1, y+1, z, x+1, y, z+1, x+1, y+1, z+1, tx, ty);
         }
         if (!isTreeVoxelAt(x - 1, y, z)) {
+            // -X face: all four vertices lie on x.
             vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
                 x, y, z, x, y+1, z, x, y, z+1, x, y+1, z+1, tx, ty);
         }
         if (!isTreeVoxelAt(x, y, z - 1)) {
+            // -Z face: all four vertices lie on z.
             vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
-                x+1, y, z+1, x+1, y+1, z+1, x+1, y, z, x+1, y+1, z, tx, ty);
+                x, y, z, x, y+1, z, x+1, y, z, x+1, y+1, z, tx, ty);
         }
         if ((tx == 4 && ty == 3) || !isTreeVoxelAt(x, y - 1, z)) {
             // Always draw leaf undersides, even when another leaf is directly
