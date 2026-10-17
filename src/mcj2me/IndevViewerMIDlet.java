@@ -11,6 +11,7 @@ import javax.microedition.rms.RecordStoreException;
 public final class IndevViewerMIDlet extends MIDlet {
     static int sensitivity = 3;
     static int fogLevel = 1;
+    static int frameskip = 0;
     static boolean humbleMode = false;
 
     // Values above 1000 represent MIDP directional actions, not device key codes.
