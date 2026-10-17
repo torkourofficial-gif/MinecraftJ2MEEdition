@@ -91,13 +91,15 @@ final class HostileMob {
         final Mesh mesh;
         final Appearance normal;
         float x, z, homeX, homeZ, dirX, dirZ;
-        int health = 3, hurtTicks, wanderTicks;
+        float jumpY = 0.0f, jumpVelocity = 0.0f;
+        int health = 3, hurtTicks, wanderTicks, hopCooldown;
         boolean alive = true;
         final Random random;
 
         Mob(Mesh mesh, Appearance normal, float x, float z, Random random) {
             this.mesh = mesh; this.normal = normal; this.random = random;
             this.x = this.homeX = x; this.z = this.homeZ = z;
+            hopCooldown = 8 + random.nextInt(35);
             chooseDirection();
         }
 
@@ -125,8 +127,22 @@ final class HostileMob {
                 if (len > 0.0f) { dx /= len; dz /= len; }
                 move(terrain, dx, dz, 0.022f, random);
             }
+            // Even the zombies inherit Indev's chaotic little hops.
+            if (hopCooldown > 0) hopCooldown--;
+            if (hopCooldown <= 0 && jumpY <= 0.001f && random.nextInt(6) != 0) {
+                jumpVelocity = 0.095f + random.nextInt(55) * 0.001f;
+                hopCooldown = 10 + random.nextInt(38);
+            }
+            if (jumpY > 0.0f || jumpVelocity > 0.0f) {
+                jumpY += jumpVelocity;
+                jumpVelocity -= 0.017f;
+                if (jumpY <= 0.0f) {
+                    jumpY = 0.0f;
+                    jumpVelocity = 0.0f;
+                }
+            }
             float bob = (float)Math.sin(wanderTicks * 0.25f) * 0.008f;
-            mesh.setTranslation(x, terrain.getHeight((int)x, (int)z) + bob, z);
+            mesh.setTranslation(x, terrain.getHeight((int)x, (int)z) + bob + jumpY, z);
         }
 
         void move(TerrainGenerator terrain, float dx, float dz, float speed, Random random) {
