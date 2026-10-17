@@ -121,11 +121,10 @@ final class PassiveMob {
             };
             parts = new int[] {1, 0, 4, 2, 5, 3};
         } else if (mobType == MOB_COW) {
-            // Cow: the classic 12x18x10 body is rotated sideways in Minecraft.
-            // Represent its visible shape as a 12-wide, 10-high, 18-long torso.
-            // Legs sit at the four corners instead of bunched together underneath.
+            // Vanilla Java geometry: body is a 12x18x10 cube rotated 90 degrees on X.
+            // Head uses its original 8x8x6 dimensions and sits low at the front.
             boxes = new int[][] {
-                {-6, 8, -9, 6, 18, 9}, {-4, 17, -8, 4, 25, -2},
+                {-6, -10, -7, 6, 8, 3}, {-4, 0, -14, 4, 8, -8},
                 {-6, 0, -7, -2, 12, -3}, {2, 0, -7, 6, 12, -3},
                 {-6, 0, 5, -2, 12, 9}, {2, 0, 5, 6, 12, 9}
             };
@@ -134,16 +133,16 @@ final class PassiveMob {
             // Pig: classic torso is 10x8x16 after the original 90-degree body rotation.
             // Keep its short legs at the front and rear corners, not close together.
             boxes = new int[][] {
-                {-5, 5, -8, 5, 13, 8}, {-4, 6, -7, 4, 14, 1},
+                {-5, 5, -8, 5, 13, 8}, {-4, 6, -11, 4, 14, -3},
                 {-5, 0, -7, -1, 6, -3}, {1, 0, -7, 5, 6, -3},
                 {-5, 0, 5, -1, 6, 9}, {1, 0, 5, 5, 6, 9}
             };
             parts = new int[] {1, 0, 2, 2, 2, 2};
         } else {
-            // Sheep: wool silhouette is broad and fluffy; adult height is close to the cow.
-            // Keep the classic 12px legs and place them at the four corners under the fleece.
+            // Vanilla sheep body plus its wool layer: wider than the bare body.
+            // The original torso is rotated on X; the head is 6x6x8 and lower than the cow's.
             boxes = new int[][] {
-                {-6, 8, -10, 6, 18, 10}, {-4, 16, -8, 4, 24, -2},
+                {-6, -10, -5, 6, 10, 5}, {-3, 2, -14, 3, 8, -6},
                 {-6, 0, -7, -2, 12, -3}, {2, 0, -7, 6, 12, -3},
                 {-6, 0, 5, -2, 12, 9}, {2, 0, 5, 6, 12, 9}
             };
@@ -172,9 +171,19 @@ final class PassiveMob {
                 int[] face = faces[faceIndex];
                 int[] rect = uv[faceIndex];
                 for (int corner = 0; corner < 4; corner++) {
-                    positions[v * 3] = (short)face[corner * 3];
-                    positions[v * 3 + 1] = (short)face[corner * 3 + 1];
-                    positions[v * 3 + 2] = (short)face[corner * 3 + 2];
+                    int px = face[corner * 3];
+                    int py = face[corner * 3 + 1];
+                    int pz = face[corner * 3 + 2];
+                    // Rotate the cow/sheep torso vertices around X, matching the original model.
+                    // UVs are calculated before this transform, so their faces rotate with the cube.
+                    if (boxIndex == 0 && (mobType == MOB_COW || mobType == MOB_SHEEP)) {
+                        int oldY = py;
+                        py = -pz + 5;
+                        pz = oldY + 2;
+                    }
+                    positions[v * 3] = (short)px;
+                    positions[v * 3 + 1] = (short)py;
+                    positions[v * 3 + 2] = (short)pz;
                     int u, vv;
                     if (faceIndex == 4) {
                         u = (corner == 0 || corner == 1) ? rect[0] : rect[2];
@@ -206,9 +215,9 @@ final class PassiveMob {
         buffer.setTexCoords(0, t, 1.0f / 1024.0f, null);
         Mesh result = new Mesh(buffer, new TriangleStripArray(indices, strips), appearance);
         // Match adult Java Edition proportions while preserving the classic pixel-model silhouettes.
-        if (mobType == MOB_COW) result.setScale(1.0f, 0.86f, 1.0f);       // ~1.4 blocks tall
-        else if (mobType == MOB_PIG) result.setScale(1.0f, 1.03f, 1.0f);  // ~0.9 blocks tall
-        else if (mobType == MOB_SHEEP) result.setScale(1.0f, 0.832f, 1.0f); // ~1.3 blocks tall
+        if (mobType == MOB_COW) result.setScale(1.0f, 1.0f, 1.0f);
+        else if (mobType == MOB_PIG) result.setScale(1.0f, 1.03f, 1.0f);  // preserve the pig scale
+        else if (mobType == MOB_SHEEP) result.setScale(1.0f, 1.0f, 1.0f);
         else if (mobType == MOB_ZOMBIE) result.setScale(0.80f, 0.975f, 0.80f); // ~0.6 x 1.95 blocks
         return result;
     }
