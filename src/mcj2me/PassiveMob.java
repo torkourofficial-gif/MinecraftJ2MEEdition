@@ -121,27 +121,31 @@ final class PassiveMob {
             };
             parts = new int[] {1, 0, 4, 2, 5, 3};
         } else if (mobType == MOB_COW) {
-            // Cow: 12x18x10 body, 8x8x6 head, four 4x12x4 legs.
+            // Cow: the classic 12x18x10 body is rotated sideways in Minecraft.
+            // Represent its visible shape as a 12-wide, 10-high, 18-long torso.
+            // Legs sit at the four corners instead of bunched together underneath.
             boxes = new int[][] {
-                {-6, 8, -5, 6, 26, 5}, {-4, 17, -8, 4, 25, -2},
-                {-5, 0, -4, -1, 12, 0}, {1, 0, -4, 5, 12, 0},
-                {-5, 0, 0, -1, 12, 4}, {1, 0, 0, 5, 12, 4}
+                {-6, 8, -9, 6, 18, 9}, {-4, 17, -8, 4, 25, -2},
+                {-6, 0, -7, -2, 12, -3}, {2, 0, -7, 6, 12, -3},
+                {-6, 0, 5, -2, 12, 9}, {2, 0, 5, 6, 12, 9}
             };
             parts = new int[] {1, 0, 2, 2, 2, 2};
         } else if (mobType == MOB_PIG) {
-            // Pig: 10x8x8 body, 8x8x8 head, four 4x6x4 legs.
+            // Pig: classic torso is 10x8x16 after the original 90-degree body rotation.
+            // Keep its short legs at the front and rear corners, not close together.
             boxes = new int[][] {
-                {-5, 5, -4, 5, 13, 4}, {-4, 6, -7, 4, 14, 1},
-                {-5, 0, -4, -1, 6, 0}, {1, 0, -4, 5, 6, 0},
-                {-5, 0, 0, -1, 6, 4}, {1, 0, 0, 5, 6, 4}
+                {-5, 5, -8, 5, 13, 8}, {-4, 6, -7, 4, 14, 1},
+                {-5, 0, -7, -1, 6, -3}, {1, 0, -7, 5, 6, -3},
+                {-5, 0, 5, -1, 6, 9}, {1, 0, 5, 5, 6, 9}
             };
             parts = new int[] {1, 0, 2, 2, 2, 2};
         } else {
-            // Sheep: 12x17x10 body, 8x8x6 head, four 4x12x4 legs.
+            // Sheep: classic wool is an inflated 8x16x6 body rotated sideways.
+            // Approximate the wool shell as a broad, low 12x10x20 torso; sheep legs are 6px tall.
             boxes = new int[][] {
-                {-6, 8, -5, 6, 25, 5}, {-4, 16, -8, 4, 24, -2},
-                {-5, 0, -4, -1, 12, 0}, {1, 0, -4, 5, 12, 0},
-                {-5, 0, 0, -1, 12, 4}, {1, 0, 0, 5, 12, 4}
+                {-6, 8, -10, 6, 18, 10}, {-4, 16, -8, 4, 24, -2},
+                {-5, 0, -7, -1, 6, -3}, {1, 0, -7, 5, 6, -3},
+                {-5, 0, 5, -1, 6, 9}, {1, 0, 5, 5, 6, 9}
             };
             parts = new int[] {1, 0, 2, 2, 2, 2};
         }
