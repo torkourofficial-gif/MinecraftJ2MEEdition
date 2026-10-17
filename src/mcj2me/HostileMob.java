@@ -69,8 +69,10 @@ final class HostileMob {
         for (int i = 0; i < mobs.length; i++) {
             Mob mob = mobs[i];
             if (!mob.alive) continue;
+            // Match the ray-hit target to the classic zombie's 2x8x2
+            // overall silhouette instead of the old oversized 0.9 radius.
             float score = PassiveMob.hitDistance(px, py, pz, yaw, pitch, mob.x,
-                terrain.getHeight((int)mob.x, (int)mob.z) + 0.9f, mob.z, 0.9f);
+                terrain.getHeight((int)mob.x, (int)mob.z) + 0.75f, mob.z, 0.55f);
             if (score >= 0.0f && score < best) { best = score; target = mob; }
         }
         if (target == null) return false;
