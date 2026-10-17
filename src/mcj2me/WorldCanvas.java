@@ -15,6 +15,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final float JUMP_SPEED = 0.38f;
     private static final float TURN_SPEED = 3.0f;
     private static final int WATER_LEVEL = TerrainGenerator.WATER_LEVEL;
+    // Keep the distant ocean below the terrain skyline; inland lakes retain WATER_LEVEL.
+    private static final int HORIZON_SEA_LEVEL = WATER_LEVEL - 5;
     private static final float WATER_ALPHA = 0.66f;
 
     private final IndevViewerMIDlet midlet;
@@ -57,6 +59,11 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final String[] BLOCK_NAMES = {"GRASS", "DIRT", "STONE", "WOOD", "LEAVES"};
     private final int[] inventory = {64, 64, 64, 64, 64};
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
+    private static final int BLOCK_PARTICLE_COUNT = 12;
+    private final float[] blockParticleVX = new float[BLOCK_PARTICLE_COUNT];
+    private final float[] blockParticleVY = new float[BLOCK_PARTICLE_COUNT];
+    private final int[] blockParticleSize = new int[BLOCK_PARTICLE_COUNT];
+    private int blockParticleColor = 0xB5A06A;
     private float cameraX = 64.0f;
     private float cameraY;
     private float velocityX, velocityZ, verticalVelocity;
@@ -296,11 +303,12 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
         }
         if (particleTicks > 0) {
-            g.setColor(0xB5A06A);
-            for (int p = 0; p < 8; p++) {
-                int px = cx + (((p * 17 + particleTicks * 7) % 19) - 9);
-                int py = cy + (((p * 11 + particleTicks * 5) % 17) - 8);
-                int size = 2 + (particleTicks & 1);
+            int age = 10 - particleTicks;
+            g.setColor(blockParticleColor);
+            for (int p = 0; p < BLOCK_PARTICLE_COUNT; p++) {
+                int px = cx + Math.round(blockParticleVX[p] * age);
+                int py = cy + Math.round(blockParticleVY[p] * age + 0.22f * age * age);
+                int size = blockParticleSize[p];
                 g.fillRect(px, py, size, size);
             }
         }
@@ -638,7 +646,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         short edge = (short) (TerrainGenerator.SIZE - 1);
         short far = 1024;
         short negativeFar = (short) (-far);
-        short y = (short) WATER_LEVEL;
+        short y = (short) HORIZON_SEA_LEVEL;
         short[] positions = {
             // north, z < 0
             0, y, negativeFar, 0, y, 0, edge, y, negativeFar, edge, y, 0,
@@ -941,10 +949,34 @@ final class WorldCanvas extends Canvas implements Runnable {
         vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++, x, y, z, x, y+1, z, x+1, y, z, x+1, y+1, z, tx, ty);
         return vertex;
     }
+    /**
+     * Spawn small screen-space block fragments at the crosshair, with a burst
+     * and gravity arc inspired by classic Minecraft block-breaking particles.
+     * Kept in MIDP Graphics so this remains cheap on old J2ME devices.
+     */
+    private void spawnBlockParticles(int blockType) {
+        if (blockType == 0) blockParticleColor = 0x7E9D43;       // grass
+        else if (blockType == 1) blockParticleColor = 0x8B6545;  // dirt
+        else if (blockType == 2) blockParticleColor = 0x929292;  // stone
+        else if (blockType == 3) blockParticleColor = 0xA77A45;  // wood
+        else blockParticleColor = 0x477D39;                      // leaves
+
+        for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
+            // Evenly distributed directions with slight deterministic variation.
+            double angle = (Math.PI * 2.0 * i / BLOCK_PARTICLE_COUNT)
+                + ((i % 3) - 1) * 0.13;
+            float speed = 0.8f + (i % 4) * 0.28f;
+            blockParticleVX[i] = (float) Math.cos(angle) * speed;
+            blockParticleVY[i] = (float) Math.sin(angle) * speed - 0.7f;
+            blockParticleSize[i] = 2 + (i % 3 == 0 ? 1 : 0);
+        }
+        particleTicks = 10;
+    }
+
     private void breakBlock() {
         int[] leafHit = raycastLeafBlock();
         if (leafHit != null && terrain.removeLeafBlock(leafHit[0], leafHit[1], leafHit[2])) {
-            particleTicks = 8;
+            spawnBlockParticles(4);
             reloadEditedChunks();
             updateCamera();
             return;
@@ -957,9 +989,9 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         int type = terrain.getTopType(x, z);
         if (type >= 0 && type < inventory.length) inventory[type]++;
+        spawnBlockParticles(type);
         terrain.setHeight(x, z, h - 1);
         terrain.setTopType(x, z, 1);
-        particleTicks = 8;
         reloadEditedChunks();
         resolvePlayerAfterTerrainEdit();
     }
