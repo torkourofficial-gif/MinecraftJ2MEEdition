@@ -28,6 +28,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Texture2D cloudTexture;
     private Image guiImage;
     private Image guiBlocksImage;
+    private final Image[] blockIcons = new Image[5];
     private float cloudPhase = 0.0f;
     private Appearance waterAppearance;
     private Image underwaterOverlay;
@@ -48,8 +49,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean jumpHeld;
     private static final int[] BLOCK_TILE_X = {0, 2, 1, 5, 4};
     private static final int[] BLOCK_TILE_Y = {0, 0, 0, 1, 3};
-    private static final int[] GUI_TILE_X = {0, 2, 1, 4, 4};
-    private static final int[] GUI_TILE_Y = {0, 0, 0, 1, 3};
+    // 48x48 block icons in gui_blocks.png, mapped to grass/dirt/stone/log/leaves.
+    private static final int[] GUI_ICON_X = {48, 96, 0, 48, 96};
+    private static final int[] GUI_ICON_Y = {0, 0, 0, 48, 48};
     private static final String[] BLOCK_NAMES = {"GRASS", "DIRT", "STONE", "WOOD", "LEAVES"};
     private final int[] inventory = {64, 64, 64, 64, 64};
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
@@ -90,6 +92,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         Image atlas = Image.createImage("/mcj2me/textures.png");
         guiImage = Image.createImage("/mcj2me/gui.png");
         guiBlocksImage = Image.createImage("/mcj2me/gui_blocks.png");
+        blockIcons[0] = createGuiBlockIcon(GUI_ICON_X[0], GUI_ICON_Y[0]);
+        blockIcons[1] = createGuiBlockIcon(GUI_ICON_X[1], GUI_ICON_Y[1]);
+        blockIcons[2] = createGuiBlockIcon(GUI_ICON_X[2], GUI_ICON_Y[2]);
+        blockIcons[3] = createGuiBlockIcon(GUI_ICON_X[3], GUI_ICON_Y[3]);
+        blockIcons[4] = createGuiBlockIcon(GUI_ICON_X[4], GUI_ICON_Y[4]);
         Image cloudsImage = Image.createImage("/mcj2me/clouds.png");
         Image2D image2D = new Image2D(Image2D.RGBA, atlas);
         Texture2D texture = new Texture2D(image2D);
@@ -263,8 +270,8 @@ final class WorldCanvas extends Canvas implements Runnable {
             int slotX = barX + 1 + i * 20;
             if (i == selectedSlot) g.drawRegion(guiImage, 0, 22, 24, 22, 0,
                 slotX, barY, Graphics.TOP | Graphics.LEFT);
-            g.drawRegion(guiBlocksImage, GUI_TILE_X[i] * 16, GUI_TILE_Y[i] * 16,
-                16, 16, 0, slotX + 4, barY + 3, Graphics.TOP | Graphics.LEFT);
+            g.drawImage(blockIcons[i], slotX + 4, barY + 3,
+                Graphics.TOP | Graphics.LEFT);
             if (inventory[i] > 1) {
                 g.setColor(0xFFFFFF);
                 g.drawString(Integer.toString(inventory[i]), slotX + 11, barY + 10,
@@ -699,6 +706,22 @@ final class WorldCanvas extends Canvas implements Runnable {
         texCoords[t] = (short) u;
         texCoords[t + 1] = (short) v;
         return vertex + 1;
+    }
+
+    /**
+     * Scale one 48x48 pre-rendered inventory block icon to 16x16 using nearest
+     * neighbour sampling, preserving the pixel-art look on small J2ME screens.
+     */
+    private Image createGuiBlockIcon(int sourceX, int sourceY) {
+        int[] source = new int[48 * 48];
+        guiBlocksImage.getRGB(source, 0, 48, sourceX, sourceY, 48, 48);
+        int[] scaled = new int[16 * 16];
+        for (int y = 0; y < 16; y++) {
+            for (int x = 0; x < 16; x++) {
+                scaled[y * 16 + x] = source[(y * 3) * 48 + x * 3];
+            }
+        }
+        return Image.createRGBImage(scaled, 16, 16, true);
     }
 
     private Mesh buildCloudPlane(Appearance appearance) {
