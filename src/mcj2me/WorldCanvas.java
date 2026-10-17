@@ -352,10 +352,6 @@ final class WorldCanvas extends Canvas implements Runnable {
                     Graphics.TOP | Graphics.LEFT);
             }
         }
-        if (inventoryOpen) {
-            drawInventory(g);
-            return;
-        }
         int cx = w / 2, cy = h / 2;
         g.setColor(0xFFFFFF);
         g.drawLine(cx - 3, cy, cx + 3, cy);
@@ -1020,12 +1016,14 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     private int sideTile(int topType, int layerType, int y, int height) {
         if (topType == TerrainGenerator.BLOCK_GRASS && y == height - 1) return 3;
+        if (layerType == TerrainGenerator.BLOCK_WOOD) return 4;
         if (layerType < 0 || layerType >= BLOCK_TILE_X.length) layerType = TerrainGenerator.BLOCK_STONE;
         return BLOCK_TILE_X[layerType];
     }
 
     private int sideTileY(int topType, int layerType, int y, int height) {
         if (topType == TerrainGenerator.BLOCK_GRASS && y == height - 1) return 0;
+        if (layerType == TerrainGenerator.BLOCK_WOOD) return 1;
         if (layerType < 0 || layerType >= BLOCK_TILE_Y.length) layerType = TerrainGenerator.BLOCK_STONE;
         return BLOCK_TILE_Y[layerType];
     }
