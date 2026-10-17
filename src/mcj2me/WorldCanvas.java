@@ -670,13 +670,14 @@ final class WorldCanvas extends Canvas implements Runnable {
                 nh = terrain.getHeight(x + 1, z); if (h > nh) quads += h - nh;
                 nh = terrain.getHeight(x, z - 1); if (h > nh) quads += h - nh;
                 nh = terrain.getHeight(x, z + 1); if (h > nh) quads += h - nh;
-                if (terrain.isTreeAt(x, z)) quads += (terrain.getTreeHeight(x, z) + 57) * 6;
+                if (terrain.isTreeAt(x, z)) quads += (terrain.getTreeHeight(x, z) + terrain.countTreeLeaves(x, z)) * 6;
             }
         }
 
         int vertexCount = quads * 4;
         short[] positions = new short[vertexCount * 3];
         short[] texCoords = new short[vertexCount * 2];
+        byte[] colors = new byte[vertexCount * 3];
         int[] indices = new int[vertexCount];
         int[] stripLengths = new int[quads];
         int vertex = 0;
@@ -686,42 +687,46 @@ final class WorldCanvas extends Canvas implements Runnable {
             for (z = startZ; z < startZ + CHUNK; z++) {
                 h = terrain.getHeight(x, z);
                 int topType = terrain.getTopType(x, z);
-                vertex = addQuad(positions, texCoords, indices, stripLengths,
+                vertex = addQuad(positions, texCoords, colors, indices, stripLengths,
                     vertex, strip++, x, h, z, x, h, z + 1,
                     x + 1, h, z, x + 1, h, z + 1, BLOCK_TYPES[topType], 0);
 
                 int neighbor = terrain.getHeight(x - 1, z);
                 for (int sy = neighbor; sy < h; sy++) {
-                    vertex = addQuad(positions, texCoords, indices, stripLengths,
+                    vertex = addQuad(positions, texCoords, colors, indices, stripLengths,
                         vertex, strip++, x, sy, z + 1, x, sy + 1, z + 1,
                         x, sy, z, x, sy + 1, z, sideTile(terrain.getTopType(x, z), sy, h), 0);
                 }
                 neighbor = terrain.getHeight(x + 1, z);
                 for (int sy = neighbor; sy < h; sy++) {
-                    vertex = addQuad(positions, texCoords, indices, stripLengths,
+                    vertex = addQuad(positions, texCoords, colors, indices, stripLengths,
                         vertex, strip++, x + 1, sy, z, x + 1, sy + 1, z,
                         x + 1, sy, z + 1, x + 1, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), sy, h), 0);
                 }
                 neighbor = terrain.getHeight(x, z - 1);
                 for (int sy = neighbor; sy < h; sy++) {
-                    vertex = addQuad(positions, texCoords, indices, stripLengths,
+                    vertex = addQuad(positions, texCoords, colors, indices, stripLengths,
                         vertex, strip++, x, sy, z, x, sy + 1, z,
                         x + 1, sy, z, x + 1, sy + 1, z, sideTile(terrain.getTopType(x, z), sy, h), 0);
                 }
                 neighbor = terrain.getHeight(x, z + 1);
                 for (int sy = neighbor; sy < h; sy++) {
-                    vertex = addQuad(positions, texCoords, indices, stripLengths,
+                    vertex = addQuad(positions, texCoords, colors, indices, stripLengths,
                         vertex, strip++, x + 1, sy, z + 1, x + 1, sy + 1, z + 1,
                         x, sy, z + 1, x, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), sy, h), 0);
                 }
                 if (terrain.isTreeAt(x, z)) {
                     int base = h, th = terrain.getTreeHeight(x, z), y;
-                    for (y = 0; y < th; y++) { vertex = addCube(positions, texCoords, indices, stripLengths, vertex, strip, x, base + y, z, 4, 1); strip += 6; }
+                    for (y = 0; y < th; y++) { vertex = addCube(positions, texCoords, colors, indices, stripLengths, vertex, strip, x, base + y, z, 4, 1); strip += 6; }
                     int crown = base + th - 1;
                     for (y = crown - 1; y <= crown + 1; y++) { int radius = (y == crown + 1) ? 1 : 2, lx, lz;
                         for (lx = x - radius; lx <= x + radius; lx++) for (lz = z - radius; lz <= z + radius; lz++) {
                             if (lx == x && lz == z && y <= crown) continue;
-                            vertex = addCube(positions, texCoords, indices, stripLengths, vertex, strip, lx, y, lz, 4, 3); strip += 6;
+                            if (terrain.isLeafBlockAt(lx, y, lz)) {
+                                vertex = addCube(positions, texCoords, colors, indices, stripLengths,
+                                    vertex, strip, lx, y, lz, 4, 3);
+                                strip += 6;
+                            }
                         }
                     }
                 }
@@ -735,6 +740,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         VertexBuffer buffer = new VertexBuffer();
         buffer.setPositions(vertexArray, 1.0f, null);
         buffer.setTexCoords(0, texArray, 1.0f / 256.0f, null);
+        VertexArray colorArray = new VertexArray(vertexCount, 3, 1);
+        colorArray.set(0, vertexCount, colors);
+        buffer.setColors(colorArray);
         TriangleStripArray triangles = new TriangleStripArray(indices, stripLengths);
         return new Mesh(buffer, triangles, groundAppearance);
     }
@@ -746,19 +754,28 @@ final class WorldCanvas extends Canvas implements Runnable {
         return y == height - 1 ? 3 : 2; // grass lip, dirt below
     }
 
-    private int addCube(short[] positions, short[] texCoords, int[] indices, int[] stripLengths, int vertex, int strip, int x, int y, int z, int tx, int ty) {
+    private int addCube(short[] positions, short[] texCoords, byte[] colors, int[] indices, int[] stripLengths, int vertex, int strip, int x, int y, int z, int tx, int ty) {
         // The cut end of a log uses the log-top atlas tile, not bark.
         int topX = (tx == 4 && ty == 1) ? 5 : tx;
         int topY = (tx == 4 && ty == 1) ? 1 : ty;
-        vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x, y+1, z, x, y+1, z+1, x+1, y+1, z, x+1, y+1, z+1, topX, topY);
-        vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x, y, z+1, x, y+1, z+1, x+1, y, z+1, x+1, y+1, z+1, tx, ty);
-        vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x+1, y, z, x+1, y+1, z, x, y, z, x, y+1, z, tx, ty);
-        vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x, y, z, x, y+1, z, x, y, z+1, x, y+1, z+1, tx, ty);
-        vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x+1, y, z+1, x+1, y+1, z+1, x+1, y, z, x+1, y+1, z, tx, ty);
-        vertex = addQuad(positions, texCoords, indices, stripLengths, vertex, strip++, x, y, z, x, y+1, z, x+1, y, z, x+1, y+1, z, tx, ty);
+        vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++, x, y+1, z, x, y+1, z+1, x+1, y+1, z, x+1, y+1, z+1, topX, topY);
+        vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++, x, y, z+1, x, y+1, z+1, x+1, y, z+1, x+1, y+1, z+1, tx, ty);
+        vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++, x+1, y, z, x+1, y+1, z, x, y, z, x, y+1, z, tx, ty);
+        vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++, x, y, z, x, y+1, z, x, y, z+1, x, y+1, z+1, tx, ty);
+        vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++, x+1, y, z+1, x+1, y+1, z+1, x+1, y, z, x+1, y+1, z, tx, ty);
+        vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++, x, y, z, x, y+1, z, x+1, y, z, x+1, y+1, z, tx, ty);
         return vertex;
     }
     private void breakBlock() {
+        int[] leafHit = raycastLeafBlock();
+        if (leafHit != null && terrain.removeLeafBlock(leafHit[0], leafHit[1], leafHit[2])) {
+            particleTicks = 8;
+            loadedCenterX = -99;
+            updateChunks();
+            updateCamera();
+            return;
+        }
+
         int[] hit = raycastSurface();
         if (hit == null) return;
         int x = hit[0], z = hit[1], h = terrain.getHeight(x, z);
@@ -810,29 +827,44 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         updateCamera();
     }
+    private int[] raycastLeafBlock() {
+        double yr = Math.PI * pitch / 180.0;
+        double xr = Math.PI * yaw / 180.0;
+        float dx = (float) (Math.sin(xr) * Math.cos(yr));
+        float dz = (float) (-Math.cos(xr) * Math.cos(yr));
+        float dy = (float) Math.sin(yr);
+        for (float d = 0.35f; d <= 5.0f; d += 0.08f) {
+            int x = (int) (cameraX + dx * d);
+            int y = (int) (cameraY + dy * d);
+            int z = (int) (cameraZ + dz * d);
+            if (terrain.isLeafBlockAt(x, y, z)) return new int[] {x, y, z};
+        }
+        return null;
+    }
+
     private int[] raycastSurface() {
         double yr=Math.PI*pitch/180.0,xr=Math.PI*yaw/180.0; float dx=(float)(Math.sin(xr)*Math.cos(yr)),dz=(float)(-Math.cos(xr)*Math.cos(yr)),dy=(float)Math.sin(yr);
         for(float d=0.5f;d<=5.0f;d+=0.15f){int x=(int)(cameraX+dx*d),z=(int)(cameraZ+dz*d);if(x<1||z<1||x>=TerrainGenerator.SIZE-1||z>=TerrainGenerator.SIZE-1)continue;float y=cameraY+dy*d;int surface=terrain.getHeight(x,z);if(y<=surface+0.25f&&y>=surface-1.0f)return new int[]{x,z};}return null;
     }
 
-    private int addQuad(short[] positions, short[] texCoords, int[] indices,
+    private int addQuad(short[] positions, short[] texCoords, byte[] colors, int[] indices,
                         int[] stripLengths, int vertex, int strip,
                         int x0, int y0, int z0, int x1, int y1, int z1,
                         int x2, int y2, int z2, int x3, int y3, int z3,
                         int tileX, int tileY) {
-        vertex = addVertex(positions, texCoords, indices, vertex, x0, y0, z0,
+        vertex = addVertex(positions, texCoords, colors, indices, vertex, x0, y0, z0,
                            tileX, tileY, 0);
-        vertex = addVertex(positions, texCoords, indices, vertex, x1, y1, z1,
+        vertex = addVertex(positions, texCoords, colors, indices, vertex, x1, y1, z1,
                            tileX, tileY, 1);
-        vertex = addVertex(positions, texCoords, indices, vertex, x2, y2, z2,
+        vertex = addVertex(positions, texCoords, colors, indices, vertex, x2, y2, z2,
                            tileX, tileY, 2);
-        vertex = addVertex(positions, texCoords, indices, vertex, x3, y3, z3,
+        vertex = addVertex(positions, texCoords, colors, indices, vertex, x3, y3, z3,
                            tileX, tileY, 3);
         stripLengths[strip] = 4;
         return vertex;
     }
 
-    private int addVertex(short[] positions, short[] texCoords, int[] indices,
+    private int addVertex(short[] positions, short[] texCoords, byte[] colors, int[] indices,
                           int vertex, int x, int y, int z,
                           int tileX, int tileY, int corner) {
         int p = vertex * 3;
@@ -840,6 +872,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         positions[p + 1] = (short) y;
         positions[p + 2] = (short) z;
         indices[vertex] = vertex;
+        int shade = terrain.getShadowShade(x, z, y);
+        int colorOffset = vertex * 3;
+        colors[colorOffset] = (byte) shade;
+        colors[colorOffset + 1] = (byte) shade;
+        colors[colorOffset + 2] = (byte) shade;
 
         // Slight inset avoids sampling adjacent tiles at atlas boundaries.
         int left = tileX * 16 + 1;
