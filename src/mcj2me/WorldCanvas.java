@@ -23,7 +23,12 @@ final class WorldCanvas extends Canvas implements Runnable {
     private World world;
     private Group terrainGroup;
     private Group waterGroup;
+    private Group cloudGroup;
     private Texture2D waterTexture;
+    private Texture2D cloudTexture;
+    private Image guiImage;
+    private Image guiBlocksImage;
+    private float cloudPhase = 0.0f;
     private Appearance waterAppearance;
     private Image underwaterOverlay;
     private int overlayWidth = -1, overlayHeight = -1;
@@ -41,9 +46,12 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean forward, backward, strafeLeft, strafeRight;
     private boolean lookUp, lookDown, turnLeft, turnRight;
     private boolean jumpHeld;
-    private static final int[] BLOCK_TYPES = {0, 2, 1};
-    private static final String[] BLOCK_NAMES = {"GRASS", "DIRT", "STONE"};
-    private final int[] inventory = {64, 64, 64};
+    private static final int[] BLOCK_TILE_X = {0, 2, 1, 5, 4};
+    private static final int[] BLOCK_TILE_Y = {0, 0, 0, 1, 3};
+    private static final int[] GUI_TILE_X = {0, 2, 1, 4, 4};
+    private static final int[] GUI_TILE_Y = {0, 0, 0, 1, 3};
+    private static final String[] BLOCK_NAMES = {"GRASS", "DIRT", "STONE", "WOOD", "LEAVES"};
+    private final int[] inventory = {64, 64, 64, 64, 64};
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
     private float cameraX = 64.0f;
     private float cameraY;
@@ -76,9 +84,13 @@ final class WorldCanvas extends Canvas implements Runnable {
         world = new World();
         terrainGroup = new Group();
         waterGroup = new Group();
+        cloudGroup = new Group();
         camera = new Camera();
 
         Image atlas = Image.createImage("/mcj2me/textures.png");
+        guiImage = Image.createImage("/mcj2me/gui.png");
+        guiBlocksImage = Image.createImage("/mcj2me/gui_blocks.png");
+        Image cloudsImage = Image.createImage("/mcj2me/clouds.png");
         Image2D image2D = new Image2D(Image2D.RGBA, atlas);
         Texture2D texture = new Texture2D(image2D);
         texture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
@@ -111,6 +123,17 @@ final class WorldCanvas extends Canvas implements Runnable {
         waterBlend.setDepthWriteEnable(false);
         waterBlend.setAlphaWriteEnable(false);
         waterAppearance.setCompositingMode(waterBlend);
+        cloudTexture = new Texture2D(new Image2D(Image2D.RGBA, cloudsImage));
+        cloudTexture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
+        cloudTexture.setWrapping(Texture2D.WRAP_REPEAT, Texture2D.WRAP_REPEAT);
+        Appearance cloudAppearance = new Appearance();
+        cloudAppearance.setTexture(0, cloudTexture);
+        cloudAppearance.setPolygonMode(polygonMode);
+        CompositingMode cloudBlend = new CompositingMode();
+        cloudBlend.setBlending(CompositingMode.ALPHA);
+        cloudBlend.setDepthWriteEnable(false);
+        cloudBlend.setAlphaWriteEnable(false);
+        cloudAppearance.setCompositingMode(cloudBlend);
 
         Background background = new Background();
         background.setColor(0x87BFEA);
@@ -127,6 +150,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         world.setActiveCamera(camera);
         world.addChild(terrainGroup);
         world.addChild(waterGroup);
+        Mesh clouds = buildCloudPlane(cloudAppearance);
+        if (clouds != null) cloudGroup.addChild(clouds);
+        world.addChild(cloudGroup);
         updateCamera();
         updateChunks();
     }
@@ -225,11 +251,29 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void drawHud(Graphics g) {
-        int w = getWidth(), h = getHeight(); g.setColor(0x101820); g.fillRect(3, 3, Math.min(w - 6, 112), 15);
-        g.setColor(0xFFFFFF); g.drawString("MC J2ME", 7, 4, Graphics.TOP | Graphics.LEFT);
-        int sy = h - 23;
-        for (int i = 0; i < 3; i++) { int sx = 4 + i * 54; g.setColor(i == selectedSlot ? 0xE8D070 : 0x303840); g.fillRect(sx, sy, 50, 19); g.setColor(0x101820); g.drawRect(sx, sy, 49, 18); g.setColor(0xFFFFFF); g.drawString(BLOCK_NAMES[i] + " " + inventory[i], sx + 2, sy + 2, Graphics.TOP | Graphics.LEFT); }
-        int cx = w / 2, cy = h / 2; g.setColor(0xFFFFFF); g.drawLine(cx - 3, cy, cx + 3, cy); g.drawLine(cx, cy - 3, cx, cy + 3);
+        int w = getWidth(), h = getHeight();
+        g.setColor(0x101820);
+        g.fillRect(3, 3, Math.min(w - 6, 112), 15);
+        g.setColor(0xFFFFFF);
+        g.drawString("MC J2ME", 7, 4, Graphics.TOP | Graphics.LEFT);
+        int barX = (w - 182) / 2;
+        int barY = h - 23;
+        g.drawRegion(guiImage, 0, 0, 182, 22, 0, barX, barY, Graphics.TOP | Graphics.LEFT);
+        for (int i = 0; i < BLOCK_NAMES.length; i++) {
+            int slotX = barX + 1 + i * 20;
+            if (i == selectedSlot) g.drawRegion(guiImage, 0, 22, 24, 22, 0,
+                slotX, barY, Graphics.TOP | Graphics.LEFT);
+            g.drawRegion(guiBlocksImage, GUI_TILE_X[i] * 16, GUI_TILE_Y[i] * 16,
+                16, 16, 0, slotX + 4, barY + 3, Graphics.TOP | Graphics.LEFT);
+            if (inventory[i] > 1) {
+                g.setColor(0xFFFFFF);
+                g.drawString(Integer.toString(inventory[i]), slotX + 11, barY + 10,
+                    Graphics.TOP | Graphics.LEFT);
+            }
+        }
+        int cx = w / 2, cy = h / 2;
+        g.drawRegion(guiImage, 0, 96, 16, 16, 0, cx - 8, cy - 8,
+            Graphics.TOP | Graphics.LEFT);
         if (splashTicks > 0) {
             g.setColor(0xBDEBFF);
             for (int b = 0; b < 5; b++) {
@@ -238,7 +282,15 @@ final class WorldCanvas extends Canvas implements Runnable {
                 g.drawArc(bx, by, 2 + (splashTicks % 3), 2 + (splashTicks % 3), 0, 360);
             }
         }
-        if (particleTicks > 0) { g.setColor(0xB5A06A); for (int p = 0; p < 8; p++) { int px = cx + (((p * 17 + particleTicks * 7) % 19) - 9), py = cy + (((p * 11 + particleTicks * 5) % 17) - 8), size = 2 + (particleTicks & 1); g.fillRect(px, py, size, size); } }
+        if (particleTicks > 0) {
+            g.setColor(0xB5A06A);
+            for (int p = 0; p < 8; p++) {
+                int px = cx + (((p * 17 + particleTicks * 7) % 19) - 9);
+                int py = cy + (((p * 11 + particleTicks * 5) % 17) - 8);
+                int size = 2 + (particleTicks & 1);
+                g.fillRect(px, py, size, size);
+            }
+        }
     }
 
     protected synchronized void keyPressed(int keyCode) {
@@ -271,8 +323,8 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         if (keyCode == '1' && actionCooldown == 0) { breakBlock(); actionCooldown = 4; }
         else if (keyCode == '3' && actionCooldown == 0) { placeBlock(); actionCooldown = 4; }
-        else if (keyCode == '7') { selectedSlot--; if (selectedSlot < 0) selectedSlot = 2; }
-        else if (keyCode == '9') { selectedSlot++; if (selectedSlot > 2) selectedSlot = 0; }
+        else if (keyCode == '7') { selectedSlot--; if (selectedSlot < 0) selectedSlot = BLOCK_NAMES.length - 1; }
+        else if (keyCode == '9') { selectedSlot++; if (selectedSlot >= BLOCK_NAMES.length) selectedSlot = 0; }
         // In water, Fire/center is the swim-up control and can be held/re-tapped
         // while already airborne. On land it remains the normal jump button.
         if (action == FIRE || keyCode == '5' || keyCode == ' ') {
@@ -649,9 +701,28 @@ final class WorldCanvas extends Canvas implements Runnable {
         return vertex + 1;
     }
 
+    private Mesh buildCloudPlane(Appearance appearance) {
+        short[] positions = {-64, 53, -64, -64, 53, 192, 192, 53, -64, 192, 53, 192};
+        short[] texCoords = {0, 0, 0, 16, 16, 0, 16, 16};
+        int[] indices = {0, 1, 2, 3};
+        int[] stripLengths = {4};
+        VertexArray positionArray = new VertexArray(4, 3, 2);
+        positionArray.set(0, 4, positions);
+        VertexArray texArray = new VertexArray(4, 2, 2);
+        texArray.set(0, 4, texCoords);
+        VertexBuffer buffer = new VertexBuffer();
+        buffer.setPositions(positionArray, 1.0f, null);
+        buffer.setTexCoords(0, texArray, 1.0f, null);
+        TriangleStripArray triangles = new TriangleStripArray(indices, stripLengths);
+        return new Mesh(buffer, triangles, appearance);
+    }
+
     private void animateWater() {
         waterPhase += 0.012f;
         if (waterPhase >= 1.0f) waterPhase -= 1.0f;
+        cloudPhase += 0.0008f;
+        if (cloudPhase >= 1.0f) cloudPhase -= 1.0f;
+        cloudTexture.setTranslation(cloudPhase, 0.0f, 0.0f);
         // Texture2D is Transformable in M3G; repeating coordinates make this
         // a cheap scrolling-water animation without rebuilding terrain meshes.
         waterTexture.setTranslation(waterPhase, waterPhase * 0.65f, 0.0f);
@@ -689,31 +760,32 @@ final class WorldCanvas extends Canvas implements Runnable {
                 int topType = terrain.getTopType(x, z);
                 vertex = addQuad(positions, texCoords, colors, indices, stripLengths,
                     vertex, strip++, x, h, z, x, h, z + 1,
-                    x + 1, h, z, x + 1, h, z + 1, BLOCK_TYPES[topType], 0);
+                    x + 1, h, z, x + 1, h, z + 1,
+                    BLOCK_TILE_X[topType], BLOCK_TILE_Y[topType]);
 
                 int neighbor = terrain.getHeight(x - 1, z);
                 for (int sy = neighbor; sy < h; sy++) {
                     vertex = addQuad(positions, texCoords, colors, indices, stripLengths,
                         vertex, strip++, x, sy, z + 1, x, sy + 1, z + 1,
-                        x, sy, z, x, sy + 1, z, sideTile(terrain.getTopType(x, z), sy, h), 0);
+                        x, sy, z, x, sy + 1, z, sideTile(terrain.getTopType(x, z), sy, h), sideTileY(terrain.getTopType(x, z)));
                 }
                 neighbor = terrain.getHeight(x + 1, z);
                 for (int sy = neighbor; sy < h; sy++) {
                     vertex = addQuad(positions, texCoords, colors, indices, stripLengths,
                         vertex, strip++, x + 1, sy, z, x + 1, sy + 1, z,
-                        x + 1, sy, z + 1, x + 1, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), sy, h), 0);
+                        x + 1, sy, z + 1, x + 1, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), sy, h), sideTileY(terrain.getTopType(x, z)));
                 }
                 neighbor = terrain.getHeight(x, z - 1);
                 for (int sy = neighbor; sy < h; sy++) {
                     vertex = addQuad(positions, texCoords, colors, indices, stripLengths,
                         vertex, strip++, x, sy, z, x, sy + 1, z,
-                        x + 1, sy, z, x + 1, sy + 1, z, sideTile(terrain.getTopType(x, z), sy, h), 0);
+                        x + 1, sy, z, x + 1, sy + 1, z, sideTile(terrain.getTopType(x, z), sy, h), sideTileY(terrain.getTopType(x, z)));
                 }
                 neighbor = terrain.getHeight(x, z + 1);
                 for (int sy = neighbor; sy < h; sy++) {
                     vertex = addQuad(positions, texCoords, colors, indices, stripLengths,
                         vertex, strip++, x + 1, sy, z + 1, x + 1, sy + 1, z + 1,
-                        x, sy, z + 1, x, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), sy, h), 0);
+                        x, sy, z + 1, x, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), sy, h), sideTileY(terrain.getTopType(x, z)));
                 }
                 if (terrain.isTreeAt(x, z)) {
                     int base = h, th = terrain.getTreeHeight(x, z), y;
@@ -751,7 +823,15 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int sideTile(int topType, int y, int height) {
         if (topType == 2) return 1; // stone
         if (topType == 1) return 2; // dirt
+        if (topType == 3) return 4; // wood bark
+        if (topType == 4) return 4; // leaves
         return y == height - 1 ? 3 : 2; // grass lip, dirt below
+    }
+
+    private int sideTileY(int topType) {
+        if (topType == 3) return 1;
+        if (topType == 4) return 3;
+        return 0;
     }
 
     private int addCube(short[] positions, short[] texCoords, byte[] colors, int[] indices, int[] stripLengths, int vertex, int strip, int x, int y, int z, int tx, int ty) {
