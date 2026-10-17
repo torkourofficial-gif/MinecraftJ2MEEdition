@@ -865,6 +865,27 @@ final class WorldCanvas extends Canvas implements Runnable {
      * player remains inside the same chunk. Synchronization prevents the game
      * loop from racing the key handler while meshes are removed and recreated. */
     private synchronized void reloadEditedChunks() {
+        // An edit invalidates the currently visible terrain meshes, but not
+        // chunks elsewhere in the world. Drop only the active window; the
+        // next updateChunks() call recreates these meshes from the new data.
+        int centerX = ((int) cameraX) / CHUNK;
+        int centerZ = ((int) cameraZ) / CHUNK;
+        for (int x = Math.max(0, centerX - RADIUS);
+             x <= Math.min(7, centerX + RADIUS); x++) {
+            for (int z = Math.max(0, centerZ - RADIUS);
+                 z <= Math.min(7, centerZ + RADIUS); z++) {
+                Mesh old = activeChunks[x][z];
+                if (old != null) {
+                    terrainGroup.removeChild(old);
+                    activeChunks[x][z] = null;
+                }
+                Mesh oldWater = activeWaterChunks[x][z];
+                if (oldWater != null) {
+                    waterGroup.removeChild(oldWater);
+                    activeWaterChunks[x][z] = null;
+                }
+            }
+        }
         loadedCenterX = -99;
         loadedCenterZ = -99;
         updateChunks();
