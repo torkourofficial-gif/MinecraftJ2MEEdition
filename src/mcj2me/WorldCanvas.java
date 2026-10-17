@@ -371,7 +371,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         int action = getGameAction(keyCode);
 
         if (keyCode == '#') {
-            inventoryOpen = !inventoryOpen;
+            inventoryOpen = true;
             forward = backward = strafeLeft = strafeRight = false;
             lookUp = lookDown = turnLeft = turnRight = false;
             jumpHeld = false;
