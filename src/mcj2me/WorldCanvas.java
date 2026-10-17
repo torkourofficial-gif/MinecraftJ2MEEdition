@@ -518,7 +518,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 repaint();
             } else if (!paused) {
                 pause();
-                owner.showPauseMenu();
+                midlet.showPauseMenu();
             }
             return;
         }
