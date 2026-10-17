@@ -12,7 +12,8 @@ final class TitleScreen extends Canvas implements Runnable {
     private int renderWidth=-1, renderHeight=-1, selected=0;
     private float panoramaOffset;
     private Thread animationThread;
-    private boolean running, settingsOpen;
+    private boolean running, settingsOpen, controlsOpen, waitingForBinding;
+    private int controlSelection = 0;
 
     TitleScreen(IndevViewerMIDlet midlet) {
         owner=midlet;
@@ -60,16 +61,36 @@ final class TitleScreen extends Canvas implements Runnable {
             Math.max(8,h/10),Graphics.TOP|Graphics.LEFT);
         else { g.setColor(0xFFFFFF); g.drawString("Minecraft",w/2,Math.max(8,h/5),Graphics.TOP|Graphics.HCENTER); }
 
-        if (settingsOpen) {
-            drawButton(g, 12, h/2-36, w-24, 28,
+        if (controlsOpen) {
+            g.setColor(0xFFFFFF);
+            g.drawString("CUSTOM CONTROLS", w/2, h/3-24, Graphics.TOP|Graphics.HCENTER);
+            int visible = 5;
+            int first = controlSelection - 2;
+            if (first < 0) first = 0;
+            if (first > IndevViewerMIDlet.CONTROL_COUNT-visible)
+                first = IndevViewerMIDlet.CONTROL_COUNT-visible;
+            int rowY = h/3;
+            for (int n = first; n < first+visible; n++) {
+                int y = rowY + (n-first)*23;
+                String line = IndevViewerMIDlet.CONTROL_NAMES[n] + ": " +
+                    IndevViewerMIDlet.controlKeyName(IndevViewerMIDlet.controlKeys[n]);
+                drawButton(g, 8, y, w-16, 21, line, n==controlSelection);
+            }
+            String help = waitingForBinding ? "Press a key to bind..." : "FIRE: remap  *: back";
+            g.setColor(0xFFFFFF);
+            g.drawString(help, w/2, h-38, Graphics.BOTTOM|Graphics.HCENTER);
+            g.drawString("UP/DOWN: choose control", w/2, h-20, Graphics.BOTTOM|Graphics.HCENTER);
+        } else if (settingsOpen) {
+            drawButton(g, 12, h/2-54, w-24, 27,
                 "Sensitivity: " + IndevViewerMIDlet.sensitivity, selected==0);
             String fog = IndevViewerMIDlet.fogLevel==0 ? "Near" :
                 (IndevViewerMIDlet.fogLevel==2 ? "Far" : "Normal");
-            drawButton(g, 12, h/2, w-24, 28, "Fog: " + fog, selected==1);
-            drawButton(g, 12, h/2+36, w-24, 28, "Back", selected==2);
+            drawButton(g, 12, h/2-22, w-24, 27, "Fog: " + fog, selected==1);
+            drawButton(g, 12, h/2+10, w-24, 27, "Controls", selected==2);
+            drawButton(g, 12, h/2+42, w-24, 27, "Back", selected==3);
             g.setColor(0xFFFFFF);
             g.drawString("LEFT/RIGHT: change", w/2, h-43, Graphics.BOTTOM|Graphics.HCENTER);
-            g.drawString("UP/DOWN: select  FIRE: back", w/2, h-25, Graphics.BOTTOM|Graphics.HCENTER);
+            g.drawString("UP/DOWN: select  FIRE: open", w/2, h-25, Graphics.BOTTOM|Graphics.HCENTER);
         } else {
             int bw=Math.min(w-24,210); if (bw<1) bw=w;
             int bh=Math.min(27,Math.max(20,h/12)), bx=(w-bw)/2;
@@ -92,9 +113,29 @@ final class TitleScreen extends Canvas implements Runnable {
     }
     protected void keyPressed(int keyCode) {
         int action=getGameAction(keyCode);
+        if (controlsOpen) {
+            if (waitingForBinding) {
+                int direction = IndevViewerMIDlet.directionalKey(action);
+                if (direction >= 0) IndevViewerMIDlet.controlKeys[controlSelection] = direction;
+                else if (keyCode != '*' && keyCode != 42 && keyCode != '#' && keyCode != 35)
+                    IndevViewerMIDlet.controlKeys[controlSelection] = keyCode;
+                IndevViewerMIDlet.saveControls();
+                waitingForBinding=false;
+            } else if (action==UP || keyCode=='2') {
+                controlSelection=(controlSelection+IndevViewerMIDlet.CONTROL_COUNT-1)%IndevViewerMIDlet.CONTROL_COUNT;
+            } else if (action==DOWN || keyCode=='8') {
+                controlSelection=(controlSelection+1)%IndevViewerMIDlet.CONTROL_COUNT;
+            } else if (action==FIRE || keyCode=='5' || keyCode==' ' || keyCode=='\n') {
+                waitingForBinding=true;
+            } else if (keyCode=='*' || keyCode==42) {
+                controlsOpen=false; settingsOpen=true; selected=2;
+            }
+            repaint();
+            return;
+        }
         if (settingsOpen) {
-            if (action==UP || keyCode=='2') selected=(selected+2)%3;
-            else if (action==DOWN || keyCode=='8') selected=(selected+1)%3;
+            if (action==UP || keyCode=='2') selected=(selected+3)%4;
+            else if (action==DOWN || keyCode=='8') selected=(selected+1)%4;
             else if (action==LEFT || keyCode=='4') {
                 if (selected==0 && IndevViewerMIDlet.sensitivity>1) IndevViewerMIDlet.sensitivity--;
                 else if (selected==1 && IndevViewerMIDlet.fogLevel>0) IndevViewerMIDlet.fogLevel--;
@@ -102,8 +143,9 @@ final class TitleScreen extends Canvas implements Runnable {
                 if (selected==0 && IndevViewerMIDlet.sensitivity<6) IndevViewerMIDlet.sensitivity++;
                 else if (selected==1 && IndevViewerMIDlet.fogLevel<2) IndevViewerMIDlet.fogLevel++;
             } else if (action==FIRE || keyCode=='5' || keyCode==' ' || keyCode=='\n') {
-                if (selected==2) { settingsOpen=false; selected=1; }
-            } else if (keyCode=='*') { settingsOpen=false; selected=1; }
+                if (selected==2) { controlsOpen=true; controlSelection=0; waitingForBinding=false; }
+                else if (selected==3) { settingsOpen=false; selected=1; }
+            } else if (keyCode=='*' || keyCode==42) { settingsOpen=false; selected=1; }
             repaint();
             return;
         }
