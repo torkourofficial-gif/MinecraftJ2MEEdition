@@ -241,19 +241,26 @@ final class PassiveMob {
     }
 
     static float directionAngle(float dx, float dz) {
-        // Eight-direction yaw avoids Math.atan2 compatibility issues in older CLDC toolchains.
         float ax = dx < 0.0f ? -dx : dx;
         float az = dz < 0.0f ? -dz : dz;
-        if (ax < 0.0001f && az < 0.0001f) return 0.0f;
-        if (ax > az) return dx > 0.0f ? 90.0f : -90.0f;
-        if (dz > 0.0f) {
-            if (dx > 0.0f) return 45.0f;
-            if (dx < 0.0f) return -45.0f;
+
+        if (ax < 0.001f && az < 0.001f) {
             return 0.0f;
         }
-        if (dx > 0.0f) return 135.0f;
-        if (dx < 0.0f) return -135.0f;
-        return 180.0f;
+
+        if (ax > az * 2.0f) {
+            return dx > 0.0f ? 90.0f : -90.0f;
+        }
+
+        if (az > ax * 2.0f) {
+            return dz > 0.0f ? 180.0f : 0.0f;
+        }
+
+        if (dx > 0.0f) {
+            return dz > 0.0f ? 135.0f : 45.0f;
+        }
+
+        return dz > 0.0f ? -135.0f : -45.0f;
     }
 
     static float hitDistance(float px, float py, float pz, float yaw, float pitch,
