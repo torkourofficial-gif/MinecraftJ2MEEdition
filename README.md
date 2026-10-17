@@ -18,7 +18,7 @@ Solid terrain is still height-map based rather than a complete voxel engine, but
 - **D-pad left / right:** turn; **up / down:** look (nearly vertical, ±88°)
 - **1:** break targeted surface block
 - **3:** place selected block on the targeted column
-- *** (star):** cycle forward through the five hotbar blocks (grass, dirt, stone, wood, leaves)
+- **Tecla estrella (`*`):** cycle forward through the five hotbar blocks (grass, dirt, stone, wood, leaves)
 - **7 / 9:** cycle backward / forward through the five hotbar blocks
 - **W / A / S / D:** movement in desktop emulators
 - **Fire / center:** jump (press again after landing)
@@ -27,4 +27,4 @@ Each new world gets a random seed, which changes both the procedural terrain and
 
 Terrain mining still changes the top of a terrain column; side-face mining, caves, persistence, mobs and survival are not implemented. Tree leaves are separate breakable canopy blocks. A lightweight Indev-style shadow approximation darkens surfaces beneath leaves and beside higher terrain.
 
-Package all four PNG resources under the `mcj2me` resource package (`/mcj2me/`) and set `mcj2me.IndevViewerMIDlet` as the MIDlet class. The repository keeps copies in `src/mcj2me/` so NetBeans can package them as classpath resources. The hotbar previews use the matching 48×48 cells in `gui_blocks.png`; pressing `*` selects the next block.
+Package all four PNG resources under the `mcj2me` resource package (`/mcj2me/`) and set `mcj2me.IndevViewerMIDlet` as the MIDlet class. The repository keeps copies in `src/mcj2me/` so NetBeans can package them as classpath resources. The hotbar previews use the matching 48×48 cells in `gui_blocks.png`; pressing the `*` key selects the next block.
