@@ -298,12 +298,14 @@ final class PassiveMob {
         final Mesh mesh;
         final Appearance normal;
         float x, z, homeX, homeZ, dirX, dirZ;
-        int health = 3, hurtTicks, wanderTicks;
+        float jumpY = 0.0f, jumpVelocity = 0.0f;
+        int health = 3, hurtTicks, wanderTicks, hopCooldown;
         boolean alive = true;
 
         Mob(Mesh mesh, Appearance normal, float x, float z, Random random) {
             this.mesh = mesh; this.normal = normal;
             this.x = this.homeX = x; this.z = this.homeZ = z;
+            hopCooldown = 4 + random.nextInt(24);
             chooseDirection(random);
         }
 
@@ -331,8 +333,23 @@ final class PassiveMob {
                 x = nx; z = nz;
             }
             if (len > 0.0f) mesh.setOrientation(directionAngle(dx, dz), 0.0f, 1.0f, 0.0f);
+
+            // Indev-style animal chaos: frequent little hops, with a springy landing.
+            if (hopCooldown > 0) hopCooldown--;
+            if (hopCooldown <= 0 && jumpY <= 0.001f && random.nextInt(5) != 0) {
+                jumpVelocity = 0.105f + random.nextInt(65) * 0.001f;
+                hopCooldown = 5 + random.nextInt(24);
+            }
+            if (jumpY > 0.0f || jumpVelocity > 0.0f) {
+                jumpY += jumpVelocity;
+                jumpVelocity -= 0.018f;
+                if (jumpY <= 0.0f) {
+                    jumpY = 0.0f;
+                    jumpVelocity = 0.0f;
+                }
+            }
             float bob = (float)Math.sin(tick * 0.22f) * (len > 0.0f ? 0.012f : 0.003f);
-            mesh.setTranslation(x, terrain.getHeight((int)x, (int)z) + bob, z);
+            mesh.setTranslation(x, terrain.getHeight((int)x, (int)z) + bob + jumpY, z);
         }
     }
 }
