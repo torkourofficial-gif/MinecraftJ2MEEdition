@@ -229,6 +229,26 @@ final class TerrainGenerator {
     static final int BLOCK_GRAVEL = 13;
     static final int BLOCK_BRICK = 14;
     static final int BLOCK_OBSIDIAN = 15;
+    // IDs 16-20 are reserved for WorldCanvas decorations; solid additions start at 21.
+    static final int BLOCK_IRON_BLOCK = 21;
+    static final int BLOCK_GOLD_BLOCK = 22;
+    static final int BLOCK_DIAMOND_BLOCK = 23;
+    static final int BLOCK_WOOL_WHITE = 24;
+    static final int BLOCK_WOOL_ORANGE = 25;
+    static final int BLOCK_WOOL_MAGENTA = 26;
+    static final int BLOCK_WOOL_LIGHT_BLUE = 27;
+    static final int BLOCK_WOOL_YELLOW = 28;
+    static final int BLOCK_WOOL_LIME = 29;
+    static final int BLOCK_WOOL_PINK = 30;
+    static final int BLOCK_WOOL_GRAY = 31;
+    static final int BLOCK_WOOL_LIGHT_GRAY = 32;
+    static final int BLOCK_WOOL_CYAN = 33;
+    static final int BLOCK_WOOL_PURPLE = 34;
+    static final int BLOCK_WOOL_BLUE = 35;
+    static final int BLOCK_WOOL_BROWN = 36;
+    static final int BLOCK_WOOL_GREEN = 37;
+    static final int BLOCK_WOOL_RED = 38;
+    static final int BLOCK_WOOL_BLACK = 39;
 
     int getTopType(int x, int z) {
         if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return BLOCK_BEDROCK;
@@ -237,7 +257,7 @@ final class TerrainGenerator {
 
     void setTopType(int x, int z, int type) {
         if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return;
-        if (type < BLOCK_GRASS || type > BLOCK_OBSIDIAN) type = BLOCK_GRASS;
+        if (type < BLOCK_GRASS || type > BLOCK_WOOL_BLACK) type = BLOCK_GRASS;
         topTypes[x][z] = (byte) type;
     }
 
