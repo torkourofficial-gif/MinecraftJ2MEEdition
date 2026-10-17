@@ -240,6 +240,22 @@ final class PassiveMob {
         return rects;
     }
 
+    static float directionAngle(float dx, float dz) {
+        // Eight-direction yaw avoids Math.atan2 compatibility issues in older CLDC toolchains.
+        float ax = dx < 0.0f ? -dx : dx;
+        float az = dz < 0.0f ? -dz : dz;
+        if (ax < 0.0001f && az < 0.0001f) return 0.0f;
+        if (ax > az) return dx > 0.0f ? 90.0f : -90.0f;
+        if (dz > 0.0f) {
+            if (dx > 0.0f) return 45.0f;
+            if (dx < 0.0f) return -45.0f;
+            return 0.0f;
+        }
+        if (dx > 0.0f) return 135.0f;
+        if (dx < 0.0f) return -135.0f;
+        return 180.0f;
+    }
+
     static float hitDistance(float px, float py, float pz, float yaw, float pitch,
                              float mx, float my, float mz, float radius) {
         float yr = (float)(yaw * Math.PI / 180.0);
@@ -290,7 +306,7 @@ final class PassiveMob {
             } else {
                 x = nx; z = nz;
             }
-            if (len > 0.0f) mesh.setOrientation((float)(Math.atan2(dx, dz) * 180.0 / Math.PI), 0.0f, 1.0f, 0.0f);
+            if (len > 0.0f) mesh.setOrientation(directionAngle(dx, dz), 0.0f, 1.0f, 0.0f);
             float bob = (float)Math.sin(tick * 0.22f) * (len > 0.0f ? 0.012f : 0.003f);
             mesh.setTranslation(x, terrain.getHeight((int)x, (int)z) + bob, z);
         }
