@@ -182,7 +182,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         Mesh horizonSea = buildHorizonSea();
         if (horizonSea != null) waterGroup.addChild(horizonSea);
         world.addChild(cloudGroup);
-        setupBlockParticles();
+        setupBlockParticles(atlas);
         world.addChild(blockParticleGroup);
         updateCamera();
         updateChunks();
@@ -953,35 +953,40 @@ final class WorldCanvas extends Canvas implements Runnable {
         return vertex;
     }
     /**
-     * Build one shared 3D cube mesh and lightweight per-particle scene nodes.
-     * Particles are tiny colored cubes in world space, not HUD/crosshair pixels.
+     * Build flat, textured world-space fragments. Each particle samples a small
+     * patch from its block's atlas tile, like classic Minecraft block debris.
      */
-    private void setupBlockParticles() {
+    private void setupBlockParticles(Image atlas) {
         short[] positions = {
-            -1, -1,  1,  -1,  1,  1,   1, -1,  1,   1,  1,  1,
-             1, -1, -1,   1,  1, -1,  -1, -1, -1,  -1,  1, -1,
-            -1, -1, -1,  -1,  1, -1,  -1, -1,  1,  -1,  1,  1,
-             1, -1,  1,   1,  1,  1,   1, -1, -1,   1,  1, -1,
-            -1,  1,  1,  -1,  1, -1,   1,  1,  1,   1,  1, -1,
-            -1, -1, -1,  -1, -1,  1,   1, -1, -1,   1, -1,  1
+            -1, -1, 0,
+            -1,  1, 0,
+             1, -1, 0,
+             1,  1, 0
         };
-        int[] indices = new int[24];
-        int[] stripLengths = {4, 4, 4, 4, 4, 4};
-        for (int i = 0; i < 24; i++) indices[i] = i;
-        VertexArray vertexArray = new VertexArray(24, 3, 2);
-        vertexArray.set(0, 24, positions);
+        short[] texCoords = {0, 0, 0, 1, 1, 0, 1, 1};
+        int[] indices = {0, 1, 2, 3};
+        int[] stripLengths = {4};
+        VertexArray vertexArray = new VertexArray(4, 3, 2);
+        vertexArray.set(0, 4, positions);
+        VertexArray texArray = new VertexArray(4, 2, 2);
+        texArray.set(0, 4, texCoords);
         blockParticleBuffer = new VertexBuffer();
         blockParticleBuffer.setPositions(vertexArray, 0.5f, null);
+        blockParticleBuffer.setTexCoords(0, texArray, 1.0f, null);
         blockParticleTriangles = new TriangleStripArray(indices, stripLengths);
 
-        int[] colors = {0x7E9D43, 0x8B6545, 0x929292, 0xA77A45, 0x477D39};
-        for (int t = 0; t < colors.length; t++) {
-            Material material = new Material();
-            material.setColor(Material.AMBIENT, colors[t]);
-            material.setColor(Material.DIFFUSE, colors[t]);
-            material.setColor(Material.EMISSIVE, colors[t] & 0x003F3F3F);
+        int[] patchPixels = new int[8 * 8];
+        for (int t = 0; t < blockParticleAppearances.length; t++) {
+            int tileX = BLOCK_TILE_X[t] * 16 + 4;
+            int tileY = BLOCK_TILE_Y[t] * 16 + 4;
+            atlas.getRGB(patchPixels, 0, 8, tileX, tileY, 8, 8);
+            Image patch = Image.createRGBImage(patchPixels, 8, 8, true);
+            Texture2D texture = new Texture2D(new Image2D(Image2D.RGBA, patch));
+            texture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
+            texture.setWrapping(Texture2D.WRAP_CLAMP, Texture2D.WRAP_CLAMP);
+
             Appearance appearance = new Appearance();
-            appearance.setMaterial(material);
+            appearance.setTexture(0, texture);
             PolygonMode pm = new PolygonMode();
             pm.setCulling(PolygonMode.CULL_NONE);
             pm.setShading(PolygonMode.SHADE_FLAT);
@@ -1027,6 +1032,13 @@ final class WorldCanvas extends Canvas implements Runnable {
             blockParticleY[i] += blockParticleVY[i];
             blockParticleZ[i] += blockParticleVZ[i];
             blockParticleVY[i] -= 0.0045f;
+            int ground = terrain.getHeight((int) blockParticleX[i], (int) blockParticleZ[i]);
+            if (blockParticleY[i] < ground + 0.035f) {
+                blockParticleY[i] = ground + 0.035f;
+                blockParticleVY[i] = 0.0f;
+                blockParticleVX[i] *= 0.72f;
+                blockParticleVZ[i] *= 0.72f;
+            }
             blockParticleMeshes[i].setTranslation(blockParticleX[i],
                 blockParticleY[i], blockParticleZ[i]);
             blockParticleMeshes[i].setOrientation((i * 37 + (BLOCK_PARTICLE_LIFE - particleTicks) * 13)
