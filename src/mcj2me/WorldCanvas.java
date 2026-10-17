@@ -954,8 +954,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         terrain.setHeight(x, z, h + 1);
         terrain.setTopType(x, z, selectedSlot);
         inventory[selectedSlot]--;
-        loadedCenterX = -99;
-        updateChunks();
+        reloadEditedChunks();
         resolvePlayerAfterTerrainEdit();
     }
 
