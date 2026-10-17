@@ -673,6 +673,15 @@ final class WorldCanvas extends Canvas implements Runnable {
                         return false;
                     }
                 }
+
+                // Leaves are solid too: reject movement when the player's
+                // body overlaps any generated leaf cube at this X/Z column.
+                int firstBodyY = Math.max(0, (int) Math.floor(feetY));
+                int lastBodyY = Math.min(TerrainGenerator.HEIGHT - 1,
+                    (int) Math.floor(cameraY + 0.10f));
+                for (int by = firstBodyY; by <= lastBodyY; by++) {
+                    if (terrain.isLeafBlockAt(bx, by, bz)) return false;
+                }
             }
         }
         return true;
