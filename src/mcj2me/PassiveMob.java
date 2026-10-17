@@ -113,18 +113,36 @@ final class PassiveMob {
         int[][] boxes;
         int[] parts;
         if (mobType == MOB_ZOMBIE) {
+            // Classic player/zombie proportions in model units: 8px head,
+            // 12px torso, 12px legs; arms are 4px wide and 12px long.
             boxes = new int[][] {
-                {-1, 2, -1, 1, 6, 1}, {-1, 6, -1, 1, 8, 1},
-                {-3, 2, -1, -2, 6, 1}, {2, 2, -1, 3, 6, 1},
-                {-1, 0, -1, 0, 2, 1}, {0, 0, -1, 1, 2, 1}
+                {-1, 3, -1, 1, 6, 0}, {-1, 6, -1, 1, 8, 1},
+                {-3, 3, -1, -2, 6, 0}, {2, 3, -1, 3, 6, 0},
+                {-1, 0, -1, 0, 3, 0}, {0, 0, -1, 1, 3, 0}
             };
             parts = new int[] {1, 0, 4, 2, 5, 3};
         } else {
-            boxes = new int[][] {
-                {-2, 2, -3, 2, 4, 3}, {-1, 3, -5, 1, 5, -3},
-                {-2, 0, -2, -1, 2, -1}, {1, 0, -2, 2, 2, -1},
-                {-2, 0, 1, -1, 2, 2}, {1, 0, 1, 2, 2, 2}
-            };
+            // Compact classic animal silhouettes: separate head, body and
+            // four short, narrow legs instead of one oversized boxy body.
+            if (mobType == MOB_COW) {
+                boxes = new int[][] {
+                    {-2, 3, -1, 2, 6, 1}, {-2, 1, -2, 2, 5, 1},
+                    {-2, 0, -2, -1, 3, -1}, {1, 0, -2, 2, 3, -1},
+                    {-2, 0, 0, -1, 3, 1}, {1, 0, 0, 2, 3, 1}
+                };
+            } else if (mobType == MOB_PIG) {
+                boxes = new int[][] {
+                    {-1, 3, -1, 1, 6, 1}, {-2, 1, -2, 2, 4, 2},
+                    {-2, 0, -2, -1, 2, -1}, {1, 0, -2, 2, 2, -1},
+                    {-2, 0, 1, -1, 2, 2}, {1, 0, 1, 2, 2, 2}
+                };
+            } else {
+                boxes = new int[][] {
+                    {-1, 3, -1, 1, 6, 1}, {-1, 1, -2, 1, 5, 1},
+                    {-2, 0, -2, -1, 3, -1}, {1, 0, -2, 2, 3, -1},
+                    {-2, 0, 0, -1, 3, 1}, {1, 0, 0, 2, 3, 1}
+                };
+            }
             parts = new int[] {1, 0, 2, 2, 2, 2};
         }
 
