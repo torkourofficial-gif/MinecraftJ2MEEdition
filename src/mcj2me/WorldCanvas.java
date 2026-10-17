@@ -13,7 +13,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final float FRICTION = 0.78f;
     private static final float GRAVITY = 0.035f;
     private static final float JUMP_SPEED = 0.38f;
-    private static final float TURN_SPEED = 3.0f;
+    private static final int DAY_TICKS = 10500; // 7 minutes at the 40 ms game tick.
+    private int dayTick = 0;
     private static final int WATER_LEVEL = TerrainGenerator.WATER_LEVEL;
     // Keep the distant ocean below the terrain skyline; inland lakes retain WATER_LEVEL.
     private static final int HORIZON_SEA_LEVEL = 10;
@@ -37,6 +38,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     private float cloudPhase = 0.0f;
     private Appearance waterAppearance;
     private Fog distanceFog;
+    private Background skyBackground;
+    private Light ambientLight;
+    private PassiveMob passiveMobs;
+    private HostileMob hostileMobs;
     private Image underwaterOverlay;
     private int overlayWidth = -1, overlayHeight = -1;
     private Mesh[][] activeWaterChunks = new Mesh[8][8];
@@ -172,20 +177,21 @@ final class WorldCanvas extends Canvas implements Runnable {
         cloudBlend.setAlphaWriteEnable(false);
         cloudAppearance.setCompositingMode(cloudBlend);
 
-        Background background = new Background();
-        background.setColor(0x87BFEA);
-        world.setBackground(background);
+        skyBackground = new Background();
+        skyBackground.setColor(0x87BFEA);
+        world.setBackground(skyBackground);
         distanceFog = new Fog();
         distanceFog.setColor(0xB6CBE0);
-        distanceFog.setLinear(20.0f, 52.0f);
+        distanceFog.setLinear(IndevViewerMIDlet.fogFarDistance() * 0.38f,
+            IndevViewerMIDlet.fogFarDistance());
         groundAppearance.setFog(distanceFog);
         waterAppearance.setFog(distanceFog);
         cloudAppearance.setFog(distanceFog);
 
-        Light ambient = new Light();
-        ambient.setMode(Light.AMBIENT);
-        ambient.setColor(0xFFFFFF);
-        world.addChild(ambient);
+        ambientLight = new Light();
+        ambientLight.setMode(Light.AMBIENT);
+        ambientLight.setColor(0xFFFFFF);
+        world.addChild(ambientLight);
 
         cameraY = terrain.getHeightSmooth(64.0f, 105.0f) + 1.65f;
         camera.setPerspective(70.0f, 1.0f, 0.1f, 180.0f);
@@ -201,6 +207,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         world.addChild(cloudGroup);
         setupBlockParticles(atlas);
         world.addChild(blockParticleGroup);
+        passiveMobs = new PassiveMob(world, terrain, cameraX, cameraZ);
+        hostileMobs = new HostileMob(world, terrain, cameraX, cameraZ);
         updateCamera();
         updateChunks();
     }
@@ -231,7 +239,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         while (running) {
             if (!paused) {
                 updateMovement();
+                updateDayNight();
                 animateWater();
+                if (passiveMobs != null) passiveMobs.update(cameraX, cameraZ);
+                if (hostileMobs != null) hostileMobs.update(cameraX, cameraZ);
                 updateTntFuse();
                 repaint();
                 serviceRepaints();
@@ -440,7 +451,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (keyCode == 'a' || keyCode == 'A') strafeLeft = true;
         if (keyCode == 'd' || keyCode == 'D') strafeRight = true;
 
-        if (keyCode == '1' && actionCooldown == 0) { breakBlock(); actionCooldown = 4; }
+        if (keyCode == '1' && actionCooldown == 0) {
+            if (!attackMobs()) breakBlock();
+            actionCooldown = 4;
+        }
         else if (keyCode == '3' && actionCooldown == 0) { placeBlock(); actionCooldown = 4; }
         else if (keyCode == '*' || keyCode == 42) {
             cycleSelectedBlock(1);
@@ -508,15 +522,15 @@ final class WorldCanvas extends Canvas implements Runnable {
         boolean changed = false;
         boolean positionChanged = false;
 
-        if (turnLeft) { yaw -= TURN_SPEED; changed = true; }
-        if (turnRight) { yaw += TURN_SPEED; changed = true; }
+        if (turnLeft) { yaw -= IndevViewerMIDlet.sensitivity; changed = true; }
+        if (turnRight) { yaw += IndevViewerMIDlet.sensitivity; changed = true; }
         if (lookUp) {
-            pitch += TURN_SPEED;
+            pitch += IndevViewerMIDlet.sensitivity;
             if (pitch > 88.0f) pitch = 88.0f;
             changed = true;
         }
         if (lookDown) {
-            pitch -= TURN_SPEED;
+            pitch -= IndevViewerMIDlet.sensitivity;
             if (pitch < -88.0f) pitch = -88.0f;
             changed = true;
         }
@@ -937,6 +951,36 @@ final class WorldCanvas extends Canvas implements Runnable {
         buffer.setTexCoords(0, texArray, 1.0f, null);
         TriangleStripArray triangles = new TriangleStripArray(indices, stripLengths);
         return new Mesh(buffer, triangles, appearance);
+    }
+
+    private void updateDayNight() {
+        dayTick++;
+        if (dayTick >= DAY_TICKS) dayTick = 0;
+        float phase = (float)(dayTick * (Math.PI * 2.0 / DAY_TICKS));
+        float daylight = 0.15f + 0.85f * (0.5f + 0.5f * (float)Math.cos(phase));
+        skyBackground.setColor(blendColor(0x10182D, 0x87BFEA, daylight));
+        distanceFog.setColor(blendColor(0x151923, 0xB6CBE0, daylight));
+        ambientLight.setColor(blendColor(0x22283D, 0xFFFFFF, daylight));
+        if (dayTick % 5 == 0) {
+            float far = IndevViewerMIDlet.fogFarDistance() * (0.65f + daylight * 0.35f);
+            distanceFog.setLinear(far * 0.38f, far);
+        }
+    }
+
+    private int blendColor(int night, int day, float amount) {
+        if (amount < 0.0f) amount = 0.0f;
+        if (amount > 1.0f) amount = 1.0f;
+        int nr = (night >> 16) & 255, ng = (night >> 8) & 255, nb = night & 255;
+        int dr = (day >> 16) & 255, dg = (day >> 8) & 255, db = day & 255;
+        int r = nr + (int)((dr - nr) * amount);
+        int g = ng + (int)((dg - ng) * amount);
+        int b = nb + (int)((db - nb) * amount);
+        return (r << 16) | (g << 8) | b;
+    }
+
+    private boolean attackMobs() {
+        if (hostileMobs != null && hostileMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch)) return true;
+        return passiveMobs != null && passiveMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch);
     }
 
     private void animateWater() {
