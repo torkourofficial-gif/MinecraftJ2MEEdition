@@ -88,6 +88,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private VertexBuffer blockParticleBuffer;
     private TriangleStripArray blockParticleTriangles;
     private Appearance[] blockParticleAppearances = new Appearance[BLOCK_TILE_X.length];
+    private Appearance mobDeathParticleAppearance;
     private float cameraX = 64.0f;
     private float cameraY;
     private float velocityX, velocityZ, verticalVelocity;
@@ -248,7 +249,6 @@ final class WorldCanvas extends Canvas implements Runnable {
                 if (hostileMobs != null) hostileMobs.update(cameraX, cameraZ, daylightLevel <= 0.42f);
                 updateTntFuse();
                 repaint();
-                serviceRepaints();
             }
             try {
                 Thread.sleep(40);
@@ -983,6 +983,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     private void updateDayNight() {
         dayTick++;
         if (dayTick >= DAY_TICKS) dayTick = 0;
+        // Recompute lighting/color state every fourth tick to reduce per-frame work
+        // on older Java ME devices while keeping day/night changes visually smooth.
+        if ((dayTick & 3) != 0) return;
         float phase = (float)(dayTick * (Math.PI * 2.0 / DAY_TICKS));
         float daylight = 0.15f + 0.85f * (0.5f + 0.5f * (float)Math.cos(phase));
         daylightLevel = daylight;
@@ -1007,8 +1010,19 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private boolean attackMobs() {
-        if (hostileMobs != null && hostileMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch)) return true;
-        return passiveMobs != null && passiveMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch);
+        if (hostileMobs != null && hostileMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch)) {
+            if (hostileMobs.consumeDeathEvent()) {
+                spawnMobDeathParticles(hostileMobs.getDeathX(), hostileMobs.getDeathY(), hostileMobs.getDeathZ());
+            }
+            return true;
+        }
+        if (passiveMobs != null && passiveMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch)) {
+            if (passiveMobs.consumeDeathEvent()) {
+                spawnMobDeathParticles(passiveMobs.getDeathX(), passiveMobs.getDeathY(), passiveMobs.getDeathZ());
+            }
+            return true;
+        }
+        return false;
     }
 
     private void animateWater() {
@@ -1186,6 +1200,19 @@ final class WorldCanvas extends Canvas implements Runnable {
             appearance.setPolygonMode(pm);
             blockParticleAppearances[t] = appearance;
         }
+        int[] grayPixel = {0xFF858585};
+        Image grayImage = Image.createRGBImage(grayPixel, 1, 1, true);
+        Texture2D grayTexture = new Texture2D(new Image2D(Image2D.RGBA, grayImage));
+        grayTexture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
+        grayTexture.setWrapping(Texture2D.WRAP_CLAMP, Texture2D.WRAP_CLAMP);
+        mobDeathParticleAppearance = new Appearance();
+        mobDeathParticleAppearance.setTexture(0, grayTexture);
+        mobDeathParticleAppearance.setFog(distanceFog);
+        PolygonMode grayMode = new PolygonMode();
+        grayMode.setCulling(PolygonMode.CULL_NONE);
+        grayMode.setShading(PolygonMode.SHADE_FLAT);
+        mobDeathParticleAppearance.setPolygonMode(grayMode);
+
         for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
             blockParticleMeshes[i] = new Mesh(blockParticleBuffer,
                 blockParticleTriangles, blockParticleAppearances[0]);
@@ -1237,6 +1264,29 @@ final class WorldCanvas extends Canvas implements Runnable {
                                              blockParticleSize[i]);
             blockParticleMeshes[i].setOrientation((i * 37) % 360, 1.0f, 1.0f, 0.5f);
             blockParticleMeshes[i].setTranslation(xs[i], ys[i], zs[i]);
+            blockParticleMeshes[i].setRenderingEnable(true);
+        }
+        particleTicks = BLOCK_PARTICLE_LIFE;
+    }
+
+    /** Gray cube-like fragments on mob death; reuses the existing particle pool. */
+    private void spawnMobDeathParticles(float x, float y, float z) {
+        for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
+            double angle = (Math.PI * 2.0 * i / BLOCK_PARTICLE_COUNT)
+                + ((i % 3) - 1) * 0.16;
+            float speed = 0.045f + (i % 4) * 0.014f;
+            blockParticleX[i] = x;
+            blockParticleY[i] = y;
+            blockParticleZ[i] = z;
+            blockParticleVX[i] = (float)Math.cos(angle) * speed;
+            blockParticleVZ[i] = (float)Math.sin(angle) * speed;
+            blockParticleVY[i] = 0.045f + (i % 4) * 0.014f;
+            blockParticleSize[i] = 0.055f + (i % 3) * 0.018f;
+            blockParticleMeshes[i].setAppearance(0, mobDeathParticleAppearance);
+            blockParticleMeshes[i].setScale(blockParticleSize[i], blockParticleSize[i],
+                                             blockParticleSize[i]);
+            blockParticleMeshes[i].setOrientation((i * 31) % 360, 1.0f, 1.0f, 0.5f);
+            blockParticleMeshes[i].setTranslation(x, y, z);
             blockParticleMeshes[i].setRenderingEnable(true);
         }
         particleTicks = BLOCK_PARTICLE_LIFE;
