@@ -48,8 +48,17 @@ final class TerrainGenerator {
     private void generateWaterBasinStructures(Random random) {
         int basinCount = 7 + random.nextInt(6);
         for (int b = 0; b < basinCount; b++) {
-            int cx = 12 + random.nextInt(SIZE - 24);
-            int cz = 12 + random.nextInt(SIZE - 24);
+            // Keep one guaranteed test lake in the spawn area's loaded
+            // chunks, in front of the player. The remaining lakes stay random.
+            int cx;
+            int cz;
+            if (b == 0) {
+                cx = 64;
+                cz = 91;
+            } else {
+                cx = 12 + random.nextInt(SIZE - 24);
+                cz = 12 + random.nextInt(SIZE - 24);
+            }
             int radiusX = 5 + random.nextInt(6);
             int radiusZ = 5 + random.nextInt(6);
             int depth = 3 + random.nextInt(5);
