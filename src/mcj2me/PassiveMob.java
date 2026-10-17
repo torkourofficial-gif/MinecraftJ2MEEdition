@@ -113,36 +113,36 @@ final class PassiveMob {
         int[][] boxes;
         int[] parts;
         if (mobType == MOB_ZOMBIE) {
-            // Classic player/zombie proportions in model units: 8px head,
-            // 12px torso, 12px legs; arms are 4px wide and 12px long.
+            // Classic 64x32 skin proportions in pixels; 16 model pixels = 1 block.
             boxes = new int[][] {
-                {-1, 3, -1, 1, 6, 0}, {-1, 6, -1, 1, 8, 1},
-                {-3, 3, -1, -2, 6, 0}, {2, 3, -1, 3, 6, 0},
-                {-1, 0, -1, 0, 3, 0}, {0, 0, -1, 1, 3, 0}
+                {-4, 12, -2, 4, 24, 2}, {-4, 24, -4, 4, 32, 4},
+                {-6, 12, -2, -2, 24, 2}, {2, 12, -2, 6, 24, 2},
+                {-4, 0, -2, 0, 12, 2}, {0, 0, -2, 4, 12, 2}
             };
             parts = new int[] {1, 0, 4, 2, 5, 3};
+        } else if (mobType == MOB_COW) {
+            // Cow: 12x18x10 body, 8x8x6 head, four 4x12x4 legs.
+            boxes = new int[][] {
+                {-6, 8, -5, 6, 26, 5}, {-4, 17, -3, 4, 25, 3},
+                {-5, 0, -4, -1, 12, 0}, {1, 0, -4, 5, 12, 0},
+                {-5, 0, 0, -1, 12, 4}, {1, 0, 0, 5, 12, 4}
+            };
+            parts = new int[] {1, 0, 2, 2, 2, 2};
+        } else if (mobType == MOB_PIG) {
+            // Pig: 10x8x8 body, 8x8x8 head, four 4x6x4 legs.
+            boxes = new int[][] {
+                {-5, 5, -4, 5, 13, 4}, {-4, 6, -4, 4, 14, 4},
+                {-5, 0, -4, -1, 6, 0}, {1, 0, -4, 5, 6, 0},
+                {-5, 0, 0, -1, 6, 4}, {1, 0, 0, 5, 6, 4}
+            };
+            parts = new int[] {1, 0, 2, 2, 2, 2};
         } else {
-            // Compact classic animal silhouettes: separate head, body and
-            // four short, narrow legs instead of one oversized boxy body.
-            if (mobType == MOB_COW) {
-                boxes = new int[][] {
-                    {-2, 3, -1, 2, 6, 1}, {-2, 1, -2, 2, 5, 1},
-                    {-2, 0, -2, -1, 3, -1}, {1, 0, -2, 2, 3, -1},
-                    {-2, 0, 0, -1, 3, 1}, {1, 0, 0, 2, 3, 1}
-                };
-            } else if (mobType == MOB_PIG) {
-                boxes = new int[][] {
-                    {-1, 3, -1, 1, 6, 1}, {-2, 1, -2, 2, 4, 2},
-                    {-2, 0, -2, -1, 2, -1}, {1, 0, -2, 2, 2, -1},
-                    {-2, 0, 1, -1, 2, 2}, {1, 0, 1, 2, 2, 2}
-                };
-            } else {
-                boxes = new int[][] {
-                    {-1, 3, -1, 1, 6, 1}, {-1, 1, -2, 1, 5, 1},
-                    {-2, 0, -2, -1, 3, -1}, {1, 0, -2, 2, 3, -1},
-                    {-2, 0, 0, -1, 3, 1}, {1, 0, 0, 2, 3, 1}
-                };
-            }
+            // Sheep: 12x17x10 body, 8x8x6 head, four 4x12x4 legs.
+            boxes = new int[][] {
+                {-6, 8, -5, 6, 25, 5}, {-4, 16, -3, 4, 24, 3},
+                {-5, 0, -4, -1, 12, 0}, {1, 0, -4, 5, 12, 0},
+                {-5, 0, 0, -1, 12, 4}, {1, 0, 0, 5, 12, 4}
+            };
             parts = new int[] {1, 0, 2, 2, 2, 2};
         }
 
@@ -198,7 +198,7 @@ final class PassiveMob {
         VertexArray t = new VertexArray(vertexCount, 2, 2);
         t.set(0, vertexCount, texCoords);
         VertexBuffer buffer = new VertexBuffer();
-        buffer.setPositions(p, 0.5f, null);
+        buffer.setPositions(p, 1.0f / 16.0f, null);
         buffer.setTexCoords(0, t, 1.0f / 1024.0f, null);
         return new Mesh(buffer, new TriangleStripArray(indices, strips), appearance);
     }
@@ -286,7 +286,9 @@ final class PassiveMob {
             } else {
                 x = nx; z = nz;
             }
-            mesh.setTranslation(x, terrain.getHeight((int)x, (int)z), z);
+            if (len > 0.0f) mesh.setOrientation((float)(Math.atan2(dx, dz) * 180.0 / Math.PI), 0.0f, 1.0f, 0.0f);
+            float bob = (float)Math.sin(tick * 0.22f) * (len > 0.0f ? 0.012f : 0.003f);
+            mesh.setTranslation(x, terrain.getHeight((int)x, (int)z) + bob, z);
         }
     }
 }
