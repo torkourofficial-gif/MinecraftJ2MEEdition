@@ -22,7 +22,7 @@ Solid terrain is still height-map based rather than a complete voxel engine, but
 - **W / A / S / D:** movement in desktop emulators
 - **Fire / center:** jump (press again after landing)
 
-Water occupies discrete block cells inside generated basins, with a top face and exposed vertical shoreline faces rather than a single shared flat sheet. The water texture scrolls, entry triggers a splash, movement slows in water, a translucent blue screen tint appears only when the camera itself is below the waterline, and holding Fire/center strokes upward so the camera can break the surface. Solid-ground collision remains active underwater.
+Water occupies discrete block cells only in naturally enclosed lowland regions found after the terrain height map is generated. The generator flood-fills connected columns below the waterline, rejects lowlands that reach the map edge, and keeps only basins large and deep enough to read as lakes. This replaces the old approach of stamping circular depressions at predetermined coordinates. Each water cell contributes to a block-like volume with a top face and exposed vertical shoreline faces rather than a single shared flat sheet. The water texture scrolls, entry triggers a splash, movement slows in water, a translucent blue screen tint appears only when the camera itself is below the waterline, and holding Fire/center strokes upward so the camera can break the surface. Solid-ground collision remains active underwater.
 
 Block editing currently changes the top of a terrain column; side-face mining,
 caves, persistence, mobs and survival are not implemented. Trees are decorative.
