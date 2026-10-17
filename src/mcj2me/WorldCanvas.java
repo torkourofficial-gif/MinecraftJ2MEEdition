@@ -279,8 +279,19 @@ final class WorldCanvas extends Canvas implements Runnable {
         clearKeys();
     }
 
+    synchronized void resume() {
+        if (running) {
+            paused = false;
+            clearKeys();
+            repaint();
+        } else {
+            start();
+        }
+    }
+
     synchronized void stop() {
         running = false;
+        paused = true;
         clearKeys();
         if (thread != null) {
             thread.interrupt();
@@ -476,6 +487,17 @@ final class WorldCanvas extends Canvas implements Runnable {
     protected synchronized void keyPressed(int keyCode) {
         int action = getGameAction(keyCode);
 
+        if (isBackKey(keyCode)) {
+            if (inventoryOpen) {
+                inventoryOpen = false;
+                repaint();
+            } else if (!paused) {
+                pause();
+                owner.showPauseMenu();
+            }
+            return;
+        }
+
         if (keyCode == '#') {
             inventoryOpen = true;
             clearKeys();
@@ -563,6 +585,11 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (next >= BLOCK_NAMES.length) next = 0;
             if (next != TerrainGenerator.BLOCK_BEDROCK) { selectedSlot = next; return; }
         }
+    }
+
+    private boolean isBackKey(int keyCode) {
+        // MIDP has no standard BACK key code; support common emulator and phone mappings.
+        return keyCode == 27 || keyCode == 8 || keyCode == 127 || keyCode == -7 || keyCode == -6;
     }
 
     protected synchronized void keyReleased(int keyCode) {
