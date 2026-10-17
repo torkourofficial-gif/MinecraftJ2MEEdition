@@ -35,6 +35,8 @@ final class HostileMob {
         }
     }
 
+    void setEnabled(boolean enabled) { group.setRenderingEnable(enabled); }
+
     void update(float playerX, float playerZ, boolean isNight) {
         if (isNight != nightActive) {
             nightActive = isNight;
