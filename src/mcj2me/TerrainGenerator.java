@@ -92,9 +92,14 @@ final class TerrainGenerator {
                         if (h > rimHeight) h = rimHeight;
                     }
                     if (h < 2) h = 2;
-                    heights[x][z] = (short) h;
-                    // Never clear another lake's water when structures overlap.
-                    if (insideWater) waterBasins[x][z] = true;
+                    // A later shoreline must not overwrite an existing lake
+                    // interior with dry ground when two structures overlap.
+                    if (insideWater) {
+                        heights[x][z] = (short) h;
+                        waterBasins[x][z] = true;
+                    } else if (!waterBasins[x][z]) {
+                        heights[x][z] = (short) h;
+                    }
                 }
             }
         }
