@@ -1226,9 +1226,9 @@ final class WorldCanvas extends Canvas implements Runnable {
                 + ((i % 3) - 1) * 0.21;
             int offset = 1 + (i % radius);
             int bx = Math.max(1, Math.min(TerrainGenerator.SIZE - 2,
-                cx + (int)Math.round(Math.cos(angle) * offset)));
+                cx + (int)(Math.cos(angle) * offset)));
             int bz = Math.max(1, Math.min(TerrainGenerator.SIZE - 2,
-                cz + (int)Math.round(Math.sin(angle) * offset)));
+                cz + (int)(Math.sin(angle) * offset)));
             int oldHeight = terrain.getHeight(bx, bz);
             debrisTypes[i] = terrain.getTopType(bx, bz);
             debrisX[i] = bx + 0.5f;
