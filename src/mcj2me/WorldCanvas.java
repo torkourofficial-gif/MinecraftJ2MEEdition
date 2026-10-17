@@ -1152,7 +1152,27 @@ final class WorldCanvas extends Canvas implements Runnable {
                 nh = terrain.getHeight(x + 1, z); if (h > nh) quads += h - nh;
                 nh = terrain.getHeight(x, z - 1); if (h > nh) quads += h - nh;
                 nh = terrain.getHeight(x, z + 1); if (h > nh) quads += h - nh;
-                if (terrain.isTreeAt(x, z)) quads += (terrain.getTreeHeight(x, z) + terrain.countTreeLeaves(x, z)) * 6;
+                if (terrain.isTreeAt(x, z)) {
+                    int treeBase = h;
+                    int treeHeight = terrain.getTreeHeight(x, z);
+                    int treeY;
+                    for (treeY = 0; treeY < treeHeight; treeY++) {
+                        quads += countExposedTreeFaces(x, treeBase + treeY, z);
+                    }
+                    int crown = treeBase + treeHeight - 1;
+                    for (treeY = crown - 1; treeY <= crown + 1; treeY++) {
+                        int radius = (treeY == crown + 1) ? 1 : 2;
+                        int lx, lz;
+                        for (lx = x - radius; lx <= x + radius; lx++) {
+                            for (lz = z - radius; lz <= z + radius; lz++) {
+                                if (lx == x && lz == z && treeY <= crown) continue;
+                                if (terrain.isLeafBlockAt(lx, treeY, lz)) {
+                                    quads += countExposedTreeFaces(lx, treeY, lz);
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -1202,15 +1222,14 @@ final class WorldCanvas extends Canvas implements Runnable {
                 }
                 if (terrain.isTreeAt(x, z)) {
                     int base = h, th = terrain.getTreeHeight(x, z), y;
-                    for (y = 0; y < th; y++) { vertex = addCube(positions, texCoords, colors, indices, stripLengths, vertex, strip, x, base + y, z, 4, 1); strip += 6; }
+                    for (y = 0; y < th; y++) { vertex = addTreeCube(positions, texCoords, colors, indices, stripLengths, vertex, strip, x, base + y, z, 4, 1); strip += countExposedTreeFaces(x, base + y, z); }
                     int crown = base + th - 1;
                     for (y = crown - 1; y <= crown + 1; y++) { int radius = (y == crown + 1) ? 1 : 2, lx, lz;
                         for (lx = x - radius; lx <= x + radius; lx++) for (lz = z - radius; lz <= z + radius; lz++) {
                             if (lx == x && lz == z && y <= crown) continue;
                             if (terrain.isLeafBlockAt(lx, y, lz)) {
-                                vertex = addCube(positions, texCoords, colors, indices, stripLengths,
-                                    vertex, strip, lx, y, lz, 4, 3);
-                                strip += 6;
+                                vertex = addTreeCube(positions, texCoords, colors, indices, stripLengths, vertex, strip, lx, y, lz, 4, 3);
+                                strip += countExposedTreeFaces(lx, y, lz);
                             }
                         }
                     }
@@ -1247,16 +1266,60 @@ final class WorldCanvas extends Canvas implements Runnable {
         return BLOCK_TILE_Y[layerType];
     }
 
-    private int addCube(short[] positions, short[] texCoords, byte[] colors, int[] indices, int[] stripLengths, int vertex, int strip, int x, int y, int z, int tx, int ty) {
-        // The cut end of a log uses the log-top atlas tile, not bark.
+    /**
+     * Tree voxels only: decorations, particles and other special geometry keep
+     * their original rendering path and are never passed through this culler.
+     */
+    private boolean isTreeVoxelAt(int x, int y, int z) {
+        if (y < 0 || y >= TerrainGenerator.HEIGHT) return false;
+        if (terrain.isLeafBlockAt(x, y, z)) return true;
+        if (!terrain.isTreeAt(x, z)) return false;
+        int base = terrain.getHeight(x, z);
+        return y >= base && y < base + terrain.getTreeHeight(x, z);
+    }
+
+    /** Number of tree-cube faces not touching another tree voxel. */
+    private int countExposedTreeFaces(int x, int y, int z) {
+        int faces = 0;
+        if (!isTreeVoxelAt(x, y + 1, z)) faces++;
+        if (!isTreeVoxelAt(x, y, z + 1)) faces++;
+        if (!isTreeVoxelAt(x + 1, y, z)) faces++;
+        if (!isTreeVoxelAt(x - 1, y, z)) faces++;
+        if (!isTreeVoxelAt(x, y, z - 1)) faces++;
+        if (!isTreeVoxelAt(x, y - 1, z)) faces++;
+        return faces;
+    }
+
+    /** Emit exposed tree faces while preserving the original atlas tile mapping. */
+    private int addTreeCube(short[] positions, short[] texCoords, byte[] colors,
+                            int[] indices, int[] stripLengths, int vertex, int strip,
+                            int x, int y, int z, int tx, int ty) {
         int topX = (tx == 4 && ty == 1) ? 5 : tx;
         int topY = (tx == 4 && ty == 1) ? 1 : ty;
-        vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++, x, y+1, z, x, y+1, z+1, x+1, y+1, z, x+1, y+1, z+1, topX, topY);
-        vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++, x, y, z+1, x, y+1, z+1, x+1, y, z+1, x+1, y+1, z+1, tx, ty);
-        vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++, x+1, y, z, x+1, y+1, z, x, y, z, x, y+1, z, tx, ty);
-        vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++, x, y, z, x, y+1, z, x, y, z+1, x, y+1, z+1, tx, ty);
-        vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++, x+1, y, z+1, x+1, y+1, z+1, x+1, y, z, x+1, y+1, z, tx, ty);
-        vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++, x, y, z, x, y+1, z, x+1, y, z, x+1, y+1, z, tx, ty);
+        if (!isTreeVoxelAt(x, y + 1, z)) {
+            vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++,
+                x, y+1, z, x, y+1, z+1, x+1, y+1, z, x+1, y+1, z+1, topX, topY);
+        }
+        if (!isTreeVoxelAt(x, y, z + 1)) {
+            vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++,
+                x, y, z+1, x, y+1, z+1, x+1, y, z+1, x+1, y+1, z+1, tx, ty);
+        }
+        if (!isTreeVoxelAt(x + 1, y, z)) {
+            vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++,
+                x+1, y, z, x+1, y+1, z, x, y, z, x, y+1, z, tx, ty);
+        }
+        if (!isTreeVoxelAt(x - 1, y, z)) {
+            vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++,
+                x, y, z, x, y+1, z, x, y, z+1, x, y+1, z+1, tx, ty);
+        }
+        if (!isTreeVoxelAt(x, y, z - 1)) {
+            vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++,
+                x+1, y, z+1, x+1, y+1, z+1, x+1, y, z, x+1, y+1, z, tx, ty);
+        }
+        if (!isTreeVoxelAt(x, y - 1, z)) {
+            vertex = addQuad(positions, texCoords, colors, indices, stripLengths, vertex, strip++,
+                x, y, z, x, y+1, z, x+1, y, z, x+1, y+1, z, tx, ty);
+        }
         return vertex;
     }
     /**
