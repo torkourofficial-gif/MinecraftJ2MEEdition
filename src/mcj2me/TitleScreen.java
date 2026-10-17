@@ -115,7 +115,7 @@ final class TitleScreen extends Canvas implements Runnable {
         int action=getGameAction(keyCode);
         if (controlsOpen) {
             if (waitingForBinding) {
-                int direction = IndevViewerMIDlet.directionalKey(action);
+                int direction = IndevViewerMIDlet.directionalKey(keyCode, action);
                 if (direction >= 0) IndevViewerMIDlet.controlKeys[controlSelection] = direction;
                 else if (keyCode != '*' && keyCode != 42 && keyCode != '#' && keyCode != 35)
                     IndevViewerMIDlet.controlKeys[controlSelection] = keyCode;
