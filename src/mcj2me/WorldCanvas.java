@@ -146,8 +146,6 @@ final class WorldCanvas extends Canvas implements Runnable {
     private float cameraZ = 105.0f;
     private float yaw = 0.0f;
     private float pitch = -28.0f;
-    private int loadedCenterX = -99;
-    private int loadedCenterZ = -99;
     private String errorMessage;
 
     WorldCanvas(IndevViewerMIDlet owner) {
@@ -623,7 +621,6 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     private void updateMovement() {
         boolean changed = false;
-        boolean positionChanged = false;
 
         if (turnLeft) { yaw -= IndevViewerMIDlet.sensitivity; changed = true; }
         if (turnRight) { yaw += IndevViewerMIDlet.sensitivity; changed = true; }
@@ -693,7 +690,6 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
 
             if (cameraX != oldX || cameraZ != oldZ) {
-                positionChanged = true;
                 changed = true;
             }
         }
@@ -743,7 +739,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (actionCooldown > 0) actionCooldown--;
         updateBlockParticles();
         if (changed) updateCamera();
-        if (positionChanged) updateChunks();
+        // Chunk streaming is advanced once per game-loop tick in run().
     }
 
     private float clampWorldX(float x) {
