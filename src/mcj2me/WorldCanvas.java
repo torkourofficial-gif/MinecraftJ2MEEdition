@@ -50,8 +50,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final int[] BLOCK_TILE_X = {0, 2, 1, 5, 4};
     private static final int[] BLOCK_TILE_Y = {0, 0, 0, 1, 3};
     // 48x48 block icons in gui_blocks.png, mapped to grass/dirt/stone/log/leaves.
-    private static final int[] GUI_ICON_X = {48, 96, 0, 48, 96};
-    private static final int[] GUI_ICON_Y = {0, 0, 0, 48, 48};
+    // 48x48 cells verified against gui_blocks.png: grass, dirt, stone,
+    // oak log, and leaves. The sheet is a block-icon atlas, not textures.png.
+    private static final int[] GUI_ICON_X = {432, 144, 0, 288, 96};
+    private static final int[] GUI_ICON_Y = {0, 288, 0, 48, 288};
     private static final String[] BLOCK_NAMES = {"GRASS", "DIRT", "STONE", "WOOD", "LEAVES"};
     private final int[] inventory = {64, 64, 64, 64, 64};
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
@@ -783,7 +785,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         texArray.set(0, 4, texCoords);
         VertexBuffer buffer = new VertexBuffer();
         buffer.setPositions(positionArray, 1.0f, null);
-        buffer.setTexCoords(0, texArray, 0.125f, null);
+        buffer.setTexCoords(0, texArray, 1.0f, null);
         TriangleStripArray triangles = new TriangleStripArray(indices, stripLengths);
         return new Mesh(buffer, triangles, appearance);
     }
