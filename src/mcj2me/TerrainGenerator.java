@@ -218,6 +218,12 @@ final class TerrainGenerator {
         placedWaterLevels[x][z] = (short) level;
     }
 
+    int getPlacedWaterLevel(int x, int z) {
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return 0;
+        int level = placedWaterLevels[x][z];
+        return level > heights[x][z] ? level : 0;
+    }
+
     /**
      * Tests one water block cell. Water is traversable, but its occupied
      * volume is discrete: x/z selects a column and y selects a block layer.
