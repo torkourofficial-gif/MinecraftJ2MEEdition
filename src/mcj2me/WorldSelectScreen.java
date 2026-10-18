@@ -17,7 +17,10 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
     private WorldStore.WorldInfo[] worlds = new WorldStore.WorldInfo[0];
     private Image dirtTile;
     private int selected;
-    private final Command create = new Command("Create", Command.OK, 1);
+    private boolean creating;
+    private int createSelection;
+    private String worldName = "New World";
+    private final Command editName = new Command("Edit name", Command.OK, 1);
     private final Command cancel = new Command("Cancel", Command.BACK, 1);
     private final Command deleteCommand = new Command("Delete world", Command.OK, 1);
     private int pendingDeleteId = -1;
@@ -36,6 +39,7 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
     void show() {
         try {
             worlds = WorldStore.list();
+            creating = false;
             if (selected > worlds.length) selected = worlds.length;
             Display.getDisplay(owner).setCurrent(this);
             repaint();
@@ -53,8 +57,18 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
         } else {
             g.setColor(0x6B4326); g.fillRect(0, 0, w, h);
         }
-        g.setColor(0x55000000); g.fillRect(0, 0, w, h);
+        g.setColor(0x66000000); g.fillRect(0, 0, w, h);
         g.setColor(0xFFFFFF);
+        if (creating) {
+            g.drawString("Create New World", w / 2, 14, Graphics.TOP | Graphics.HCENTER);
+            g.drawString("Choose a name and create your world", w / 2, 36, Graphics.TOP | Graphics.HCENTER);
+            drawRow(g, 10, h / 2 - 36, w - 20, 25, "World name: " + worldName, createSelection == 0);
+            drawRow(g, 10, h / 2 - 5, w - 20, 25, "Create New World", createSelection == 1);
+            drawRow(g, 10, h / 2 + 26, w - 20, 25, "Cancel", createSelection == 2);
+            g.drawString("UP/DOWN: choose   FIRE: select", w / 2, h - 25, Graphics.BOTTOM | Graphics.HCENTER);
+            g.drawString("BACK: world list", w / 2, h - 8, Graphics.BOTTOM | Graphics.HCENTER);
+            return;
+        }
         g.drawString("Select World", w / 2, 8, Graphics.TOP | Graphics.HCENTER);
         g.drawString("ENTER: open/create   *: delete", w / 2, 27, Graphics.TOP | Graphics.HCENTER);
         int visible = Math.max(1, (h - 76) / 23);
@@ -87,7 +101,18 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
 
     protected void keyPressed(int keyCode) {
         int action = getGameAction(keyCode);
-        if (keyCode == 27 || keyCode == 8 || keyCode == 127 || keyCode == -7 || keyCode == -6) {
+        if (creating) {
+            if (isBackKey(keyCode)) { creating = false; repaint(); return; }
+            if (action == UP || keyCode == '2') { createSelection = (createSelection + 2) % 3; repaint(); return; }
+            if (action == DOWN || keyCode == '8') { createSelection = (createSelection + 1) % 3; repaint(); return; }
+            if (action == FIRE || keyCode == '5' || keyCode == ' ' || keyCode == 10) {
+                if (createSelection == 0) askName();
+                else if (createSelection == 1) createWorld();
+                else { creating = false; repaint(); }
+            }
+            return;
+        }
+        if (isBackKey(keyCode)) {
             owner.returnToMainMenu();
             return;
         }
@@ -104,7 +129,7 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
             return;
         }
         if (action == FIRE || keyCode == '5' || keyCode == ' ' || keyCode == 10) {
-            if (selected == 0) askName();
+            if (selected == 0) { creating = true; createSelection = 0; repaint(); }
             else if (selected > 0 && selected <= worlds.length) {
                 WorldStore.WorldInfo world = worlds[selected - 1];
                 try { owner.startGame(world.name, world.seed, world.id); }
@@ -114,11 +139,25 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
     }
 
     private void askName() {
-        TextBox name = new TextBox("Create world", "My World", 24, TextField.ANY);
-        name.addCommand(create);
+        TextBox name = new TextBox("World name", worldName, 24, TextField.ANY);
+        name.addCommand(editName);
         name.addCommand(cancel);
         name.setCommandListener(this);
         Display.getDisplay(owner).setCurrent(name);
+    }
+
+    private void createWorld() {
+        try {
+            WorldStore.WorldInfo world = WorldStore.create(worldName);
+            creating = false;
+            owner.startGame(world.name, world.seed, world.id);
+        } catch (Exception e) {
+            owner.showWorldError("Could not create this world.");
+        }
+    }
+
+    private boolean isBackKey(int keyCode) {
+        return keyCode == 27 || keyCode == 8 || keyCode == 127 || keyCode == -7 || keyCode == -6;
     }
 
     private void confirmDelete(WorldStore.WorldInfo world) {
@@ -134,14 +173,12 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
 
     public void commandAction(Command command, Displayable displayable) {
         if (displayable instanceof TextBox) {
-            if (command == create) {
-                try {
-                    WorldStore.WorldInfo world = WorldStore.create(((TextBox) displayable).getString());
-                    owner.startGame(world.name, world.seed, world.id);
-                } catch (Exception e) {
-                    owner.showWorldError("Could not save this world.");
-                }
-            } else Display.getDisplay(owner).setCurrent(this);
+            if (command == editName) {
+                String value = ((TextBox) displayable).getString();
+                if (value != null && value.trim().length() > 0) worldName = value.trim();
+            }
+            Display.getDisplay(owner).setCurrent(this);
+            repaint();
         } else if (displayable instanceof javax.microedition.lcdui.Alert) {
             if (command == deleteCommand && pendingDeleteId > 0) {
                 try {
