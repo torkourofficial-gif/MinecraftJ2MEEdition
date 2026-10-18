@@ -339,13 +339,18 @@ final class WorldCanvas extends Canvas implements Runnable {
         decorationGroup = new Group();
         camera = new Camera();
 
-        setupStage = "loading images and inventory icons";
-        Image atlas = createWoolAtlas(Image.createImage("/mcj2me/textures.png"));
+        setupStage = "loading /mcj2me/textures.png";
+        Image atlas = createWoolAtlas(ResourceImages.load("/mcj2me/textures.png"));
         terrainAtlasImage = atlas;
-        guiImage = Image.createImage("/mcj2me/gui.png");
-        guiBlocksImage = Image.createImage("/mcj2me/gui_blocks.png");
-        inventoryImage = Image.createImage("/mcj2me/inventory.png");
-        Image itemsImage = Image.createImage("/mcj2me/items.png");
+        setupStage = "loading /mcj2me/gui.png";
+        guiImage = ResourceImages.load("/mcj2me/gui.png");
+        setupStage = "loading /mcj2me/gui_blocks.png";
+        guiBlocksImage = ResourceImages.load("/mcj2me/gui_blocks.png");
+        setupStage = "loading /mcj2me/inventory.png";
+        inventoryImage = ResourceImages.load("/mcj2me/inventory.png");
+        setupStage = "loading /mcj2me/items.png";
+        Image itemsImage = ResourceImages.load("/mcj2me/items.png");
+        setupStage = "creating inventory icons";
         blockIcons[0] = createGuiBlockIcon(GUI_ICON_X[0], GUI_ICON_Y[0]);
         blockIcons[1] = createGuiBlockIcon(GUI_ICON_X[1], GUI_ICON_Y[1]);
         blockIcons[2] = createGuiBlockIcon(GUI_ICON_X[2], GUI_ICON_Y[2]);
@@ -358,7 +363,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         blockIcons[BLOCK_DOOR] = createItemsIcon(itemsImage, 0, 1);
         blockIcons[ITEM_WATER_BUCKET] = createItemsIcon(itemsImage, 3, 0);
         blockIcons[ITEM_EMPTY_BUCKET] = createItemsIcon(itemsImage, 1, 0);
-        Image cloudsImage = Image.createImage("/mcj2me/clouds.png");
+        setupStage = "loading /mcj2me/clouds.png";
+        Image cloudsImage = ResourceImages.load("/mcj2me/clouds.png");
         setupStage = "creating terrain Image2D/Texture2D";
         Image2D image2D = new Image2D(Image2D.RGBA, atlas);
         Texture2D texture = new Texture2D(image2D);
@@ -453,8 +459,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         setupStage = "building block-particle meshes";
         setupBlockParticles(atlas);
         world.addChild(blockParticleGroup);
-        setupStage = "creating mob scenes";
+        setupStage = "loading passive mob textures";
         passiveMobs = new PassiveMob(world, terrain, cameraX, cameraZ);
+        setupStage = "loading hostile mob texture";
         hostileMobs = new HostileMob(world, terrain, cameraX, cameraZ);
         setupStage = "updating camera and building initial terrain chunks";
         updateCamera();
