@@ -155,10 +155,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         "PINK WOOL", "GRAY WOOL", "LIGHT GRAY WOOL", "CYAN WOOL", "PURPLE WOOL", "BLUE WOOL",
         "BROWN WOOL", "GREEN WOOL", "RED WOOL", "BLACK WOOL", "WATER BUCKET", "EMPTY BUCKET"
     };
+    // Creative-style starter inventory: every block stack starts at 64.
+    // Buckets remain individual items; mining can never grow a stack past 64.
     private final int[] inventory = {
-        64, 64, 64, 64, 64, 16, 8, 8, 4, 0, 8, 64, 32, 32, 16, 8,
-        16, 4, 4, 4, 2, 8, 8, 8,
-        16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 1, 0
+        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+        64, 64, 64, 64, 64, 64, 64, 64,
+        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 1, 0
     };
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
     private int tntFuseTicks = 0, tntX = -1, tntZ = -1, tntFlashCounter = 0;
