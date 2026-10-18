@@ -350,7 +350,7 @@ final class TerrainGenerator {
         n = getHeight(x + 1, z); if (n < min) min = n; if (n > max) max = n;
         n = getHeight(x, z - 1); if (n < min) min = n; if (n > max) max = n;
         n = getHeight(x, z + 1); if (n < min) min = n; if (n > max) max = n;
-        return max - min <= 2 && (hash(x * 17 + 31, z * 23 - 19) & 31) < 3;
+        return max - min <= 2 && (hash(x * 17 + 31, z * 23 - 19) & 63) < 3;
     }
 
     boolean isTreeAt(int x, int z) {
@@ -387,7 +387,7 @@ final class TerrainGenerator {
         if (x < 1 || z < 1 || x >= SIZE - 1 || z >= SIZE - 1) return -1;
         if (getTopType(x, z) != BLOCK_GRASS || isWaterAt(x, z) || isTreeAt(x, z)) return -1;
         int chance = hash(x * 29 + 53, z * 31 - 17) & 63;
-        if (chance > 5) return -1;
+        if (chance > 2) return -1;
         // Avoid a flower on a steep edge or directly under a tree canopy.
         int h = getHeight(x, z);
         if (Math.abs(h - getHeight(x - 1, z)) > 1 ||
