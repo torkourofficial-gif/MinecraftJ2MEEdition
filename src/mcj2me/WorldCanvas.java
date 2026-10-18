@@ -1438,7 +1438,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             case 6:  sx = 384; sy = 144; break;  // iron ore
             case 7:  sx = 432; sy = 144; break;  // gold ore
             case 8:  sx = 0;   sy = 192; break;  // diamond ore
-            case 9:  sx = 144; sy = 48; break;   // bedrock
+            case 9:  return createTerrainBlockIcon(terrain, BLOCK_TILE_X[block], BLOCK_TILE_Y[block]); // bedrock
             case 10: sx = 288; sy = 336; break;  // TNT
             case 11: sx = 240; sy = 0; break;    // oak planks
             case 12: sx = 48;  sy = 48; break;   // sand
@@ -1450,13 +1450,18 @@ final class WorldCanvas extends Canvas implements Runnable {
             case 18: return createTerrainBlockIcon(terrain, BLOCK_TILE_X[block], BLOCK_TILE_Y[block]);
             case 19: return createTerrainBlockIcon(terrain, BLOCK_TILE_X[block], BLOCK_TILE_Y[block]);
             case 21: sx = 192; sy = 144; break;  // iron block
-            case 22: sx = 144; sy = 144; break;  // gold block
-            case 23: sx = 240; sy = 144; break;  // diamond block
+            case 22: sx = 144; sy = 192; break;  // gold block
+            case 23: sx = 240; sy = 192; break;  // diamond block
             default:
                 if (block >= 24 && block < 40) {
-                    // Wool tiles are generated in row 7 of textures.png from
-                    // the original white-wool tile, one exact 16x16 tile each.
-                    return createTerrainBlockIcon(terrain, block - 24, 7);
+                    // Wool cubes in gui_blocks.png, mapped in classic dye order:
+                    // white, orange, magenta, light blue, yellow, lime, pink,
+                    // gray, light gray, cyan, purple, blue, brown, green, red, black.
+                    final int[] woolX = {96, 432, 384, 336, 288, 240, 192, 144,
+                                         336, 288, 240, 192, 144, 96, 48, 0};
+                    final int[] woolY = {240, 240, 240, 240, 240, 240, 240, 240,
+                                         288, 288, 288, 288, 288, 288, 288, 288};
+                    return createGuiBlockIcon(woolX[block - 24], woolY[block - 24]);
                 }
                 return createTerrainBlockIcon(terrain, BLOCK_TILE_X[block], BLOCK_TILE_Y[block]);
         }
