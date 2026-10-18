@@ -345,7 +345,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         guiImage = Image.createImage("/mcj2me/gui.png");
         guiBlocksImage = Image.createImage("/mcj2me/gui_blocks.png");
         inventoryImage = Image.createImage("/mcj2me/inventory.png");
-        Image itemsImage = Image.createImage("/items.png");
+        Image itemsImage = Image.createImage("/mcj2me/items.png");
         blockIcons[0] = createGuiBlockIcon(GUI_ICON_X[0], GUI_ICON_Y[0]);
         blockIcons[1] = createGuiBlockIcon(GUI_ICON_X[1], GUI_ICON_Y[1]);
         blockIcons[2] = createGuiBlockIcon(GUI_ICON_X[2], GUI_ICON_Y[2]);
@@ -355,7 +355,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             blockIcons[bi] = createGuiBlockInventoryIcon(bi, atlas);
         }
         // The classic item atlas supplies the actual door and bucket sprites.
-        blockIcons[BLOCK_DOOR] = createItemsIcon(itemsImage, 0, 16);
+        blockIcons[BLOCK_DOOR] = createItemsIcon(itemsImage, 0, 1);
         blockIcons[ITEM_WATER_BUCKET] = createItemsIcon(itemsImage, 3, 0);
         blockIcons[ITEM_EMPTY_BUCKET] = createItemsIcon(itemsImage, 1, 0);
         Image cloudsImage = Image.createImage("/mcj2me/clouds.png");
