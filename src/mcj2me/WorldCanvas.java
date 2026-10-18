@@ -1675,14 +1675,15 @@ final class WorldCanvas extends Canvas implements Runnable {
                 int flowerType = terrain.getFlowerType(x, z);
                 if (flowerType >= 0) {
                     int fx = BLOCK_TILE_X[flowerType], fy = BLOCK_TILE_Y[flowerType];
-                    // Two crossed, atlas-textured planes make classic flat flowers
-                    // visible from every camera direction without creating blocks.
+                    // Classic crossed billboards: two vertical diagonal planes
+                    // through the block center. Keep both planes; they are plant
+                    // geometry, not cube faces eligible for hidden-face culling.
                     vertex = addQuad(positions, texCoords, colors, stripLengths,
-                        vertex, strip++, x, h, z, x + 1, h, z,
-                        x, h + 1, z + 1, x + 1, h + 1, z + 1, fx, fy);
+                        vertex, strip++, x, h, z, x + 1, h, z + 1,
+                        x, h + 1, z, x + 1, h + 1, z + 1, fx, fy);
                     vertex = addQuad(positions, texCoords, colors, stripLengths,
-                        vertex, strip++, x + 1, h, z, x + 1, h, z + 1,
-                        x, h + 1, z, x, h + 1, z + 1, fx, fy);
+                        vertex, strip++, x + 1, h, z, x, h, z + 1,
+                        x + 1, h + 1, z, x, h + 1, z + 1, fx, fy);
                 }
                 if (terrain.isTreeAt(x, z)) {
                     int base = h, th = terrain.getTreeHeight(x, z), y;
