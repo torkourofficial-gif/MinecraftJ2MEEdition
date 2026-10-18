@@ -32,6 +32,16 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
             Image atlas = ResourceImages.load("/mcj2me/textures.png");
             int[] pixels = new int[16 * 16];
             atlas.getRGB(pixels, 0, 16, 2 * 16, 0, 16, 16);
+            // MIDP Graphics.setColor() does not provide reliable alpha compositing.
+            // Darken the tile pixels directly instead of drawing an opaque overlay.
+            for (int i = 0; i < pixels.length; i++) {
+                int pixel = pixels[i];
+                int a = (pixel >>> 24) & 0xFF;
+                int red = (((pixel >>> 16) & 0xFF) * 72) / 100;
+                int green = (((pixel >>> 8) & 0xFF) * 72) / 100;
+                int blue = ((pixel & 0xFF) * 72) / 100;
+                pixels[i] = (a << 24) | (red << 16) | (green << 8) | blue;
+            }
             dirtTile = Image.createRGBImage(pixels, 16, 16, true);
         } catch (Exception ignored) { }
     }
@@ -57,9 +67,6 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
         } else {
             g.setColor(0x6B4326); g.fillRect(0, 0, w, h);
         }
-        // Classic Minecraft-style dim overlay: keep the dirt texture visible, but subdued.
-        g.setColor(0x44000000);
-        g.fillRect(0, 0, w, h);
         g.setColor(0xFFFFFF);
         if (creating) {
             g.drawString("Create New World", w / 2, 14, Graphics.TOP | Graphics.HCENTER);
