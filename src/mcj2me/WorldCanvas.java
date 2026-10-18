@@ -1845,10 +1845,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (!isTreeVoxelAt(x + 1, y, z)) faces++;
         if (!isTreeVoxelAt(x - 1, y, z)) faces++;
         if (!isTreeVoxelAt(x, y, z - 1)) faces++;
-        // Leaf textures contain transparent pixels, so even a face touching
-        // another leaf must be emitted: otherwise the canopy can show a hole
-        // from below through the transparent parts of the neighboring block.
-        if (terrain.isLeafBlockAt(x, y, z) || !isTreeVoxelAt(x, y - 1, z)) faces++;
+        // Cull every face shared by adjacent tree voxels, including leaves.
+        // Alpha-test handles transparent pixels inside an exposed leaf face;
+        // it must not force internal lateral/underside faces to be rendered.
+        if (!isTreeVoxelAt(x, y - 1, z)) faces++;
         return faces;
     }
 
@@ -1881,10 +1881,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
                 x, y, z, x, y+1, z, x+1, y, z, x+1, y+1, z, tx, ty);
         }
-        if ((tx == 4 && ty == 3) || !isTreeVoxelAt(x, y - 1, z)) {
-            // Always draw leaf undersides, even when another leaf is directly
-            // below. Leaf textures are transparent, so culling this internal
-            // face can leave visible gaps when viewed from underneath.
+        if (!isTreeVoxelAt(x, y - 1, z)) {
             vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
                 x, y, z, x+1, y, z, x, y, z+1, x+1, y, z+1, tx, ty);
         }
@@ -2644,6 +2641,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         float dty = dy == 0 ? Float.MAX_VALUE : Math.abs(1.0f / dy);
         float dtz = dz == 0 ? Float.MAX_VALUE : Math.abs(1.0f / dz);
         float distance = 0.0f;
+        // Track which voxel boundary was crossed to enter the current cell.
+        // Horizontal entry means the player is aiming at a side; vertical entry
+        // means the top/bottom face. This is important for mining cliff walls.
+        int enteredAxis = -1; // 0=X, 1=Y, 2=Z
         while (distance <= 5.0f) {
             if (x >= 1 && z >= 1 && x < TerrainGenerator.SIZE - 1
                     && z < TerrainGenerator.SIZE - 1 && y >= 0) {
@@ -2652,13 +2653,17 @@ final class WorldCanvas extends Canvas implements Runnable {
                     surfaceHitResult[0] = x;
                     surfaceHitResult[1] = z;
                     surfaceHitResult[2] = y;
-                    surfaceHitResult[3] = (y == surface - 1) ? 0 : 1;
+                    surfaceHitResult[3] = (enteredAxis == 0 || enteredAxis == 2) ? 1 : 0;
                     return surfaceHitResult;
                 }
             }
-            if (tx <= ty && tx <= tz) { distance = tx; tx += dtx; x += sx; }
-            else if (ty <= tz) { distance = ty; ty += dty; y += sy; }
-            else { distance = tz; tz += dtz; z += sz; }
+            if (tx <= ty && tx <= tz) {
+                distance = tx; tx += dtx; x += sx; enteredAxis = 0;
+            } else if (ty <= tz) {
+                distance = ty; ty += dty; y += sy; enteredAxis = 1;
+            } else {
+                distance = tz; tz += dtz; z += sz; enteredAxis = 2;
+            }
         }
         return null;
     }
