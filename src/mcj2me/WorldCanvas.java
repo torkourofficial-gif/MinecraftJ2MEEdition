@@ -369,13 +369,14 @@ final class WorldCanvas extends Canvas implements Runnable {
             setupStage = "creating inventory icon " + bi + " (" + BLOCK_NAMES[bi] + ")";
             blockIcons[bi] = createGuiBlockInventoryIcon(bi, atlas);
         }
-        // The classic item atlas supplies the actual door and bucket sprites.
+        // Coordinates are 16x16 cells in the 256x256 classic items atlas.
+        // Keep these distinct from the armor icons near the top-left of the sheet.
         setupStage = "creating inventory icon 20 (door from items.png)";
-        blockIcons[BLOCK_DOOR] = createItemsIcon(itemsImage, 0, 1);
+        blockIcons[BLOCK_DOOR] = createItemsIcon(itemsImage, 1, 2);
         setupStage = "creating inventory icon 40 (water bucket from items.png)";
-        blockIcons[ITEM_WATER_BUCKET] = createItemsIcon(itemsImage, 3, 0);
+        blockIcons[ITEM_WATER_BUCKET] = createItemsIcon(itemsImage, 11, 4);
         setupStage = "creating inventory icon 41 (empty bucket from items.png)";
-        blockIcons[ITEM_EMPTY_BUCKET] = createItemsIcon(itemsImage, 1, 0);
+        blockIcons[ITEM_EMPTY_BUCKET] = createItemsIcon(itemsImage, 10, 4);
         setupStage = "loading /mcj2me/clouds.png";
         Image cloudsImage = ResourceImages.load("/mcj2me/clouds.png");
         setupStage = "creating terrain Image2D/Texture2D";
