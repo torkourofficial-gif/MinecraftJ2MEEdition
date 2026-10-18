@@ -1596,6 +1596,8 @@ final class WorldCanvas extends Canvas implements Runnable {
                 nh = terrain.getHeight(x + 1, z); if (h > nh) quads += h - nh;
                 nh = terrain.getHeight(x, z - 1); if (h > nh) quads += h - nh;
                 nh = terrain.getHeight(x, z + 1); if (h > nh) quads += h - nh;
+                int flowerType = terrain.getFlowerType(x, z);
+                if (flowerType >= 0) quads += 2;
                 if (terrain.isTreeAt(x, z)) {
                     int treeBase = h;
                     int treeHeight = terrain.getTreeHeight(x, z);
@@ -1654,6 +1656,18 @@ final class WorldCanvas extends Canvas implements Runnable {
                     vertex = addQuad(positions, texCoords, colors, stripLengths,
                         vertex, strip++, x + 1, sy, z + 1, x + 1, sy + 1, z + 1,
                         x, sy, z + 1, x, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h), sideTileY(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h));
+                }
+                int flowerType = terrain.getFlowerType(x, z);
+                if (flowerType >= 0) {
+                    int fx = BLOCK_TILE_X[flowerType], fy = BLOCK_TILE_Y[flowerType];
+                    // Two crossed, atlas-textured planes make classic flat flowers
+                    // visible from every camera direction without creating blocks.
+                    vertex = addQuad(positions, texCoords, colors, stripLengths,
+                        vertex, strip++, x, h, z, x + 1, h, z,
+                        x, h + 1, z + 1, x + 1, h + 1, z + 1, fx, fy);
+                    vertex = addQuad(positions, texCoords, colors, stripLengths,
+                        vertex, strip++, x + 1, h, z, x + 1, h, z + 1,
+                        x, h + 1, z, x, h + 1, z + 1, fx, fy);
                 }
                 if (terrain.isTreeAt(x, z)) {
                     int base = h, th = terrain.getTreeHeight(x, z), y;
