@@ -22,7 +22,7 @@ final class TitleScreen extends Canvas implements Runnable {
     TitleScreen(IndevViewerMIDlet midlet) {
         owner=midlet;
         setFullScreenMode(true);
-        try { skybox=Image.createImage("/mcj2me/skybox.png"); titleImage=Image.createImage("/mcj2me/title.png"); }
+        try { skybox=ResourceImages.load("/mcj2me/skybox.png"); titleImage=ResourceImages.load("/mcj2me/title.png"); }
         catch (Exception e) { /* Menu remains usable if an image is missing. */ }
     }
     synchronized void showPauseMenu() {
