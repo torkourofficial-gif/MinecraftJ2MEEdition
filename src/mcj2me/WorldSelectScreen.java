@@ -57,7 +57,6 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
         } else {
             g.setColor(0x6B4326); g.fillRect(0, 0, w, h);
         }
-        g.setColor(0x66000000); g.fillRect(0, 0, w, h);
         g.setColor(0xFFFFFF);
         if (creating) {
             g.drawString("Create New World", w / 2, 14, Graphics.TOP | Graphics.HCENTER);
