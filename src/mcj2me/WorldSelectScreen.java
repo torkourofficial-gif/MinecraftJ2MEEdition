@@ -57,6 +57,9 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
         } else {
             g.setColor(0x6B4326); g.fillRect(0, 0, w, h);
         }
+        // Classic Minecraft-style dim overlay: keep the dirt texture visible, but subdued.
+        g.setColor(0x44000000);
+        g.fillRect(0, 0, w, h);
         g.setColor(0xFFFFFF);
         if (creating) {
             g.drawString("Create New World", w / 2, 14, Graphics.TOP | Graphics.HCENTER);
