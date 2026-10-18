@@ -19,6 +19,8 @@ final class TerrainGenerator {
     // Original generated surface is retained so strata do not reset when mined.
     private final short[][] originalHeights = new short[SIZE][SIZE];
     private final byte[][] topTypes = new byte[SIZE][SIZE];
+    // Immutable generated surface material; player edits must not rewrite geology below it.
+    private final byte[][] originalTopTypes = new byte[SIZE][SIZE];
     private final boolean[][] waterBasins = new boolean[SIZE][SIZE];
     // Player-placed water uses a per-column surface level; zero means dry.
     private final short[][] placedWaterLevels = new short[SIZE][SIZE];
@@ -57,6 +59,7 @@ final class TerrainGenerator {
         lowerWorldEdgesTowardSea();
         for (int x = 0; x < SIZE; x++) {
             System.arraycopy(heights[x], 0, originalHeights[x], 0, SIZE);
+            System.arraycopy(topTypes[x], 0, originalTopTypes[x], 0, SIZE);
         }
     }
 
@@ -334,7 +337,7 @@ final class TerrainGenerator {
         int depth = originalHeights[x][z] - y;
         // Dirt layers belong only beneath a grass surface; other surface
         // materials must not turn their entire subsurface into dirt.
-        if (topTypes[x][z] == BLOCK_GRASS && depth > 0 && depth <= 3)
+        if (originalTopTypes[x][z] == BLOCK_GRASS && depth > 0 && depth <= 3)
             return BLOCK_DIRT;
         int oreHash = hash(x + y * 37 + 101, z - y * 19 - 53) & 2047;
         if (y < 18 && oreHash < 4) return BLOCK_DIAMOND_ORE;
