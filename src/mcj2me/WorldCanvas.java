@@ -170,8 +170,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
     private int tntFuseTicks = 0, tntX = -1, tntZ = -1, tntFlashCounter = 0;
     private boolean tntFlashOn = false;
-    private static final int BLOCK_PARTICLE_COUNT = 12;
-    private static final int BLOCK_PARTICLE_LIFE = 20;
+    private static final int BLOCK_PARTICLE_COUNT = 16;
+    private static final int BLOCK_PARTICLE_LIFE = 26;
     private final float[] blockParticleX = new float[BLOCK_PARTICLE_COUNT];
     private final float[] blockParticleY = new float[BLOCK_PARTICLE_COUNT];
     private final float[] blockParticleZ = new float[BLOCK_PARTICLE_COUNT];
@@ -2019,19 +2019,31 @@ final class WorldCanvas extends Canvas implements Runnable {
      * patch from its block's atlas tile, like classic Minecraft block debris.
      */
     private void setupBlockParticles(Image atlas) {
+        // Six independently textured cube faces: classic Minecraft debris is
+        // a tiny block fragment, not a flat billboard.
         short[] positions = {
-            -1, -1, 0,
-            -1,  1, 0,
-             1, -1, 0,
-             1,  1, 0
+            -1,-1,-1, -1, 1,-1, 1,-1,-1, 1,1,-1,
+             1,-1, 1, 1,1, 1, -1,-1, 1, -1,1, 1,
+            -1,-1, 1, -1,1, 1, -1,-1,-1, -1,1,-1,
+             1,-1,-1, 1,1,-1, 1,-1, 1, 1,1, 1,
+            -1,1,-1, -1,1, 1, 1,1,-1, 1,1, 1,
+            -1,-1, 1, -1,-1,-1, 1,-1, 1, 1,-1,-1
         };
-        short[] texCoords = {0, 0, 0, 1, 1, 0, 1, 1};
-        int[] indices = {0, 1, 2, 3};
-        int[] stripLengths = {4};
-        VertexArray vertexArray = new VertexArray(4, 3, 2);
-        vertexArray.set(0, 4, positions);
-        VertexArray texArray = new VertexArray(4, 2, 2);
-        texArray.set(0, 4, texCoords);
+        short[] texCoords = new short[48];
+        for (int face = 0; face < 6; face++) {
+            int p = face * 8;
+            texCoords[p] = 0; texCoords[p + 1] = 0;
+            texCoords[p + 2] = 0; texCoords[p + 3] = 1;
+            texCoords[p + 4] = 1; texCoords[p + 5] = 0;
+            texCoords[p + 6] = 1; texCoords[p + 7] = 1;
+        }
+        int[] indices = new int[24];
+        int[] stripLengths = {4, 4, 4, 4, 4, 4};
+        for (int i = 0; i < indices.length; i++) indices[i] = i;
+        VertexArray vertexArray = new VertexArray(24, 3, 2);
+        vertexArray.set(0, 24, positions);
+        VertexArray texArray = new VertexArray(24, 2, 2);
+        texArray.set(0, 24, texCoords);
         blockParticleBuffer = new VertexBuffer();
         blockParticleBuffer.setPositions(vertexArray, 0.5f, null);
         blockParticleBuffer.setTexCoords(0, texArray, 1.0f, null);
@@ -2081,16 +2093,20 @@ final class WorldCanvas extends Canvas implements Runnable {
         int type = blockType;
         if (type < 0 || type >= blockParticleAppearances.length) type = 1;
         for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
-            double angle = (Math.PI * 2.0 * i / BLOCK_PARTICLE_COUNT)
-                + ((i % 3) - 1) * 0.17;
-            float horizontalSpeed = 0.035f + (i % 4) * 0.012f;
-            blockParticleX[i] = x;
-            blockParticleY[i] = y;
-            blockParticleZ[i] = z;
+            // Fragments begin at different points inside the mined voxel and
+            // burst outward with a little random variation, like vanilla.
+            float dx = (float) Math.random() - 0.5f;
+            float dy = (float) Math.random() - 0.5f;
+            float dz = (float) Math.random() - 0.5f;
+            double angle = Math.atan2(dz, dx);
+            float horizontalSpeed = 0.025f + (float) Math.random() * 0.065f;
+            blockParticleX[i] = x + dx * 0.72f;
+            blockParticleY[i] = y + dy * 0.72f;
+            blockParticleZ[i] = z + dz * 0.72f;
             blockParticleVX[i] = (float) Math.cos(angle) * horizontalSpeed;
             blockParticleVZ[i] = (float) Math.sin(angle) * horizontalSpeed;
-            blockParticleVY[i] = 0.045f + (i % 4) * 0.012f;
-            blockParticleSize[i] = 0.07f + (i % 3) * 0.025f;
+            blockParticleVY[i] = 0.015f + (float) Math.random() * 0.085f;
+            blockParticleSize[i] = 0.045f + (float) Math.random() * 0.035f;
             blockParticleMeshes[i].setAppearance(0, blockParticleAppearances[type]);
             blockParticleMeshes[i].setScale(blockParticleSize[i], blockParticleSize[i],
                                              blockParticleSize[i]);
@@ -2157,21 +2173,35 @@ final class WorldCanvas extends Canvas implements Runnable {
             return;
         }
         for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
+            float previousY = blockParticleY[i];
             blockParticleX[i] += blockParticleVX[i];
             blockParticleY[i] += blockParticleVY[i];
             blockParticleZ[i] += blockParticleVZ[i];
-            blockParticleVY[i] -= 0.0045f;
-            int ground = terrain.getHeight((int) blockParticleX[i], (int) blockParticleZ[i]);
-            if (blockParticleY[i] < ground + 0.035f) {
-                blockParticleY[i] = ground + 0.035f;
-                blockParticleVY[i] = 0.0f;
-                blockParticleVX[i] *= 0.72f;
-                blockParticleVZ[i] *= 0.72f;
+            // Gravity, air drag and a tiny amount of spin. Do not use getHeight:
+            // that only describes the old heightmap surface and breaks particles
+            // inside caves, mined holes, and edited voxel columns.
+            blockParticleVY[i] -= 0.008f;
+            blockParticleVX[i] *= 0.985f;
+            blockParticleVZ[i] *= 0.985f;
+
+            int px = (int) Math.floor(blockParticleX[i]);
+            int pz = (int) Math.floor(blockParticleZ[i]);
+            int belowY = (int) Math.floor(blockParticleY[i]);
+            if (blockParticleVY[i] < 0.0f && previousY >= belowY + 1.0f
+                    && terrain.getBlockTypeAt(px, belowY, pz) >= 0) {
+                // Land on the actual solid voxel, including exposed blocks below
+                // a mined gap. A short bounce is closer to the original game.
+                blockParticleY[i] = belowY + 1.015f;
+                blockParticleVY[i] = -blockParticleVY[i] * 0.22f;
+                blockParticleVX[i] *= 0.62f;
+                blockParticleVZ[i] *= 0.62f;
+                if (blockParticleVY[i] < 0.012f) blockParticleVY[i] = 0.0f;
             }
             blockParticleMeshes[i].setTranslation(blockParticleX[i],
                 blockParticleY[i], blockParticleZ[i]);
-            blockParticleMeshes[i].setOrientation((i * 37 + (BLOCK_PARTICLE_LIFE - particleTicks) * 13)
-                % 360, 1.0f, 1.0f, 0.5f);
+            int age = BLOCK_PARTICLE_LIFE - particleTicks;
+            blockParticleMeshes[i].setOrientation((i * 37 + age * (17 + (i % 5) * 3))
+                % 360, 1.0f, 0.7f + (i % 4) * 0.1f, 0.5f);
         }
         particleTicks--;
         if (particleTicks <= 0) {
