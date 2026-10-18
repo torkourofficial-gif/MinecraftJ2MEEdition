@@ -267,7 +267,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         selectedSlot = in.readInt();
         if (selectedSlot < 0 || selectedSlot >= inventory.length) selectedSlot = 0;
         int invCount = in.readInt();
-        if (invCount < inventory.length - 1 || invCount > inventory.length)
+        // Older save records can contain the pre-bucket inventory (40 slots).
+        // Keep defaults for newly added slots, then overwrite slots present in
+        // the save so water buckets and the placed-water state remain compatible.
+        if (invCount < 0 || invCount > inventory.length)
             throw new Exception("Invalid saved inventory");
         for (int i = 0; i < invCount; i++) inventory[i] = Math.max(0, in.readInt());
         int savedCount = in.readInt();
@@ -350,18 +353,26 @@ final class WorldCanvas extends Canvas implements Runnable {
         inventoryImage = ResourceImages.load("/mcj2me/inventory.png");
         setupStage = "loading /mcj2me/items.png";
         Image itemsImage = ResourceImages.load("/mcj2me/items.png");
-        setupStage = "creating inventory icons";
+        setupStage = "creating inventory icon 0 (grass)";
         blockIcons[0] = createGuiBlockIcon(GUI_ICON_X[0], GUI_ICON_Y[0]);
+        setupStage = "creating inventory icon 1 (dirt)";
         blockIcons[1] = createGuiBlockIcon(GUI_ICON_X[1], GUI_ICON_Y[1]);
+        setupStage = "creating inventory icon 2 (stone)";
         blockIcons[2] = createGuiBlockIcon(GUI_ICON_X[2], GUI_ICON_Y[2]);
+        setupStage = "creating inventory icon 3 (wood)";
         blockIcons[3] = createGuiBlockIcon(GUI_ICON_X[3], GUI_ICON_Y[3]);
+        setupStage = "creating inventory icon 4 (leaves)";
         blockIcons[4] = createGuiBlockIcon(GUI_ICON_X[4], GUI_ICON_Y[4]);
         for (int bi = 5; bi < 40; bi++) {
+            setupStage = "creating inventory icon " + bi + " (" + BLOCK_NAMES[bi] + ")";
             blockIcons[bi] = createGuiBlockInventoryIcon(bi, atlas);
         }
         // The classic item atlas supplies the actual door and bucket sprites.
+        setupStage = "creating inventory icon 20 (door from items.png)";
         blockIcons[BLOCK_DOOR] = createItemsIcon(itemsImage, 0, 1);
+        setupStage = "creating inventory icon 40 (water bucket from items.png)";
         blockIcons[ITEM_WATER_BUCKET] = createItemsIcon(itemsImage, 3, 0);
+        setupStage = "creating inventory icon 41 (empty bucket from items.png)";
         blockIcons[ITEM_EMPTY_BUCKET] = createItemsIcon(itemsImage, 1, 0);
         setupStage = "loading /mcj2me/clouds.png";
         Image cloudsImage = ResourceImages.load("/mcj2me/clouds.png");
@@ -1454,6 +1465,19 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private Image createGuiBlockIcon(int sourceX, int sourceY) {
+        // Some gui_blocks.png atlas coordinates point beyond the 512x512
+        // sheet's right edge. Clamp the crop to a complete 48x48 cell before
+        // getRGB(), which otherwise throws IllegalArgumentException on phones.
+        int sheetWidth = guiBlocksImage.getWidth();
+        int sheetHeight = guiBlocksImage.getHeight();
+        if (sheetWidth < 1 || sheetHeight < 1) {
+            throw new IllegalArgumentException("gui_blocks.png has invalid dimensions");
+        }
+        if (sourceX < 0) sourceX = 0;
+        if (sourceY < 0) sourceY = 0;
+        if (sourceX + 48 > sheetWidth) sourceX = Math.max(0, sheetWidth - 48);
+        if (sourceY + 48 > sheetHeight) sourceY = Math.max(0, sheetHeight - 48);
+
         int[] source = new int[48 * 48];
         guiBlocksImage.getRGB(source, 0, 48, sourceX, sourceY, 48, 48);
         int[] scaled = new int[16 * 16];
