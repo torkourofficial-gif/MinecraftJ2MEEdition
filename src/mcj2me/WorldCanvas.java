@@ -2019,31 +2019,21 @@ final class WorldCanvas extends Canvas implements Runnable {
      * patch from its block's atlas tile, like classic Minecraft block debris.
      */
     private void setupBlockParticles(Image atlas) {
-        // Six independently textured cube faces: classic Minecraft debris is
-        // a tiny block fragment, not a flat billboard.
+        // Minecraft-style debris uses a single flat, camera-facing sprite.
+        // It falls and slides, but never spins like a miniature cube.
         short[] positions = {
-            -1,-1,-1, -1, 1,-1, 1,-1,-1, 1,1,-1,
-             1,-1, 1, 1,1, 1, -1,-1, 1, -1,1, 1,
-            -1,-1, 1, -1,1, 1, -1,-1,-1, -1,1,-1,
-             1,-1,-1, 1,1,-1, 1,-1, 1, 1,1, 1,
-            -1,1,-1, -1,1, 1, 1,1,-1, 1,1, 1,
-            -1,-1, 1, -1,-1,-1, 1,-1, 1, 1,-1,-1
+            -1, -1, 0,
+            -1,  1, 0,
+             1, -1, 0,
+             1,  1, 0
         };
-        short[] texCoords = new short[48];
-        for (int face = 0; face < 6; face++) {
-            int p = face * 8;
-            texCoords[p] = 0; texCoords[p + 1] = 0;
-            texCoords[p + 2] = 0; texCoords[p + 3] = 1;
-            texCoords[p + 4] = 1; texCoords[p + 5] = 0;
-            texCoords[p + 6] = 1; texCoords[p + 7] = 1;
-        }
-        int[] indices = new int[24];
-        int[] stripLengths = {4, 4, 4, 4, 4, 4};
-        for (int i = 0; i < indices.length; i++) indices[i] = i;
-        VertexArray vertexArray = new VertexArray(24, 3, 2);
-        vertexArray.set(0, 24, positions);
-        VertexArray texArray = new VertexArray(24, 2, 2);
-        texArray.set(0, 24, texCoords);
+        short[] texCoords = {0, 0, 0, 1, 1, 0, 1, 1};
+        int[] indices = {0, 1, 2, 3};
+        int[] stripLengths = {4};
+        VertexArray vertexArray = new VertexArray(4, 3, 2);
+        vertexArray.set(0, 4, positions);
+        VertexArray texArray = new VertexArray(4, 2, 2);
+        texArray.set(0, 4, texCoords);
         blockParticleBuffer = new VertexBuffer();
         blockParticleBuffer.setPositions(vertexArray, 0.5f, null);
         blockParticleBuffer.setTexCoords(0, texArray, 1.0f, null);
@@ -2110,8 +2100,8 @@ final class WorldCanvas extends Canvas implements Runnable {
             blockParticleMeshes[i].setAppearance(0, blockParticleAppearances[type]);
             blockParticleMeshes[i].setScale(blockParticleSize[i], blockParticleSize[i],
                                              blockParticleSize[i]);
-            blockParticleMeshes[i].setOrientation((i * 37) % 360, 1.0f, 1.0f, 0.5f);
-            blockParticleMeshes[i].setTranslation(x, y, z);
+            blockParticleMeshes[i].setOrientation(0.0f, 0.0f, 1.0f, 0.0f);
+            blockParticleMeshes[i].setTranslation(blockParticleX[i], blockParticleY[i], blockParticleZ[i]);
             blockParticleMeshes[i].setRenderingEnable(true);
         }
         particleTicks = BLOCK_PARTICLE_LIFE;
@@ -2135,7 +2125,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             blockParticleMeshes[i].setScale(blockParticleSize[i], blockParticleSize[i],
                                              blockParticleSize[i]);
             blockParticleMeshes[i].setOrientation((i * 37) % 360, 1.0f, 1.0f, 0.5f);
-            blockParticleMeshes[i].setTranslation(xs[i], ys[i], zs[i]);
+            blockParticleMeshes[i].setTranslation(blockParticleX[i], blockParticleY[i], blockParticleZ[i]);
             blockParticleMeshes[i].setRenderingEnable(true);
         }
         particleTicks = BLOCK_PARTICLE_LIFE;
@@ -2157,7 +2147,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             blockParticleMeshes[i].setAppearance(0, mobDeathParticleAppearance);
             blockParticleMeshes[i].setScale(blockParticleSize[i], blockParticleSize[i],
                                              blockParticleSize[i]);
-            blockParticleMeshes[i].setOrientation((i * 31) % 360, 1.0f, 1.0f, 0.5f);
+            blockParticleMeshes[i].setOrientation(0.0f, 0.0f, 1.0f, 0.0f);
             blockParticleMeshes[i].setTranslation(x, y, z);
             blockParticleMeshes[i].setRenderingEnable(true);
         }
@@ -2199,9 +2189,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
             blockParticleMeshes[i].setTranslation(blockParticleX[i],
                 blockParticleY[i], blockParticleZ[i]);
-            int age = BLOCK_PARTICLE_LIFE - particleTicks;
-            blockParticleMeshes[i].setOrientation((i * 37 + age * (17 + (i % 5) * 3))
-                % 360, 1.0f, 0.7f + (i % 4) * 0.1f, 0.5f);
+            // Keep each sprite's orientation fixed throughout its fall.
         }
         particleTicks--;
         if (particleTicks <= 0) {
