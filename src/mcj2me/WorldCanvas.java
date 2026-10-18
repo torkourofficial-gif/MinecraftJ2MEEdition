@@ -1708,6 +1708,16 @@ final class WorldCanvas extends Canvas implements Runnable {
                 nh = terrain.getHeight(x + 1, z); if (h > nh) quads += h - nh;
                 nh = terrain.getHeight(x, z - 1); if (h > nh) quads += h - nh;
                 nh = terrain.getHeight(x, z + 1); if (h > nh) quads += h - nh;
+                // Each removed voxel on an exposed cliff removes its side quad.
+                int low, high, yy;
+                nh = terrain.getHeight(x - 1, z); low = nh; high = h;
+                for (yy = low; yy < high; yy++) if (terrain.isBlockRemoved(x, yy, z)) quads--;
+                nh = terrain.getHeight(x + 1, z); low = nh; high = h;
+                for (yy = low; yy < high; yy++) if (terrain.isBlockRemoved(x, yy, z)) quads--;
+                nh = terrain.getHeight(x, z - 1); low = nh; high = h;
+                for (yy = low; yy < high; yy++) if (terrain.isBlockRemoved(x, yy, z)) quads--;
+                nh = terrain.getHeight(x, z + 1); low = nh; high = h;
+                for (yy = low; yy < high; yy++) if (terrain.isBlockRemoved(x, yy, z)) quads--;
                 int flowerType = terrain.getFlowerType(x, z);
                 if (flowerType >= 0) quads += 2;
                 if (terrain.isTreeAt(x, z)) {
@@ -1747,24 +1757,28 @@ final class WorldCanvas extends Canvas implements Runnable {
                 h = terrain.getHeight(x, z);
                 int neighbor = terrain.getHeight(x - 1, z);
                 for (int sy = neighbor; sy < h; sy++) {
+                    if (terrain.isBlockRemoved(x, sy, z)) continue;
                     vertex = addQuad(positions, texCoords, colors, stripLengths,
                         vertex, strip++, x, sy, z + 1, x, sy + 1, z + 1,
                         x, sy, z, x, sy + 1, z, sideTile(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h), sideTileY(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h));
                 }
                 neighbor = terrain.getHeight(x + 1, z);
                 for (int sy = neighbor; sy < h; sy++) {
+                    if (terrain.isBlockRemoved(x, sy, z)) continue;
                     vertex = addQuad(positions, texCoords, colors, stripLengths,
                         vertex, strip++, x + 1, sy, z, x + 1, sy + 1, z,
                         x + 1, sy, z + 1, x + 1, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h), sideTileY(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h));
                 }
                 neighbor = terrain.getHeight(x, z - 1);
                 for (int sy = neighbor; sy < h; sy++) {
+                    if (terrain.isBlockRemoved(x, sy, z)) continue;
                     vertex = addQuad(positions, texCoords, colors, stripLengths,
                         vertex, strip++, x, sy, z, x, sy + 1, z,
                         x + 1, sy, z, x + 1, sy + 1, z, sideTile(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h), sideTileY(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h));
                 }
                 neighbor = terrain.getHeight(x, z + 1);
                 for (int sy = neighbor; sy < h; sy++) {
+                    if (terrain.isBlockRemoved(x, sy, z)) continue;
                     vertex = addQuad(positions, texCoords, colors, stripLengths,
                         vertex, strip++, x + 1, sy, z + 1, x + 1, sy + 1, z + 1,
                         x, sy, z + 1, x, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h), sideTileY(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h));
@@ -2271,19 +2285,14 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (type >= 0 && type < inventory.length && type != TerrainGenerator.BLOCK_BEDROCK && inventory[type] < 64) inventory[type]++;
         spawnBlockParticles(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
 
-        if (sideHit && blockY < h - 1) {
-            // A lower side block was struck. The height-map representation
-            // cannot make a cavity, so lower the column to that block's layer.
-            int newHeight = blockY + 1;
-            if (newHeight >= h) return;
-            terrain.setHeight(x, z, newHeight);
-            terrain.setTopType(x, z, type);
-        } else {
-            // The top block can also be hit through one of its four side faces.
-            // Do not reject it just because the side-hit height equals h - 1.
+        if (blockY == h - 1) {
+            // Surface mining reveals the next layer at the top.
             int nextType = terrain.getSubsurfaceType(x, h - 2, z);
             terrain.setHeight(x, z, h - 1);
             terrain.setTopType(x, z, nextType);
+        } else {
+            // Side mining removes only the targeted XYZ voxel.
+            if (!terrain.removeBlockAt(x, blockY, z)) return;
         }
         invalidateEditedArea(x, x, z, z);
         resolvePlayerAfterTerrainEdit();
@@ -2761,15 +2770,15 @@ final class WorldCanvas extends Canvas implements Runnable {
                     && z < TerrainGenerator.SIZE - 1 && y >= 0
                     && y < TerrainGenerator.HEIGHT) {
                 int surface = terrain.getHeight(x, z);
+                boolean occupied = y < surface && terrain.getBlockTypeAt(x, y, z) >= 0;
                 boolean topFace = enteredAxis == 1 && dy < 0.0f
-                    && y == surface - 1;
+                    && y == surface - 1 && occupied;
                 boolean sideFace = false;
 
-                if (enteredAxis == 0 || enteredAxis == 2) {
+                if (occupied && (enteredAxis == 0 || enteredAxis == 2)) {
                     int previousHeight = terrain.getHeight(previousX, previousZ);
-                    // A column occupies cells y < height; only the portion
-                    // above the previous column is an exposed vertical face.
-                    sideFace = y < surface && y >= previousHeight;
+                    int previousType = terrain.getBlockTypeAt(previousX, y, previousZ);
+                    sideFace = y < surface && (y >= previousHeight || previousType < 0);
                 }
 
                 if (topFace || sideFace) {
