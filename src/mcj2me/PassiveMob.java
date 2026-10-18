@@ -21,9 +21,9 @@ final class PassiveMob {
     PassiveMob(Group parent, TerrainGenerator terrain, float startX, float startZ) throws Exception {
         this.terrain = terrain;
         parent.addChild(group);
-        appearances[0] = textureAppearance(Image.createImage("/mcj2me/cow.png"));
-        appearances[1] = textureAppearance(Image.createImage("/mcj2me/pig.png"));
-        appearances[2] = textureAppearance(Image.createImage("/mcj2me/sheep.png"));
+        appearances[0] = textureAppearance(ResourceImages.load("/mcj2me/cow.png"));
+        appearances[1] = textureAppearance(ResourceImages.load("/mcj2me/pig.png"));
+        appearances[2] = textureAppearance(ResourceImages.load("/mcj2me/sheep.png"));
         getHurtAppearance();
         int[] types = {0, 1, 2, 0, 2};
         for (int i = 0; i < COUNT; i++) {
