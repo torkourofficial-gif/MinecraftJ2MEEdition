@@ -1412,10 +1412,10 @@ final class WorldCanvas extends Canvas implements Runnable {
             case 13: sx = 384; sy = 48; break;     // gravel
             case 14: sx = 288; sy = 0; break;      // bricks
             case 15: sx = 288; sy = 192; break;    // obsidian
-            case 16: return createItemsIcon(Image.createImage("/items.png"), 5, 0);
+            case 16: sx = 0; sy = 336; break;     // torch / utility icon
             case 17: sx = 0; sy = 192; break;      // yellow flower
             case 18: sx = 48; sy = 192; break;     // red flower
-            case 19: return createItemsIcon(Image.createImage("/items.png"), 0, 16);
+            case 19: sx = 96; sy = 336; break;     // sapling
             case 20: return createItemsIcon(Image.createImage("/items.png"), 0, 16);
             case 21: sx = 192; sy = 144; break;    // iron block
             case 22: sx = 144; sy = 144; break;    // gold block
@@ -2352,15 +2352,15 @@ final class WorldCanvas extends Canvas implements Runnable {
             return;
         }
         if (selectedSlot < 0 || selectedSlot >= inventory.length || inventory[selectedSlot] <= 0) return;
+        if (selectedSlot == ITEM_EMPTY_BUCKET) {
+            collectWaterBucket();
+            return;
+        }
         int[] hit = raycastSurface();
         if (hit == null) return;
         int x = hit[0], z = hit[1], h = terrain.getHeight(x, z);
         if (selectedSlot == ITEM_WATER_BUCKET) {
             placeWaterBucket(x, z, h);
-            return;
-        }
-        if (selectedSlot == ITEM_EMPTY_BUCKET) {
-            collectWaterBucket();
             return;
         }
         if (selectedSlot >= BLOCK_TORCH && selectedSlot <= BLOCK_DOOR) {
