@@ -323,13 +323,57 @@ final class WorldCanvas extends Canvas implements Runnable {
     private void ensurePlayerNotBuried() {
         cameraX = clampWorldX(cameraX);
         cameraZ = clampWorldZ(cameraZ);
-        float groundY = terrain.getHeight((int) cameraX, (int) cameraZ) + 1.65f;
-        if (cameraY < groundY) {
+
+        int spawnX = (int) cameraX;
+        int spawnZ = (int) cameraZ;
+        if (!isPlayerColumnClear(spawnX, spawnZ)) {
+            // Search outwards for a clear surface column instead of leaving
+            // the camera inside terrain, trees, leaves, or water.
+            boolean found = false;
+            for (int radius = 1; radius <= 12 && !found; radius++) {
+                for (int dx = -radius; dx <= radius && !found; dx++) {
+                    for (int dz = -radius; dz <= radius; dz++) {
+                        if (Math.abs(dx) != radius && Math.abs(dz) != radius) continue;
+                        int x = spawnX + dx, z = spawnZ + dz;
+                        if (x < 4 || z < 4 || x >= TerrainGenerator.SIZE - 4 ||
+                            z >= TerrainGenerator.SIZE - 4) continue;
+                        if (isPlayerColumnClear(x, z)) {
+                            spawnX = x;
+                            spawnZ = z;
+                            cameraX = x + 0.5f;
+                            cameraZ = z + 0.5f;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        float groundY = terrain.getHeight(spawnX, spawnZ) + 1.65f;
+        if (cameraY < groundY || !isPlayerColumnClear(spawnX, spawnZ)) {
             cameraY = groundY;
             verticalVelocity = 0.0f;
             airborne = false;
         }
         updateCamera();
+    }
+
+    private boolean isPlayerColumnClear(int x, int z) {
+        if (x < 2 || z < 2 || x >= TerrainGenerator.SIZE - 2 ||
+            z >= TerrainGenerator.SIZE - 2) return false;
+        int ground = terrain.getHeight(x, z);
+        if (terrain.isWaterAt(x, z) || terrain.isTreeAt(x, z)) return false;
+        // The player occupies roughly two vertical cells above the ground.
+        for (int y = ground; y <= ground + 2; y++) {
+            if (terrain.isLeafBlockAt(x, y, z)) return false;
+        }
+        // Avoid sharp ledges where the camera can clip into a neighboring column.
+        if (Math.abs(ground - terrain.getHeight(x - 1, z)) > 1 ||
+            Math.abs(ground - terrain.getHeight(x + 1, z)) > 1 ||
+            Math.abs(ground - terrain.getHeight(x, z - 1)) > 1 ||
+            Math.abs(ground - terrain.getHeight(x, z + 1)) > 1) return false;
+        return true;
     }
 
     boolean hasSetupError() { return errorMessage != null; }
