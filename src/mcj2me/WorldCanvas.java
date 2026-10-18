@@ -131,11 +131,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         1, 1, 1,
         7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7
     };
-    // 48x48 block icons in gui_blocks.png, mapped to grass/dirt/stone/log/leaves.
-    // 48x48 cells verified against gui_blocks.png: grass, dirt, stone,
-    // oak log, and leaves. The sheet is a block-icon atlas, not textures.png.
-    private static final int[] GUI_ICON_X = {432, 144, 0, 288, 96};
-    private static final int[] GUI_ICON_Y = {0, 288, 0, 48, 288};
+    // Coordinates are pixel offsets in the 512x512 gui_blocks atlas.
+    // The first five entries are the actual grass, dirt, stone, oak-log and
+    // leaves cube icons; the remaining blocks are mapped by their own atlas cells.
+    private static final int[] GUI_ICON_X = {432, 384, 0, 288, 192};
+    private static final int[] GUI_ICON_Y = {0, 0, 0, 48, 0};
     private static final int BLOCK_TORCH = 16, BLOCK_YELLOW_FLOWER = 17, BLOCK_RED_FLOWER = 18, BLOCK_SAPLING = 19, BLOCK_DOOR = 20;
     private static final int ITEM_WATER_BUCKET = 40, ITEM_EMPTY_BUCKET = 41;
     private static final int MAX_WATER_SOURCES = 8;
@@ -1424,42 +1424,41 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private Image createGuiBlockInventoryIcon(int block, Image terrain) {
-        // gui_blocks.png stores pre-rendered 48x48 block icons in its upper
-        // section. Coordinates are pixel offsets in that sheet, not terrain tiles.
-        int sx = GUI_ICON_X[2], sy = GUI_ICON_Y[2];
+        // Match each inventory item to its own icon. gui_blocks.png contains
+        // 48x48 rendered cube icons on a 48px grid; terrain-only decorations
+        // and wool variants use the original 16x16 terrain atlas instead.
+        int sx = 0, sy = 0;
         switch (block) {
-            case 0: sx = 432; sy = 0; break;       // grass block
-            case 1: sx = 144; sy = 288; break;     // dirt
-            case 2: sx = 0; sy = 0; break;         // stone
-            case 3: sx = 288; sy = 48; break;      // oak log
-            case 4: sx = 96; sy = 288; break;      // leaves
-            case 5: sx = 384; sy = 144; break;     // coal ore
-            case 6: sx = 432; sy = 144; break;     // iron ore
-            case 7: sx = 480; sy = 144; break;     // gold ore
-            case 8: sx = 432; sy = 192; break;     // diamond ore
-            case 9: sx = 0; sy = 240; break;       // bedrock
-            case 10: sx = 288; sy = 288; break;    // TNT
-            case 11: sx = 240; sy = 0; break;      // planks
-            case 12: sx = 192; sy = 48; break;     // sand
-            case 13: sx = 384; sy = 48; break;     // gravel
-            case 14: sx = 288; sy = 0; break;      // bricks
-            case 15: sx = 288; sy = 192; break;    // obsidian
-            case 16: sx = 0; sy = 336; break;     // torch / utility icon
-            case 17: sx = 0; sy = 192; break;      // yellow flower
-            case 18: sx = 48; sy = 192; break;     // red flower
-            case 19: sx = 96; sy = 336; break;     // sapling
-            case 20: sx = 288; sy = 336; break;     // fallback door block icon
-            case 21: sx = 192; sy = 144; break;    // iron block
-            case 22: sx = 144; sy = 144; break;    // gold block
-            case 23: sx = 240; sy = 144; break;    // diamond block
+            case 0:  sx = 432; sy = 0; break;    // grass block
+            case 1:  sx = 384; sy = 0; break;    // dirt
+            case 2:  sx = 0;   sy = 0; break;    // stone
+            case 3:  sx = 288; sy = 48; break;   // oak log
+            case 4:  sx = 192; sy = 0; break;    // leaves
+            case 5:  sx = 336; sy = 144; break;  // coal ore
+            case 6:  sx = 384; sy = 144; break;  // iron ore
+            case 7:  sx = 432; sy = 144; break;  // gold ore
+            case 8:  sx = 0;   sy = 192; break;  // diamond ore
+            case 9:  sx = 144; sy = 48; break;   // bedrock
+            case 10: sx = 288; sy = 336; break;  // TNT
+            case 11: sx = 240; sy = 0; break;    // oak planks
+            case 12: sx = 48;  sy = 48; break;   // sand
+            case 13: sx = 240; sy = 48; break;   // gravel
+            case 14: sx = 288; sy = 0; break;    // bricks
+            case 15: sx = 336; sy = 192; break;  // obsidian
+            case 16: return createTerrainBlockIcon(terrain, BLOCK_TILE_X[block], BLOCK_TILE_Y[block]);
+            case 17: return createTerrainBlockIcon(terrain, BLOCK_TILE_X[block], BLOCK_TILE_Y[block]);
+            case 18: return createTerrainBlockIcon(terrain, BLOCK_TILE_X[block], BLOCK_TILE_Y[block]);
+            case 19: return createTerrainBlockIcon(terrain, BLOCK_TILE_X[block], BLOCK_TILE_Y[block]);
+            case 21: sx = 192; sy = 144; break;  // iron block
+            case 22: sx = 144; sy = 144; break;  // gold block
+            case 23: sx = 240; sy = 144; break;  // diamond block
             default:
                 if (block >= 24 && block < 40) {
-                    sx = (block - 24) * 48 % 480;
-                    sy = 240 + ((block - 24) / 10) * 48;
-                } else {
-                    return createTerrainBlockIcon(terrain, BLOCK_TILE_X[block], BLOCK_TILE_Y[block]);
+                    // Wool tiles are generated in row 7 of textures.png from
+                    // the original white-wool tile, one exact 16x16 tile each.
+                    return createTerrainBlockIcon(terrain, block - 24, 7);
                 }
-                break;
+                return createTerrainBlockIcon(terrain, BLOCK_TILE_X[block], BLOCK_TILE_Y[block]);
         }
         return createGuiBlockIcon(sx, sy);
     }
@@ -2085,7 +2084,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             int type = decorationTypes[decorationHit];
             int removedDecorationX = (int)decorationX[decorationHit];
             int removedDecorationZ = (int)decorationZ[decorationHit];
-            inventory[type]++;
+            if (inventory[type] < 64) inventory[type]++;
             spawnBlockParticles(type, decorationX[decorationHit], decorationY[decorationHit] + 0.35f,
                 decorationZ[decorationHit]);
             if (decorationTypes[decorationHit] == BLOCK_DOOR && decorationPivots[decorationHit] != null)
@@ -2141,7 +2140,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
             return;
         }
-        if (type >= 0 && type < inventory.length && type != TerrainGenerator.BLOCK_BEDROCK) inventory[type]++;
+        if (type >= 0 && type < inventory.length && type != TerrainGenerator.BLOCK_BEDROCK && inventory[type] < 64) inventory[type]++;
         spawnBlockParticles(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
 
         if (sideHit) {
