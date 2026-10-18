@@ -9,6 +9,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.util.Random;
 
 final class WorldCanvas extends Canvas implements Runnable {
     // Keep the movement IDs local so this class does not depend on MIDlet constant visibility.
@@ -34,6 +35,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final int HORIZON_SEA_LEVEL = 10;
     private static final float WATER_ALPHA = 0.66f;
 
+    private final Random particleRandom = new Random();
     private final IndevViewerMIDlet midlet;
     private final TerrainGenerator terrain;
     private Graphics3D graphics3D;
@@ -2085,18 +2087,18 @@ final class WorldCanvas extends Canvas implements Runnable {
         for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
             // Fragments begin at different points inside the mined voxel and
             // burst outward with a little random variation, like vanilla.
-            float dx = (float) Math.random() - 0.5f;
-            float dy = (float) Math.random() - 0.5f;
-            float dz = (float) Math.random() - 0.5f;
+            float dx = particleRandom.nextFloat() - 0.5f;
+            float dy = particleRandom.nextFloat() - 0.5f;
+            float dz = particleRandom.nextFloat() - 0.5f;
             double angle = Math.atan2(dz, dx);
-            float horizontalSpeed = 0.025f + (float) Math.random() * 0.065f;
+            float horizontalSpeed = 0.025f + particleRandom.nextFloat() * 0.065f;
             blockParticleX[i] = x + dx * 0.72f;
             blockParticleY[i] = y + dy * 0.72f;
             blockParticleZ[i] = z + dz * 0.72f;
             blockParticleVX[i] = (float) Math.cos(angle) * horizontalSpeed;
             blockParticleVZ[i] = (float) Math.sin(angle) * horizontalSpeed;
-            blockParticleVY[i] = 0.015f + (float) Math.random() * 0.085f;
-            blockParticleSize[i] = 0.045f + (float) Math.random() * 0.035f;
+            blockParticleVY[i] = 0.015f + particleRandom.nextFloat() * 0.085f;
+            blockParticleSize[i] = 0.045f + particleRandom.nextFloat() * 0.035f;
             blockParticleMeshes[i].setAppearance(0, blockParticleAppearances[type]);
             blockParticleMeshes[i].setScale(blockParticleSize[i], blockParticleSize[i],
                                              blockParticleSize[i]);
