@@ -186,6 +186,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private float yaw = 0.0f;
     private float pitch = -28.0f;
     private String errorMessage;
+    private String setupStage = "constructor";
     private final String worldName;
     private final int worldSeed;
     private final int worldId;
@@ -218,7 +219,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         } catch (OutOfMemoryError e) {
             errorMessage = "Not enough Java heap for M3G.";
         } catch (Exception e) {
-            errorMessage = "M3G setup failed: " + e.toString();
+            errorMessage = "M3G setup failed at " + setupStage + ": " + e.toString();
         }
     }
 
@@ -328,6 +329,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         // Initialize M3G objects inside the guarded setup path so API/linkage
         // failures can be reported by the constructor instead of escaping
         // from field initializers.
+        setupStage = "Graphics3D.getInstance";
         graphics3D = Graphics3D.getInstance();
         world = new World();
         terrainGroup = new Group();
@@ -337,6 +339,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         decorationGroup = new Group();
         camera = new Camera();
 
+        setupStage = "loading images and inventory icons";
         Image atlas = createWoolAtlas(Image.createImage("/mcj2me/textures.png"));
         terrainAtlasImage = atlas;
         guiImage = Image.createImage("/mcj2me/gui.png");
@@ -356,6 +359,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         blockIcons[ITEM_WATER_BUCKET] = createItemsIcon(itemsImage, 3, 0);
         blockIcons[ITEM_EMPTY_BUCKET] = createItemsIcon(itemsImage, 1, 0);
         Image cloudsImage = Image.createImage("/mcj2me/clouds.png");
+        setupStage = "creating terrain Image2D/Texture2D";
         Image2D image2D = new Image2D(Image2D.RGBA, atlas);
         Texture2D texture = new Texture2D(image2D);
         texture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
@@ -379,6 +383,7 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         // Extract the classic still-water tile from the existing atlas, tint it
         // with partial alpha, then repeat/scroll it independently for animation.
+        setupStage = "creating water texture";
         int[] waterPixels = new int[16 * 16];
         atlas.getRGB(waterPixels, 0, 16, 14 * 16, 12 * 16, 16, 16);
         for (int wi = 0; wi < waterPixels.length; wi++) {
@@ -397,6 +402,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         waterBlend.setDepthWriteEnable(false);
         waterBlend.setAlphaWriteEnable(false);
         waterAppearance.setCompositingMode(waterBlend);
+        setupStage = "creating cloud texture";
         cloudTexture = new Texture2D(new Image2D(Image2D.RGBA, cloudsImage));
         cloudTexture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
         cloudTexture.setWrapping(Texture2D.WRAP_REPEAT, Texture2D.WRAP_REPEAT);
@@ -409,6 +415,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         cloudBlend.setAlphaWriteEnable(false);
         cloudAppearance.setCompositingMode(cloudBlend);
 
+        setupStage = "creating fog, background and ambient light";
         skyBackground = new Background();
         skyBackground.setColor(0x87BFEA);
         world.setBackground(skyBackground);
@@ -432,20 +439,27 @@ final class WorldCanvas extends Canvas implements Runnable {
         world.addChild(terrainGroup);
         world.addChild(waterGroup);
         world.addChild(decorationGroup);
+        setupStage = "creating decorations and torch lights";
         setupDecorations();
         setupTorchLights();
+        setupStage = "building cloud mesh";
         Mesh clouds = buildCloudPlane(cloudAppearance);
         if (clouds != null) cloudGroup.addChild(clouds);
         // A separate, very large sea surface continues beyond the finite map.
+        setupStage = "building horizon sea mesh";
         Mesh horizonSea = buildHorizonSea();
         if (horizonSea != null) waterGroup.addChild(horizonSea);
         world.addChild(cloudGroup);
+        setupStage = "building block-particle meshes";
         setupBlockParticles(atlas);
         world.addChild(blockParticleGroup);
+        setupStage = "creating mob scenes";
         passiveMobs = new PassiveMob(world, terrain, cameraX, cameraZ);
         hostileMobs = new HostileMob(world, terrain, cameraX, cameraZ);
+        setupStage = "updating camera and building initial terrain chunks";
         updateCamera();
         updateChunks();
+        setupStage = "complete";
     }
 
     synchronized void start() {
