@@ -1711,6 +1711,11 @@ final class WorldCanvas extends Canvas implements Runnable {
                     if (isTerrainFaceExposed(x, yy, z, x + 1, z)) quads++;
                     if (isTerrainFaceExposed(x, yy, z, x, z - 1)) quads++;
                     if (isTerrainFaceExposed(x, yy, z, x, z + 1)) quads++;
+                    // A mined voxel exposes the underside of the block above
+                    // and the top of the block below. Natural top faces remain
+                    // handled by the greedy surface mesh to avoid duplicates.
+                    if (yy + 1 < h && terrain.isBlockRemoved(x, yy + 1, z)) quads++;
+                    if (yy > 0 && terrain.isBlockRemoved(x, yy - 1, z)) quads++;
                 }
                 int flowerType = terrain.getFlowerType(x, z);
                 if (flowerType >= 0) quads += 2;
@@ -1771,6 +1776,20 @@ final class WorldCanvas extends Canvas implements Runnable {
                         vertex = addQuad(positions, texCoords, colors, stripLengths,
                             vertex, strip++, x + 1, sy, z + 1, x + 1, sy + 1, z + 1,
                             x, sy, z + 1, x, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), layerType, sy, h), sideTileY(terrain.getTopType(x, z), layerType, sy, h));
+                    }
+                    if (sy + 1 < h && terrain.isBlockRemoved(x, sy + 1, z)) {
+                        int topX = BLOCK_TILE_X[layerType], topY = BLOCK_TILE_Y[layerType];
+                        vertex = addQuad(positions, texCoords, colors, stripLengths,
+                            vertex, strip++, x, sy + 1, z, x, sy + 1, z + 1,
+                            x + 1, sy + 1, z, x + 1, sy + 1, z + 1, topX, topY);
+                    }
+                    if (sy > 0 && terrain.isBlockRemoved(x, sy - 1, z)) {
+                        int bottomType = layerType == TerrainGenerator.BLOCK_GRASS
+                            ? TerrainGenerator.BLOCK_DIRT : layerType;
+                        int bottomX = BLOCK_TILE_X[bottomType], bottomY = BLOCK_TILE_Y[bottomType];
+                        vertex = addQuad(positions, texCoords, colors, stripLengths,
+                            vertex, strip++, x, sy, z, x + 1, sy, z,
+                            x, sy, z + 1, x + 1, sy, z + 1, bottomX, bottomY);
                     }
                 }
                 int flowerType = terrain.getFlowerType(x, z);
