@@ -27,6 +27,9 @@ final class TerrainGenerator {
     // Sparse storage avoids a full 128x64x128 voxel array on the MIDP heap.
     private int[] removedLeafIds = new int[64];
     private int removedLeafCount;
+    // Sparse per-voxel edits: mining one block never shifts the rest of its column.
+    private int[] removedBlockIds = new int[64];
+    private int removedBlockCount;
     // 0=unknown, 1=tree, -1=no tree. Tiny cache for the regular tree grid.
     private final byte[][] treeAtCache = new byte[SIZE][SIZE];
     private final int seed;
@@ -321,9 +324,37 @@ final class TerrainGenerator {
         invalidateTreeCache(x, z);
     }
 
-    /** Returns the block occupying a vertical side-wall cell. */
+    /** True when this exact XYZ voxel has been mined. */
+    boolean isBlockRemoved(int x, int y, int z) {
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE || y < 0 || y >= HEIGHT) return false;
+        int id = blockId(x, y, z);
+        for (int i = 0; i < removedBlockCount; i++)
+            if (removedBlockIds[i] == id) return true;
+        return false;
+    }
+
+    /** Removes one voxel without changing any other block in its column. */
+    boolean removeBlockAt(int x, int y, int z) {
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE || y < 0 || y >= heights[x][z]) return false;
+        int type = getBlockTypeAt(x, y, z);
+        if (type < 0 || type == BLOCK_BEDROCK) return false;
+        if (removedBlockCount == removedBlockIds.length) {
+            int[] expanded = new int[removedBlockIds.length * 2];
+            System.arraycopy(removedBlockIds, 0, expanded, 0, removedBlockCount);
+            removedBlockIds = expanded;
+        }
+        removedBlockIds[removedBlockCount++] = blockId(x, y, z);
+        return true;
+    }
+
+    private int blockId(int x, int y, int z) {
+        return y * SIZE * SIZE + z * SIZE + x;
+    }
+
+    /** Returns the block occupying a wall cell, or -1 when that voxel was removed. */
     int getBlockTypeAt(int x, int y, int z) {
         if (x < 0 || z < 0 || x >= SIZE || z >= SIZE || y < 0) return BLOCK_BEDROCK;
+        if (isBlockRemoved(x, y, z)) return -1;
         if (y >= heights[x][z] - 1) return topTypes[x][z];
         return getSubsurfaceType(x, y, z);
     }
@@ -453,6 +484,9 @@ final class TerrainGenerator {
         // Appended to keep old save records readable.
         for (int x = 0; x < SIZE; x++)
             for (int z = 0; z < SIZE; z++) out.writeShort(placedWaterLevels[x][z]);
+        // Optional appended sparse block edits; older saves remain compatible.
+        out.writeInt(removedBlockCount);
+        for (int i = 0; i < removedBlockCount; i++) out.writeInt(removedBlockIds[i]);
         out.flush();
         return bytes.toByteArray();
     }
@@ -475,6 +509,16 @@ final class TerrainGenerator {
         if (in.available() >= SIZE * SIZE * 2) {
             for (int x = 0; x < SIZE; x++)
                 for (int z = 0; z < SIZE; z++) placedWaterLevels[x][z] = in.readShort();
+        }
+        if (in.available() >= 4) {
+            int blockCount = in.readInt();
+            if (blockCount < 0 || blockCount > SIZE * SIZE * HEIGHT)
+                throw new Exception("Invalid saved block edits");
+            if (blockCount > removedBlockIds.length) removedBlockIds = new int[blockCount];
+            removedBlockCount = blockCount;
+            for (int i = 0; i < blockCount; i++) removedBlockIds[i] = in.readInt();
+        } else {
+            removedBlockCount = 0;
         }
         for (int x = 0; x < SIZE; x++)
             for (int z = 0; z < SIZE; z++) treeAtCache[x][z] = 0;
