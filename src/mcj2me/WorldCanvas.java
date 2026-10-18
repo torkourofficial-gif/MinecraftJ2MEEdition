@@ -395,6 +395,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         terrainPolygonMode.setCulling(PolygonMode.CULL_NONE);
         terrainPolygonMode.setShading(PolygonMode.SHADE_FLAT);
         groundAppearance.setPolygonMode(terrainPolygonMode);
+        // The classic terrain atlas includes transparent pixels in flower,
+        // sapling and leaf tiles. Enable alpha compositing so their cutouts
+        // remain transparent instead of appearing as solid colored squares.
+        CompositingMode terrainBlend = new CompositingMode();
+        terrainBlend.setBlending(CompositingMode.ALPHA);
+        groundAppearance.setCompositingMode(terrainBlend);
 
         PolygonMode transparentPolygonMode = new PolygonMode();
         transparentPolygonMode.setCulling(PolygonMode.CULL_NONE);
@@ -1801,6 +1807,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (topType == TerrainGenerator.BLOCK_GRASS && y == height - 1) return 3;
         if (layerType == TerrainGenerator.BLOCK_WOOD) return 4;
         if (layerType < 0 || layerType >= BLOCK_TILE_X.length) layerType = TerrainGenerator.BLOCK_STONE;
+        // Stone and ore blocks use the stone/ore face tiles from textures.png,
+        // not the top-face coordinates of the GUI cube-icon atlas.
+        if (layerType == TerrainGenerator.BLOCK_STONE) return 1;
         return BLOCK_TILE_X[layerType];
     }
 
@@ -1808,6 +1817,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (topType == TerrainGenerator.BLOCK_GRASS && y == height - 1) return 0;
         if (layerType == TerrainGenerator.BLOCK_WOOD) return 1;
         if (layerType < 0 || layerType >= BLOCK_TILE_Y.length) layerType = TerrainGenerator.BLOCK_STONE;
+        if (layerType == TerrainGenerator.BLOCK_STONE) return 0;
         return BLOCK_TILE_Y[layerType];
     }
 
