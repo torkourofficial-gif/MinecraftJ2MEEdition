@@ -400,6 +400,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         // remain transparent instead of appearing as solid colored squares.
         CompositingMode terrainBlend = new CompositingMode();
         terrainBlend.setBlending(CompositingMode.ALPHA);
+        // Alpha-test atlas cut-outs so invisible flower pixels do not occlude geometry.
+        terrainBlend.setAlphaThreshold(0.5f);
         groundAppearance.setCompositingMode(terrainBlend);
 
         PolygonMode transparentPolygonMode = new PolygonMode();
@@ -2589,68 +2591,72 @@ final class WorldCanvas extends Canvas implements Runnable {
         updateCamera();
     }
     private int[] raycastLeafBlock() {
+        // Minecraft-style voxel DDA: advance to the nearest cell boundary.
         double yr = Math.PI * pitch / 180.0;
         double xr = Math.PI * yaw / 180.0;
         float dx = (float) (Math.sin(xr) * Math.cos(yr));
-        float dz = (float) (-Math.cos(xr) * Math.cos(yr));
         float dy = (float) Math.sin(yr);
-        // Start almost at the camera; a larger minimum distance skipped nearby leaves.
-        for (float d = 0.05f; d <= 5.0f; d += 0.04f) {
-            int x = (int) (cameraX + dx * d);
-            int y = (int) (cameraY + dy * d);
-            int z = (int) (cameraZ + dz * d);
+        float dz = (float) (-Math.cos(xr) * Math.cos(yr));
+        int x = floorVoxel(cameraX), y = floorVoxel(cameraY), z = floorVoxel(cameraZ);
+        int sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
+        float tx = dx == 0 ? Float.MAX_VALUE : (((dx > 0 ? x + 1 : x) - cameraX) / dx);
+        float ty = dy == 0 ? Float.MAX_VALUE : (((dy > 0 ? y + 1 : y) - cameraY) / dy);
+        float tz = dz == 0 ? Float.MAX_VALUE : (((dz > 0 ? z + 1 : z) - cameraZ) / dz);
+        float dtx = dx == 0 ? Float.MAX_VALUE : Math.abs(1.0f / dx);
+        float dty = dy == 0 ? Float.MAX_VALUE : Math.abs(1.0f / dy);
+        float dtz = dz == 0 ? Float.MAX_VALUE : Math.abs(1.0f / dz);
+        float distance = 0.0f;
+        while (distance <= 5.0f) {
             if (terrain.isLeafBlockAt(x, y, z)) {
                 leafHitResult[0] = x; leafHitResult[1] = y; leafHitResult[2] = z;
                 return leafHitResult;
             }
+            if (tx <= ty && tx <= tz) { distance = tx; tx += dtx; x += sx; }
+            else if (ty <= tz) { distance = ty; ty += dty; y += sy; }
+            else { distance = tz; tz += dtz; z += sz; }
         }
         return null;
     }
 
+    private int floorVoxel(float value) {
+        int whole = (int) value;
+        return value < whole ? whole - 1 : whole;
+    }
+
     /**
-     * Sample the view ray at short intervals so blocks close to the camera
-     * are not skipped. Returns {x, z, blockY, sideHit}; sideHit is true when
-     * the ray intersects an exposed vertical face below the column's top.
+     * Minecraft-style voxel DDA raycast. The first intersected cell wins.
+     * Returns {x, z, blockY, sideHit}; sideHit=0 denotes the surface block.
      */
     private int[] raycastSurface() {
         double yr = Math.PI * pitch / 180.0;
         double xr = Math.PI * yaw / 180.0;
         float dx = (float) (Math.sin(xr) * Math.cos(yr));
-        float dz = (float) (-Math.cos(xr) * Math.cos(yr));
         float dy = (float) Math.sin(yr);
-
-        for (float d = 0.05f; d <= 5.0f; d += 0.04f) {
-            float fx = cameraX + dx * d;
-            float fy = cameraY + dy * d;
-            float fz = cameraZ + dz * d;
-            int x = (int) fx, z = (int) fz;
-            int blockY = (int) fy;
-            if (x < 1 || z < 1 || x >= TerrainGenerator.SIZE - 1
-                    || z >= TerrainGenerator.SIZE - 1 || blockY < 0) continue;
-
-            int surface = terrain.getHeight(x, z);
-            // Only count a top hit when the ray actually crosses the surface
-            // from above. A broad Y tolerance incorrectly selected the top
-            // block while the player was aiming at an exposed lower side.
-            float previousY = fy - dy * 0.04f;
-            if (dy < 0.0f && previousY > surface && fy <= surface) {
-                surfaceHitResult[0] = x; surfaceHitResult[1] = z;
-                surfaceHitResult[2] = surface - 1; surfaceHitResult[3] = 0;
-                return surfaceHitResult;
-            }
-
-            // Any exposed side layer can be mined, including the block directly
-            // below the top layer (previously excluded by the surface - 1 test).
-            if (blockY < surface && blockY >= 0) {
-                if (terrain.getHeight(x - 1, z) <= blockY
-                        || terrain.getHeight(x + 1, z) <= blockY
-                        || terrain.getHeight(x, z - 1) <= blockY
-                        || terrain.getHeight(x, z + 1) <= blockY) {
-                    surfaceHitResult[0] = x; surfaceHitResult[1] = z;
-                    surfaceHitResult[2] = blockY; surfaceHitResult[3] = 1;
+        float dz = (float) (-Math.cos(xr) * Math.cos(yr));
+        int x = floorVoxel(cameraX), y = floorVoxel(cameraY), z = floorVoxel(cameraZ);
+        int sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
+        float tx = dx == 0 ? Float.MAX_VALUE : (((dx > 0 ? x + 1 : x) - cameraX) / dx);
+        float ty = dy == 0 ? Float.MAX_VALUE : (((dy > 0 ? y + 1 : y) - cameraY) / dy);
+        float tz = dz == 0 ? Float.MAX_VALUE : (((dz > 0 ? z + 1 : z) - cameraZ) / dz);
+        float dtx = dx == 0 ? Float.MAX_VALUE : Math.abs(1.0f / dx);
+        float dty = dy == 0 ? Float.MAX_VALUE : Math.abs(1.0f / dy);
+        float dtz = dz == 0 ? Float.MAX_VALUE : Math.abs(1.0f / dz);
+        float distance = 0.0f;
+        while (distance <= 5.0f) {
+            if (x >= 1 && z >= 1 && x < TerrainGenerator.SIZE - 1
+                    && z < TerrainGenerator.SIZE - 1 && y >= 0) {
+                int surface = terrain.getHeight(x, z);
+                if (y < surface) {
+                    surfaceHitResult[0] = x;
+                    surfaceHitResult[1] = z;
+                    surfaceHitResult[2] = y;
+                    surfaceHitResult[3] = (y == surface - 1) ? 0 : 1;
                     return surfaceHitResult;
                 }
             }
+            if (tx <= ty && tx <= tz) { distance = tx; tx += dtx; x += sx; }
+            else if (ty <= tz) { distance = ty; ty += dty; y += sy; }
+            else { distance = tz; tz += dtz; z += sz; }
         }
         return null;
     }
