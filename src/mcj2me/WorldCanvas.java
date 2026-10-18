@@ -2403,15 +2403,30 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     private void collectWaterBucket() {
         int waterX = -1, waterZ = -1, waterLevel = -1;
-        float dx = (float) Math.sin(yaw * Math.PI / 180.0);
-        float dz = (float) Math.cos(yaw * Math.PI / 180.0);
-        for (float distance = 0.5f; distance <= 4.0f; distance += 0.25f) {
-            int x = (int) (cameraX + dx * distance);
-            int z = (int) (cameraZ + dz * distance);
+        double yr = Math.PI * pitch / 180.0;
+        double xr = Math.PI * yaw / 180.0;
+        float dx = (float) (Math.sin(xr) * Math.cos(yr));
+        float dz = (float) (-Math.cos(xr) * Math.cos(yr));
+        float dy = (float) Math.sin(yr);
+        float waterY = cameraY;
+        for (float distance = 0.1f; distance <= 5.0f; distance += 0.04f) {
+            float fx = cameraX + dx * distance;
+            waterY = cameraY + dy * distance;
+            float fz = cameraZ + dz * distance;
+            int x = (int) fx, z = (int) fz;
             int level = terrain.getPlacedWaterLevel(x, z);
-            if (level > 0) { waterX = x; waterZ = z; waterLevel = level; break; }
+            if (level > 0 && waterY <= level && waterY >= terrain.getHeight(x, z)) {
+                waterX = x; waterZ = z; waterLevel = level; break;
+            }
         }
         if (waterX < 0) return;
+        // Prefer the original source position when the flow is still active.
+        for (int i = 0; i < MAX_WATER_SOURCES; i++) {
+            if (waterFlowLevel[i] == waterLevel
+                    && Math.abs(waterFlowX[i] - waterX) + Math.abs(waterFlowZ[i] - waterZ) <= 2) {
+                waterX = waterFlowX[i]; waterZ = waterFlowZ[i]; break;
+            }
+        }
         // Remove the small 5x5-diamond puddle belonging to this source, not
         // natural lakes. Keep this bounded for predictable memory/performance.
         for (int dxCell = -2; dxCell <= 2; dxCell++) {
