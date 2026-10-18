@@ -39,6 +39,12 @@ final class TitleScreen extends Canvas implements Runnable {
         waitingForBinding = false;
         selected = 0;
     }
+    synchronized void openSettings() {
+        settingsOpen = true;
+        controlsOpen = false;
+        waitingForBinding = false;
+        selected = 0;
+    }
     synchronized void start() {
         if (running) return;
         running=true; animationThread=new Thread(this); animationThread.start();
