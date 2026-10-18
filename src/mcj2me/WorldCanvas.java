@@ -2686,7 +2686,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         updateCamera();
     }
     private int[] raycastLeafBlock() {
-        // Minecraft-style voxel DDA: advance to the nearest cell boundary.
+        // A leaf is selectable only if it is the first block intersected.
+        int[] solidHit = raycastSurface();
+        float solidDistance = solidHit == null ? 5001.0f : surfaceHitResult[4];
         double yr = Math.PI * pitch / 180.0;
         double xr = Math.PI * yaw / 180.0;
         float dx = (float) (Math.sin(xr) * Math.cos(yr));
@@ -2703,8 +2705,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         float distance = 0.0f;
         while (distance <= 5.0f) {
             if (terrain.isLeafBlockAt(x, y, z)) {
-                leafHitResult[0] = x; leafHitResult[1] = y; leafHitResult[2] = z;
-                return leafHitResult;
+                if ((int)(distance * 1000.0f) <= solidDistance) {
+                    leafHitResult[0] = x; leafHitResult[1] = y; leafHitResult[2] = z;
+                    return leafHitResult;
+                }
+                return null;
             }
             if (tx <= ty && tx <= tz) { distance = tx; tx += dtx; x += sx; }
             else if (ty <= tz) { distance = ty; ty += dty; y += sy; }
@@ -2719,8 +2724,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     /**
-     * Minecraft-style voxel DDA raycast. The first intersected cell wins.
-     * Returns {x, z, blockY, sideHit}; sideHit=0 denotes the surface block.
+     * Classic voxel ray trace. It only hits visible faces, not invisible
+     * cells buried below a height-map surface. Result: x, z, y, sideHit, distance*1000.
      */
     private int[] raycastSurface() {
         double yr = Math.PI * pitch / 180.0;
@@ -2737,22 +2742,29 @@ final class WorldCanvas extends Canvas implements Runnable {
         float dty = dy == 0 ? Float.MAX_VALUE : Math.abs(1.0f / dy);
         float dtz = dz == 0 ? Float.MAX_VALUE : Math.abs(1.0f / dz);
         float distance = 0.0f;
-        // Track which voxel boundary was crossed to enter the current cell.
-        // Horizontal entry means the player is aiming at a side; vertical entry
-        // means the top/bottom face. This is important for mining cliff walls.
         int enteredAxis = -1; // 0=X, 1=Y, 2=Z
+        int previousX = x, previousZ = z;
         while (distance <= 5.0f) {
             if (x >= 1 && z >= 1 && x < TerrainGenerator.SIZE - 1
                     && z < TerrainGenerator.SIZE - 1 && y >= 0) {
                 int surface = terrain.getHeight(x, z);
-                if (y < surface) {
+                boolean topFace = enteredAxis == 1 && dy < 0.0f && y == surface - 1;
+                boolean sideFace = false;
+                if ((enteredAxis == 0 || enteredAxis == 2) && y < surface) {
+                    int previousHeight = terrain.getHeight(previousX, previousZ);
+                    sideFace = y >= previousHeight;
+                }
+                if (topFace || sideFace) {
                     surfaceHitResult[0] = x;
                     surfaceHitResult[1] = z;
                     surfaceHitResult[2] = y;
-                    surfaceHitResult[3] = (enteredAxis == 0 || enteredAxis == 2) ? 1 : 0;
+                    surfaceHitResult[3] = sideFace ? 1 : 0;
+                    surfaceHitResult[4] = (int)(distance * 1000.0f);
                     return surfaceHitResult;
                 }
             }
+            previousX = x;
+            previousZ = z;
             if (tx <= ty && tx <= tz) {
                 distance = tx; tx += dtx; x += sx; enteredAxis = 0;
             } else if (ty <= tz) {
