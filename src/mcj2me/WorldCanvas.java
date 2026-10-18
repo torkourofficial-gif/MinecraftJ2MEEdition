@@ -20,6 +20,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final int CONTROL_JUMP = 8, CONTROL_BREAK = 9, CONTROL_PLACE = 10;
     private static final int CHUNK = 16;
     private static final int RADIUS = 1;
+    private static final float PLAYER_HEIGHT = 2.0f;
+    private static final float PLAYER_EYE_HEIGHT = 1.62f;
+    private static final float PLAYER_HEAD_OFFSET = PLAYER_HEIGHT - PLAYER_EYE_HEIGHT;
+    private static final float BLOCK_REACH = 5.0f;
     private static final float MOVE_SPEED = 0.20f;
     private static final float MOVE_ACCEL = 0.035f;
     private static final float FRICTION = 0.78f;
@@ -352,7 +356,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
         }
 
-        float groundY = terrain.getHeight(spawnX, spawnZ) + 1.65f;
+        float groundY = terrain.getHeight(spawnX, spawnZ) + PLAYER_EYE_HEIGHT;
         if (cameraY < groundY || !isPlayerColumnClear(spawnX, spawnZ)) {
             cameraY = groundY;
             verticalVelocity = 0.0f;
@@ -511,7 +515,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         ambientLight.setColor(0xFFFFFF);
         world.addChild(ambientLight);
 
-        cameraY = terrain.getHeight(64, 105) + 1.65f;
+        cameraY = terrain.getHeight(64, 105) + PLAYER_EYE_HEIGHT;
         camera.setPerspective(70.0f, 1.0f, 0.1f, 180.0f);
         world.addChild(camera);
         world.setActiveCamera(camera);
@@ -1027,7 +1031,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
         }
 
-        float groundY = terrain.getHeight((int) cameraX, (int) cameraZ) + 1.65f;
+        float groundY = terrain.getHeight((int) cameraX, (int) cameraZ) + PLAYER_EYE_HEIGHT;
         boolean inWater = isSwimming();
         if (inWater && !wasInWater) splashTicks = 10;
         wasInWater = inWater;
@@ -1096,7 +1100,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean canOccupy(float x, float z) {
         if (x < 1.0f || z < 1.0f || x > 126.0f || z > 126.0f) return false;
 
-        float feetY = cameraY - 1.65f;
+        float feetY = cameraY - PLAYER_EYE_HEIGHT;
         int minX = (int) Math.floor(x - 0.20f);
         int maxX = (int) Math.floor(x + 0.20f);
         int minZ = (int) Math.floor(z - 0.20f);
@@ -1119,7 +1123,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 // body overlaps any generated leaf cube at this X/Z column.
                 int firstBodyY = Math.max(0, (int) Math.floor(feetY));
                 int lastBodyY = Math.min(TerrainGenerator.HEIGHT - 1,
-                    (int) Math.floor(cameraY + 0.10f));
+                    (int) Math.floor(cameraY + PLAYER_HEAD_OFFSET));
                 for (int by = firstBodyY; by <= lastBodyY; by++) {
                     if (terrain.isLeafBlockAt(bx, by, bz)) return false;
                 }
@@ -2518,7 +2522,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         float dx = (float)(Math.sin(xr) * Math.cos(yr));
         float dz = (float)(-Math.cos(xr) * Math.cos(yr));
         float dy = (float)Math.sin(yr);
-        for (float d = 0.05f; d <= 5.0f; d += 0.05f) {
+        for (float d = 0.0f; d <= BLOCK_REACH; d += 0.025f) {
             float px = cameraX + dx * d, py = cameraY + dy * d, pz = cameraZ + dz * d;
             for (int i = decorationCount - 1; i >= 0; i--) {
                 float radius = decorationTypes[i] == BLOCK_TORCH ? 0.22f : 0.48f;
@@ -2634,7 +2638,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         float dz = (float) (-Math.cos(xr) * Math.cos(yr));
         float dy = (float) Math.sin(yr);
         float waterY = cameraY;
-        for (float distance = 0.1f; distance <= 5.0f; distance += 0.04f) {
+        for (float distance = 0.0f; distance <= BLOCK_REACH; distance += 0.025f) {
             float fx = cameraX + dx * distance;
             waterY = cameraY + dy * distance;
             float fz = cameraZ + dz * distance;
@@ -2724,7 +2728,7 @@ final class WorldCanvas extends Canvas implements Runnable {
      * player. This avoids snapping the camera to the ground on every edit.
      */
     private void resolvePlayerAfterTerrainEdit() {
-        float groundY = terrain.getHeight((int) cameraX, (int) cameraZ) + 1.65f;
+        float groundY = terrain.getHeight((int) cameraX, (int) cameraZ) + PLAYER_EYE_HEIGHT;
         if (cameraY < groundY) {
             // A newly raised block intersects the player: place them safely
             // on top, and cancel only the downward motion into that block.
@@ -2756,7 +2760,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         float dty = dy == 0 ? Float.MAX_VALUE : Math.abs(1.0f / dy);
         float dtz = dz == 0 ? Float.MAX_VALUE : Math.abs(1.0f / dz);
         float distance = 0.0f;
-        while (distance <= 5.0f) {
+        while (distance <= BLOCK_REACH) {
             if (terrain.isLeafBlockAt(x, y, z)) {
                 if ((int)(distance * 1000.0f) <= solidDistance) {
                     leafHitResult[0] = x; leafHitResult[1] = y; leafHitResult[2] = z;
