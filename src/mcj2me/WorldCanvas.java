@@ -117,6 +117,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     private final int[] surfaceHitResult = new int[4];
     private final int[] leafHitResult = new int[3];
     private boolean paused;
+    private boolean pauseOverlayOpen;
+    private int pauseSelection;
+    private Image pauseOverlay;
+    private int pauseOverlayWidth = -1, pauseOverlayHeight = -1;
     private boolean forward, backward, strafeLeft, strafeRight;
     private boolean lookUp, lookDown, turnLeft, turnRight;
     private boolean jumpHeld;
@@ -501,18 +505,24 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     synchronized void pause() {
         paused = true;
+        pauseOverlayOpen = true;
+        pauseSelection = 0;
         clearKeys();
+        repaint();
     }
 
     synchronized void resume() {
         if (running) {
             paused = false;
+            pauseOverlayOpen = false;
             clearKeys();
             repaint();
         } else {
             start();
         }
     }
+
+    synchronized boolean isPauseOverlayOpen() { return pauseOverlayOpen; }
 
     synchronized void stop() {
         running = false;
@@ -592,6 +602,35 @@ final class WorldCanvas extends Canvas implements Runnable {
         drawNightOverlay(g);
         drawUnderwaterOverlay(g);
         drawHud(g);
+        if (pauseOverlayOpen) drawPauseOverlay(g);
+    }
+
+    private void drawPauseOverlay(Graphics g) {
+        int w = getWidth(), h = getHeight();
+        if (pauseOverlay == null || pauseOverlayWidth != w || pauseOverlayHeight != h) {
+            int[] pixels = new int[w * h];
+            for (int i = 0; i < pixels.length; i++) pixels[i] = 0x99000000;
+            pauseOverlay = Image.createRGBImage(pixels, w, h, true);
+            pauseOverlayWidth = w; pauseOverlayHeight = h;
+        }
+        g.drawImage(pauseOverlay, 0, 0, Graphics.TOP | Graphics.LEFT);
+        int bw = Math.min(w - 24, 210); if (bw < 1) bw = w;
+        int bh = Math.min(29, Math.max(22, h / 11)), bx = (w - bw) / 2;
+        int y = Math.max(8, (h - bh * 2 - 10) / 2);
+        g.setColor(0xFFFFFF);
+        g.drawString("Game menu", w / 2, y - 30, Graphics.TOP | Graphics.HCENTER);
+        drawPauseButton(g, bx, y, bw, bh, "Settings", pauseSelection == 0);
+        drawPauseButton(g, bx, y + bh + 10, bw, bh, "Save and quit to title", pauseSelection == 1);
+        g.drawString("BACK: resume   UP/DOWN: select", w / 2, h - 12, Graphics.BOTTOM | Graphics.HCENTER);
+    }
+
+    private void drawPauseButton(Graphics g, int x, int y, int w, int h, String text, boolean selected) {
+        g.setColor(selected ? 0x666666 : 0x333333); g.fillRect(x, y, w, h);
+        g.setColor(selected ? 0xFFFFFF : 0xAAAAAA); g.drawRect(x, y, w - 1, h - 1);
+        g.setColor(selected ? 0xFFFF55 : 0xFFFFFF);
+        Font font = Font.getDefaultFont();
+        g.drawString(text, x + (w - font.stringWidth(text)) / 2,
+            y + (h - font.getHeight()) / 2, Graphics.TOP | Graphics.LEFT);
     }
 
     // MIDP Graphics has no setAlpha, so use a cached ARGB image for the blue
@@ -733,9 +772,21 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (inventoryOpen) {
                 inventoryOpen = false;
                 repaint();
-            } else if (!paused) {
+            } else if (pauseOverlayOpen) {
+                resume();
+            } else {
                 pause();
-                midlet.showPauseMenu();
+            }
+            return;
+        }
+
+        if (pauseOverlayOpen) {
+            if (action == UP || action == DOWN || keyCode == '2' || keyCode == '8') {
+                pauseSelection = (pauseSelection + 1) % 2;
+                repaint();
+            } else if (action == FIRE || keyCode == '5' || keyCode == ' ' || keyCode == 10) {
+                if (pauseSelection == 0) midlet.openPauseSettings();
+                else midlet.returnToMainMenu();
             }
             return;
         }
