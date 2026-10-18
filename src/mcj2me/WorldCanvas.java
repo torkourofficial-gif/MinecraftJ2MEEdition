@@ -1704,20 +1704,14 @@ final class WorldCanvas extends Canvas implements Runnable {
         for (x = startX; x < startX + CHUNK; x++) {
             for (z = startZ; z < startZ + CHUNK; z++) {
                 h = terrain.getHeight(x, z);
-                int nh = terrain.getHeight(x - 1, z); if (h > nh) quads += h - nh;
-                nh = terrain.getHeight(x + 1, z); if (h > nh) quads += h - nh;
-                nh = terrain.getHeight(x, z - 1); if (h > nh) quads += h - nh;
-                nh = terrain.getHeight(x, z + 1); if (h > nh) quads += h - nh;
-                // Each removed voxel on an exposed cliff removes its side quad.
-                int low, high, yy;
-                nh = terrain.getHeight(x - 1, z); low = nh; high = h;
-                for (yy = low; yy < high; yy++) if (terrain.isBlockRemoved(x, yy, z)) quads--;
-                nh = terrain.getHeight(x + 1, z); low = nh; high = h;
-                for (yy = low; yy < high; yy++) if (terrain.isBlockRemoved(x, yy, z)) quads--;
-                nh = terrain.getHeight(x, z - 1); low = nh; high = h;
-                for (yy = low; yy < high; yy++) if (terrain.isBlockRemoved(x, yy, z)) quads--;
-                nh = terrain.getHeight(x, z + 1); low = nh; high = h;
-                for (yy = low; yy < high; yy++) if (terrain.isBlockRemoved(x, yy, z)) quads--;
+                int yy;
+                for (yy = 0; yy < h; yy++) {
+                    if (terrain.isBlockRemoved(x, yy, z)) continue;
+                    if (isTerrainFaceExposed(x, yy, z, x - 1, z)) quads++;
+                    if (isTerrainFaceExposed(x, yy, z, x + 1, z)) quads++;
+                    if (isTerrainFaceExposed(x, yy, z, x, z - 1)) quads++;
+                    if (isTerrainFaceExposed(x, yy, z, x, z + 1)) quads++;
+                }
                 int flowerType = terrain.getFlowerType(x, z);
                 if (flowerType >= 0) quads += 2;
                 if (terrain.isTreeAt(x, z)) {
@@ -1743,7 +1737,6 @@ final class WorldCanvas extends Canvas implements Runnable {
                 }
             }
         }
-
         int vertexCount = quads * 4;
         short[] positions = new short[vertexCount * 3];
         short[] texCoords = new short[vertexCount * 2];
@@ -1755,33 +1748,30 @@ final class WorldCanvas extends Canvas implements Runnable {
         for (x = startX; x < startX + CHUNK; x++) {
             for (z = startZ; z < startZ + CHUNK; z++) {
                 h = terrain.getHeight(x, z);
-                int neighbor = terrain.getHeight(x - 1, z);
-                for (int sy = neighbor; sy < h; sy++) {
+                int sy;
+                for (sy = 0; sy < h; sy++) {
                     if (terrain.isBlockRemoved(x, sy, z)) continue;
-                    vertex = addQuad(positions, texCoords, colors, stripLengths,
-                        vertex, strip++, x, sy, z + 1, x, sy + 1, z + 1,
-                        x, sy, z, x, sy + 1, z, sideTile(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h), sideTileY(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h));
-                }
-                neighbor = terrain.getHeight(x + 1, z);
-                for (int sy = neighbor; sy < h; sy++) {
-                    if (terrain.isBlockRemoved(x, sy, z)) continue;
-                    vertex = addQuad(positions, texCoords, colors, stripLengths,
-                        vertex, strip++, x + 1, sy, z, x + 1, sy + 1, z,
-                        x + 1, sy, z + 1, x + 1, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h), sideTileY(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h));
-                }
-                neighbor = terrain.getHeight(x, z - 1);
-                for (int sy = neighbor; sy < h; sy++) {
-                    if (terrain.isBlockRemoved(x, sy, z)) continue;
-                    vertex = addQuad(positions, texCoords, colors, stripLengths,
-                        vertex, strip++, x, sy, z, x, sy + 1, z,
-                        x + 1, sy, z, x + 1, sy + 1, z, sideTile(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h), sideTileY(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h));
-                }
-                neighbor = terrain.getHeight(x, z + 1);
-                for (int sy = neighbor; sy < h; sy++) {
-                    if (terrain.isBlockRemoved(x, sy, z)) continue;
-                    vertex = addQuad(positions, texCoords, colors, stripLengths,
-                        vertex, strip++, x + 1, sy, z + 1, x + 1, sy + 1, z + 1,
-                        x, sy, z + 1, x, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h), sideTileY(terrain.getTopType(x, z), terrain.getBlockTypeAt(x, sy, z), sy, h));
+                    int layerType = terrain.getBlockTypeAt(x, sy, z);
+                    if (isTerrainFaceExposed(x, sy, z, x - 1, z)) {
+                        vertex = addQuad(positions, texCoords, colors, stripLengths,
+                            vertex, strip++, x, sy, z + 1, x, sy + 1, z + 1,
+                            x, sy, z, x, sy + 1, z, sideTile(terrain.getTopType(x, z), layerType, sy, h), sideTileY(terrain.getTopType(x, z), layerType, sy, h));
+                    }
+                    if (isTerrainFaceExposed(x, sy, z, x + 1, z)) {
+                        vertex = addQuad(positions, texCoords, colors, stripLengths,
+                            vertex, strip++, x + 1, sy, z, x + 1, sy + 1, z,
+                            x + 1, sy, z + 1, x + 1, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), layerType, sy, h), sideTileY(terrain.getTopType(x, z), layerType, sy, h));
+                    }
+                    if (isTerrainFaceExposed(x, sy, z, x, z - 1)) {
+                        vertex = addQuad(positions, texCoords, colors, stripLengths,
+                            vertex, strip++, x, sy, z, x, sy + 1, z,
+                            x + 1, sy, z, x + 1, sy + 1, z, sideTile(terrain.getTopType(x, z), layerType, sy, h), sideTileY(terrain.getTopType(x, z), layerType, sy, h));
+                    }
+                    if (isTerrainFaceExposed(x, sy, z, x, z + 1)) {
+                        vertex = addQuad(positions, texCoords, colors, stripLengths,
+                            vertex, strip++, x + 1, sy, z + 1, x + 1, sy + 1, z + 1,
+                            x, sy, z + 1, x, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), layerType, sy, h), sideTileY(terrain.getTopType(x, z), layerType, sy, h));
+                    }
                 }
                 int flowerType = terrain.getFlowerType(x, z);
                 if (flowerType >= 0) {
@@ -1833,6 +1823,14 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
 
+
+    /** True if a solid terrain voxel has an exposed horizontal face toward its neighbor. */
+    private boolean isTerrainFaceExposed(int x, int y, int z, int nx, int nz) {
+        if (terrain.isBlockRemoved(x, y, z)) return false;
+        int neighborHeight = terrain.getHeight(nx, nz);
+        if (y >= neighborHeight) return true;
+        return terrain.isBlockRemoved(nx, y, nz);
+    }
 
     /** Merge compatible adjacent top faces while repeating their own 16x16 tile. */
     private void buildGreedyTopMeshes(Group chunkGroup, int chunkX, int chunkZ) {
