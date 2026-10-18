@@ -174,9 +174,13 @@ public final class IndevViewerMIDlet extends MIDlet {
         Display.getDisplay(this).setCurrent(alert, titleScreen);
     }
     void showPauseMenu() {
+        if (worldCanvas != null) worldCanvas.pause();
+    }
+    void openPauseSettings() {
         saveWorld(worldCanvas);
-        if (titleScreen==null) titleScreen=new TitleScreen(this);
+        if (titleScreen == null) titleScreen = new TitleScreen(this);
         titleScreen.showPauseMenu();
+        titleScreen.openSettings();
         Display.getDisplay(this).setCurrent(titleScreen);
         titleScreen.start();
     }
