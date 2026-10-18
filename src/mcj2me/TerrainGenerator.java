@@ -20,6 +20,8 @@ final class TerrainGenerator {
     private final short[][] originalHeights = new short[SIZE][SIZE];
     private final byte[][] topTypes = new byte[SIZE][SIZE];
     private final boolean[][] waterBasins = new boolean[SIZE][SIZE];
+    // Player-placed water uses a per-column surface level; zero means dry.
+    private final short[][] placedWaterLevels = new short[SIZE][SIZE];
     // Sparse storage avoids a full 128x64x128 voxel array on the MIDP heap.
     private int[] removedLeafIds = new int[64];
     private int removedLeafCount;
@@ -196,8 +198,24 @@ final class TerrainGenerator {
     }
 
     boolean isWaterAt(int x, int z) {
-        return x >= 0 && z >= 0 && x < SIZE && z < SIZE
-            && waterBasins[x][z] && heights[x][z] < WATER_LEVEL;
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return false;
+        return (waterBasins[x][z] && heights[x][z] < WATER_LEVEL)
+            || placedWaterLevels[x][z] > heights[x][z];
+    }
+
+    /** Surface Y of the water column, or -1 for a dry column. */
+    int getWaterSurfaceLevel(int x, int z) {
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return -1;
+        if (waterBasins[x][z] && heights[x][z] < WATER_LEVEL) return WATER_LEVEL;
+        int level = placedWaterLevels[x][z];
+        return level > heights[x][z] ? level : -1;
+    }
+
+    void setPlacedWaterLevel(int x, int z, int level) {
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return;
+        if (level < 0) level = 0;
+        if (level > HEIGHT - 1) level = HEIGHT - 1;
+        placedWaterLevels[x][z] = (short) level;
     }
 
     /**
@@ -205,7 +223,8 @@ final class TerrainGenerator {
      * volume is discrete: x/z selects a column and y selects a block layer.
      */
     boolean isWaterBlockAt(int x, int y, int z) {
-        return isWaterAt(x, z) && y >= heights[x][z] && y < WATER_LEVEL;
+        int surface = getWaterSurfaceLevel(x, z);
+        return surface > 0 && y >= heights[x][z] && y < surface;
     }
 
     int getWaterLevel() {
@@ -369,6 +388,9 @@ final class TerrainGenerator {
             for (int z = 0; z < SIZE; z++) out.writeBoolean(waterBasins[x][z]);
         out.writeInt(removedLeafCount);
         for (int i = 0; i < removedLeafCount; i++) out.writeInt(removedLeafIds[i]);
+        // Appended to keep old save records readable.
+        for (int x = 0; x < SIZE; x++)
+            for (int z = 0; z < SIZE; z++) out.writeShort(placedWaterLevels[x][z]);
         out.flush();
         return bytes.toByteArray();
     }
@@ -387,6 +409,11 @@ final class TerrainGenerator {
         if (count > removedLeafIds.length) removedLeafIds = new int[count];
         removedLeafCount = count;
         for (int i = 0; i < count; i++) removedLeafIds[i] = in.readInt();
+        // Older worlds end here; newer ones append the surface-water map.
+        if (in.available() >= SIZE * SIZE * 2) {
+            for (int x = 0; x < SIZE; x++)
+                for (int z = 0; z < SIZE; z++) placedWaterLevels[x][z] = in.readShort();
+        }
         for (int x = 0; x < SIZE; x++)
             for (int z = 0; z < SIZE; z++) treeAtCache[x][z] = 0;
         in.close();
