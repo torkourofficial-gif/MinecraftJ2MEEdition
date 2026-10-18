@@ -2090,13 +2090,18 @@ final class WorldCanvas extends Canvas implements Runnable {
             float dx = particleRandom.nextFloat() - 0.5f;
             float dy = particleRandom.nextFloat() - 0.5f;
             float dz = particleRandom.nextFloat() - 0.5f;
-            double angle = Math.atan2(dz, dx);
+            float directionLength = (float) Math.sqrt(dx * dx + dz * dz);
+            if (directionLength < 0.001f) {
+                dx = 1.0f;
+                dz = 0.0f;
+                directionLength = 1.0f;
+            }
             float horizontalSpeed = 0.025f + particleRandom.nextFloat() * 0.065f;
             blockParticleX[i] = x + dx * 0.72f;
             blockParticleY[i] = y + dy * 0.72f;
             blockParticleZ[i] = z + dz * 0.72f;
-            blockParticleVX[i] = (float) Math.cos(angle) * horizontalSpeed;
-            blockParticleVZ[i] = (float) Math.sin(angle) * horizontalSpeed;
+            blockParticleVX[i] = (dx / directionLength) * horizontalSpeed;
+            blockParticleVZ[i] = (dz / directionLength) * horizontalSpeed;
             blockParticleVY[i] = 0.015f + particleRandom.nextFloat() * 0.085f;
             blockParticleSize[i] = 0.045f + particleRandom.nextFloat() * 0.035f;
             blockParticleMeshes[i].setAppearance(0, blockParticleAppearances[type]);
