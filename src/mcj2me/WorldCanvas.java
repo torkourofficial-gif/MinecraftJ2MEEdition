@@ -2,6 +2,7 @@ package mcj2me;
 
 import javax.microedition.lcdui.Canvas;
 import javax.microedition.lcdui.Graphics;
+import javax.microedition.lcdui.Font;
 import javax.microedition.lcdui.Image;
 import javax.microedition.m3g.*;
 import java.io.ByteArrayInputStream;
