@@ -1416,7 +1416,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             case 17: sx = 0; sy = 192; break;      // yellow flower
             case 18: sx = 48; sy = 192; break;     // red flower
             case 19: sx = 96; sy = 336; break;     // sapling
-            case 20: return createItemsIcon(Image.createImage("/items.png"), 0, 16);
+            case 20: sx = 288; sy = 336; break;     // fallback door block icon
             case 21: sx = 192; sy = 144; break;    // iron block
             case 22: sx = 144; sy = 144; break;    // gold block
             case 23: sx = 240; sy = 144; break;    // diamond block
