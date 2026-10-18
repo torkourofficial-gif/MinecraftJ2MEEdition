@@ -297,6 +297,15 @@ final class TerrainGenerator {
         if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return;
         if (type < BLOCK_GRASS || type > BLOCK_WOOL_BLACK) type = BLOCK_GRASS;
         topTypes[x][z] = (byte) type;
+        invalidateTreeCache(x, z);
+    }
+
+    private void invalidateTreeCache(int x, int z) {
+        for (int tx = Math.max(0, x - 4); tx <= Math.min(SIZE - 1, x + 4); tx++) {
+            for (int tz = Math.max(0, z - 4); tz <= Math.min(SIZE - 1, z + 4); tz++) {
+                treeAtCache[tx][tz] = 0;
+            }
+        }
     }
 
     void setHeight(int x, int z, int height) {
@@ -304,10 +313,9 @@ final class TerrainGenerator {
         if (height < 1) height = 1;
         if (height > HEIGHT - 3) height = HEIGHT - 3;
         heights[x][z] = (short) height;
-        // Height edits can change tree eligibility at this column and neighbors.
-        for (int tx = Math.max(0, x - 1); tx <= Math.min(SIZE - 1, x + 1); tx++) {
-            for (int tz = Math.max(0, z - 1); tz <= Math.min(SIZE - 1, z + 1); tz++) treeAtCache[tx][tz] = 0;
-        }
+        // Tree spacing is checked across a 7x7 neighbourhood, so terrain
+        // edits invalidate every nearby cached candidate, not just adjacent cells.
+        invalidateTreeCache(x, z);
     }
 
     /** Returns the block occupying a vertical side-wall cell. */
