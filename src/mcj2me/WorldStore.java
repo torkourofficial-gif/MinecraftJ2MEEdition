@@ -108,6 +108,18 @@ final class WorldStore {
         }
     }
 
+    static synchronized void delete(int worldId) throws Exception {
+        RecordStore catalogue = null;
+        try {
+            catalogue = RecordStore.openRecordStore(STORE, false);
+            try { catalogue.deleteRecord(worldId); } catch (Exception ignored) { }
+        } finally {
+            if (catalogue != null) try { catalogue.closeRecordStore(); } catch (RecordStoreException ignored) { }
+        }
+        try { RecordStore.deleteRecordStore(stateStoreName(worldId)); }
+        catch (RecordStoreNotFoundException ignored) { }
+    }
+
     private static String stateStoreName(int id) {
         return "mcw" + Integer.toString(id, 36);
     }
