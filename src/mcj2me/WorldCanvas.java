@@ -63,7 +63,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Image guiImage;
     private Image guiBlocksImage;
     private Image inventoryImage;
-    private final Image[] blockIcons = new Image[41];
+    private final Image[] blockIcons = new Image[42];
     private boolean inventoryOpen = false;
     private int inventoryCursor = 0;
     private int inventoryPageStart = 0;
@@ -137,7 +137,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final int[] GUI_ICON_X = {432, 144, 0, 288, 96};
     private static final int[] GUI_ICON_Y = {0, 288, 0, 48, 288};
     private static final int BLOCK_TORCH = 16, BLOCK_YELLOW_FLOWER = 17, BLOCK_RED_FLOWER = 18, BLOCK_SAPLING = 19, BLOCK_DOOR = 20;
-    private static final int ITEM_WATER_BUCKET = 40;
+    private static final int ITEM_WATER_BUCKET = 40, ITEM_EMPTY_BUCKET = 41;
     private static final int MAX_WATER_SOURCES = 8;
     private static final int WATER_FLOW_INTERVAL = 10;
     private final int[] waterFlowX = new int[MAX_WATER_SOURCES];
@@ -153,12 +153,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         "IRON BLOCK", "GOLD BLOCK", "DIAMOND BLOCK",
         "WHITE WOOL", "ORANGE WOOL", "MAGENTA WOOL", "LIGHT BLUE WOOL", "YELLOW WOOL", "LIME WOOL",
         "PINK WOOL", "GRAY WOOL", "LIGHT GRAY WOOL", "CYAN WOOL", "PURPLE WOOL", "BLUE WOOL",
-        "BROWN WOOL", "GREEN WOOL", "RED WOOL", "BLACK WOOL", "WATER BUCKET"
+        "BROWN WOOL", "GREEN WOOL", "RED WOOL", "BLACK WOOL", "WATER BUCKET", "EMPTY BUCKET"
     };
     private final int[] inventory = {
         64, 64, 64, 64, 64, 16, 8, 8, 4, 0, 8, 64, 32, 32, 16, 8,
         16, 4, 4, 4, 2, 8, 8, 8,
-        16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 1
+        16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 1, 0
     };
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
     private int tntFuseTicks = 0, tntX = -1, tntZ = -1, tntFlashCounter = 0;
@@ -342,15 +342,19 @@ final class WorldCanvas extends Canvas implements Runnable {
         guiImage = Image.createImage("/mcj2me/gui.png");
         guiBlocksImage = Image.createImage("/mcj2me/gui_blocks.png");
         inventoryImage = Image.createImage("/mcj2me/inventory.png");
+        Image itemsImage = Image.createImage("/items.png");
         blockIcons[0] = createGuiBlockIcon(GUI_ICON_X[0], GUI_ICON_Y[0]);
         blockIcons[1] = createGuiBlockIcon(GUI_ICON_X[1], GUI_ICON_Y[1]);
         blockIcons[2] = createGuiBlockIcon(GUI_ICON_X[2], GUI_ICON_Y[2]);
         blockIcons[3] = createGuiBlockIcon(GUI_ICON_X[3], GUI_ICON_Y[3]);
         blockIcons[4] = createGuiBlockIcon(GUI_ICON_X[4], GUI_ICON_Y[4]);
         for (int bi = 5; bi < 40; bi++) {
-            blockIcons[bi] = createTerrainBlockIcon(atlas, BLOCK_TILE_X[bi], BLOCK_TILE_Y[bi]);
+            blockIcons[bi] = createGuiBlockInventoryIcon(bi, atlas);
         }
-        blockIcons[ITEM_WATER_BUCKET] = createWaterBucketIcon();
+        // The classic item atlas supplies the actual door and bucket sprites.
+        blockIcons[BLOCK_DOOR] = createItemsIcon(itemsImage, 0, 16);
+        blockIcons[ITEM_WATER_BUCKET] = createItemsIcon(itemsImage, 3, 0);
+        blockIcons[ITEM_EMPTY_BUCKET] = createItemsIcon(itemsImage, 1, 0);
         Image cloudsImage = Image.createImage("/mcj2me/clouds.png");
         Image2D image2D = new Image2D(Image2D.RGBA, atlas);
         Texture2D texture = new Texture2D(image2D);
@@ -706,7 +710,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 return;
             }
             if (keyCode == '9' && inventoryPageStart == 0) {
-                inventoryPageStart = 14;
+                inventoryPageStart = 15;
                 repaint();
                 return;
             }
@@ -1381,20 +1385,51 @@ final class WorldCanvas extends Canvas implements Runnable {
         return Image.createRGBImage(pixels, width, height, true);
     }
 
-    private Image createWaterBucketIcon() {
-        Image icon = Image.createImage(16, 16);
-        Graphics g = icon.getGraphics();
-        g.setColor(0xBFC7CE);
-        g.drawLine(4, 3, 11, 3); g.drawLine(4, 3, 4, 12);
-        g.drawLine(11, 3, 11, 12); g.drawLine(4, 12, 11, 12);
-        g.setColor(0x5BA8E8);
-        g.fillRect(5, 7, 6, 4);
-        g.setColor(0xE8EDF2);
-        g.drawLine(4, 4, 11, 4); g.drawLine(5, 2, 10, 2);
-        g.setColor(0x8C969F);
-        g.drawLine(3, 4, 2, 6); g.drawLine(2, 6, 3, 8);
-        g.drawLine(12, 4, 13, 6); g.drawLine(13, 6, 12, 8);
-        return icon;
+    private Image createItemsIcon(Image items, int tileX, int tileY) {
+        int[] pixels = new int[16 * 16];
+        items.getRGB(pixels, 0, 16, tileX * 16, tileY * 16, 16, 16);
+        return Image.createRGBImage(pixels, 16, 16, true);
+    }
+
+    private Image createGuiBlockInventoryIcon(int block, Image terrain) {
+        // gui_blocks.png stores pre-rendered 48x48 block icons in its upper
+        // section. Coordinates are pixel offsets in that sheet, not terrain tiles.
+        int sx = GUI_ICON_X[2], sy = GUI_ICON_Y[2];
+        switch (block) {
+            case 0: sx = 432; sy = 0; break;       // grass block
+            case 1: sx = 144; sy = 288; break;     // dirt
+            case 2: sx = 0; sy = 0; break;         // stone
+            case 3: sx = 288; sy = 48; break;      // oak log
+            case 4: sx = 96; sy = 288; break;      // leaves
+            case 5: sx = 384; sy = 144; break;     // coal ore
+            case 6: sx = 432; sy = 144; break;     // iron ore
+            case 7: sx = 480; sy = 144; break;     // gold ore
+            case 8: sx = 432; sy = 192; break;     // diamond ore
+            case 9: sx = 0; sy = 240; break;       // bedrock
+            case 10: sx = 288; sy = 288; break;    // TNT
+            case 11: sx = 240; sy = 0; break;      // planks
+            case 12: sx = 192; sy = 48; break;     // sand
+            case 13: sx = 384; sy = 48; break;     // gravel
+            case 14: sx = 288; sy = 0; break;      // bricks
+            case 15: sx = 288; sy = 192; break;    // obsidian
+            case 16: return createItemsIcon(Image.createImage("/items.png"), 5, 0);
+            case 17: sx = 0; sy = 192; break;      // yellow flower
+            case 18: sx = 48; sy = 192; break;     // red flower
+            case 19: return createItemsIcon(Image.createImage("/items.png"), 0, 16);
+            case 20: return createItemsIcon(Image.createImage("/items.png"), 0, 16);
+            case 21: sx = 192; sy = 144; break;    // iron block
+            case 22: sx = 144; sy = 144; break;    // gold block
+            case 23: sx = 240; sy = 144; break;    // diamond block
+            default:
+                if (block >= 24 && block < 40) {
+                    sx = (block - 24) * 48 % 480;
+                    sy = 240 + ((block - 24) / 10) * 48;
+                } else {
+                    return createTerrainBlockIcon(terrain, BLOCK_TILE_X[block], BLOCK_TILE_Y[block]);
+                }
+                break;
+        }
+        return createGuiBlockIcon(sx, sy);
     }
 
     private Image createGuiBlockIcon(int sourceX, int sourceY) {
@@ -2324,6 +2359,10 @@ final class WorldCanvas extends Canvas implements Runnable {
             placeWaterBucket(x, z, h);
             return;
         }
+        if (selectedSlot == ITEM_EMPTY_BUCKET) {
+            collectWaterBucket();
+            return;
+        }
         if (selectedSlot >= BLOCK_TORCH && selectedSlot <= BLOCK_DOOR) {
             if (decorationCount >= MAX_DECORATIONS) return;
             if (h >= TerrainGenerator.HEIGHT - 3) return;
@@ -2352,12 +2391,45 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         if (free < 0) return;
         terrain.setPlacedWaterLevel(x, z, level);
+        inventory[ITEM_WATER_BUCKET]--;
+        inventory[ITEM_EMPTY_BUCKET]++;
         waterFlowX[free] = x;
         waterFlowZ[free] = z;
         waterFlowLevel[free] = level;
         waterFlowTicks[free] = 0;
         waterFlowActive[free] = true;
         invalidateEditedArea(x, x, z, z);
+    }
+
+    private void collectWaterBucket() {
+        int waterX = -1, waterZ = -1, waterLevel = -1;
+        float dx = (float) Math.sin(yaw * Math.PI / 180.0);
+        float dz = (float) Math.cos(yaw * Math.PI / 180.0);
+        for (float distance = 0.5f; distance <= 4.0f; distance += 0.25f) {
+            int x = (int) (cameraX + dx * distance);
+            int z = (int) (cameraZ + dz * distance);
+            int level = terrain.getPlacedWaterLevel(x, z);
+            if (level > 0) { waterX = x; waterZ = z; waterLevel = level; break; }
+        }
+        if (waterX < 0) return;
+        // Remove the small 5x5-diamond puddle belonging to this source, not
+        // natural lakes. Keep this bounded for predictable memory/performance.
+        for (int dxCell = -2; dxCell <= 2; dxCell++) {
+            for (int dzCell = -2; dzCell <= 2; dzCell++) {
+                if (Math.abs(dxCell) + Math.abs(dzCell) > 2) continue;
+                int x = waterX + dxCell, z = waterZ + dzCell;
+                if (terrain.getPlacedWaterLevel(x, z) == waterLevel) {
+                    terrain.setPlacedWaterLevel(x, z, 0);
+                    invalidateEditedArea(x, x, z, z);
+                }
+            }
+        }
+        for (int i = 0; i < MAX_WATER_SOURCES; i++) {
+            if (waterFlowActive[i] && Math.abs(waterFlowX[i] - waterX) + Math.abs(waterFlowZ[i] - waterZ) <= 2)
+                waterFlowActive[i] = false;
+        }
+        inventory[ITEM_EMPTY_BUCKET]--;
+        inventory[ITEM_WATER_BUCKET]++;
     }
 
     private boolean isWaterFlowBlocked(int x, int z, int level) {
