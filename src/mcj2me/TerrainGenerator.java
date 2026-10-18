@@ -332,7 +332,10 @@ final class TerrainGenerator {
         if (y <= bedrockTop) return BLOCK_BEDROCK;
 
         int depth = originalHeights[x][z] - y;
-        if (depth <= 3) return BLOCK_DIRT;
+        // Dirt layers belong only beneath a grass surface; other surface
+        // materials must not turn their entire subsurface into dirt.
+        if (topTypes[x][z] == BLOCK_GRASS && depth > 0 && depth <= 3)
+            return BLOCK_DIRT;
         int oreHash = hash(x + y * 37 + 101, z - y * 19 - 53) & 2047;
         if (y < 18 && oreHash < 4) return BLOCK_DIAMOND_ORE;
         if (y < 27 && oreHash < 15) return BLOCK_GOLD_ORE;
