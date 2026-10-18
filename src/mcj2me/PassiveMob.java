@@ -263,10 +263,10 @@ final class PassiveMob {
         if (mobType == MOB_ZOMBIE) {
             if (part == 0) { x=0; y=0; w=8; h=8; d=8; }          // head
             else if (part == 1) { x=16; y=16; w=8; h=12; d=4; } // torso
-            else if (part == 2) { x=40; y=16; w=4; h=12; d=4; }// right arm
+            else if (part == 2) { x=32; y=16; w=4; h=12; d=4; }// right arm: same texture as left arm
             else if (part == 4) { x=32; y=16; w=4; h=12; d=4; }// left arm
             else if (part == 5) { x=16; y=16; w=4; h=12; d=4; }// left leg
-            else { x=0; y=16; w=4; h=12; d=4; }                // right leg
+            else { x=16; y=16; w=4; h=12; d=4; }               // right leg: same texture as left leg
         } else if (mobType == MOB_COW) {
             if (part == 0) { x=0; y=0; w=8; h=8; d=6; }          // head
             else if (part == 1) { x=18; y=4; w=12; h=18; d=10; }// body
