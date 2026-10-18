@@ -2271,14 +2271,16 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (type >= 0 && type < inventory.length && type != TerrainGenerator.BLOCK_BEDROCK && inventory[type] < 64) inventory[type]++;
         spawnBlockParticles(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
 
-        if (sideHit) {
-            // This terrain is height-map based, so a side edit lowers that column
-            // to the struck layer rather than creating a fully voxel-shaped cavity.
+        if (sideHit && blockY < h - 1) {
+            // A lower side block was struck. The height-map representation
+            // cannot make a cavity, so lower the column to that block's layer.
             int newHeight = blockY + 1;
             if (newHeight >= h) return;
             terrain.setHeight(x, z, newHeight);
             terrain.setTopType(x, z, type);
         } else {
+            // The top block can also be hit through one of its four side faces.
+            // Do not reject it just because the side-hit height equals h - 1.
             int nextType = terrain.getSubsurfaceType(x, h - 2, z);
             terrain.setHeight(x, z, h - 1);
             terrain.setTopType(x, z, nextType);
