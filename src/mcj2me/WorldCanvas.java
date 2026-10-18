@@ -115,7 +115,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Thread thread;
     private boolean running;
     private int frameSkipCounter = 0;
-    private final int[] surfaceHitResult = new int[4];
+    private final int[] surfaceHitResult = new int[5];
     private final int[] leafHitResult = new int[3];
     private boolean paused;
     private boolean pauseOverlayOpen;
@@ -2733,27 +2733,43 @@ final class WorldCanvas extends Canvas implements Runnable {
         float dx = (float) (Math.sin(xr) * Math.cos(yr));
         float dy = (float) Math.sin(yr);
         float dz = (float) (-Math.cos(xr) * Math.cos(yr));
+
         int x = floorVoxel(cameraX), y = floorVoxel(cameraY), z = floorVoxel(cameraZ);
-        int sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
-        float tx = dx == 0 ? Float.MAX_VALUE : (((dx > 0 ? x + 1 : x) - cameraX) / dx);
-        float ty = dy == 0 ? Float.MAX_VALUE : (((dy > 0 ? y + 1 : y) - cameraY) / dy);
-        float tz = dz == 0 ? Float.MAX_VALUE : (((dz > 0 ? z + 1 : z) - cameraZ) / dz);
-        float dtx = dx == 0 ? Float.MAX_VALUE : Math.abs(1.0f / dx);
-        float dty = dy == 0 ? Float.MAX_VALUE : Math.abs(1.0f / dy);
-        float dtz = dz == 0 ? Float.MAX_VALUE : Math.abs(1.0f / dz);
+        int sx = dx > 0.0f ? 1 : -1;
+        int sy = dy > 0.0f ? 1 : -1;
+        int sz = dz > 0.0f ? 1 : -1;
+        float tx = dx == 0.0f ? Float.MAX_VALUE :
+            (((dx > 0.0f ? x + 1 : x) - cameraX) / dx);
+        float ty = dy == 0.0f ? Float.MAX_VALUE :
+            (((dy > 0.0f ? y + 1 : y) - cameraY) / dy);
+        float tz = dz == 0.0f ? Float.MAX_VALUE :
+            (((dz > 0.0f ? z + 1 : z) - cameraZ) / dz);
+        float dtx = dx == 0.0f ? Float.MAX_VALUE : Math.abs(1.0f / dx);
+        float dty = dy == 0.0f ? Float.MAX_VALUE : Math.abs(1.0f / dy);
+        float dtz = dz == 0.0f ? Float.MAX_VALUE : Math.abs(1.0f / dz);
         float distance = 0.0f;
-        int enteredAxis = -1; // 0=X, 1=Y, 2=Z
-        int previousX = x, previousZ = z;
+        int enteredAxis = -1;
+        int previousX = x, previousY = y, previousZ = z;
+
+        // Amanatides-Woo DDA: visit the voxel cells crossed by the view ray.
+        // The height-map world only has editable column surfaces, so side hits
+        // are accepted where the neighbouring column leaves a wall exposed.
         while (distance <= 5.0f) {
             if (x >= 1 && z >= 1 && x < TerrainGenerator.SIZE - 1
-                    && z < TerrainGenerator.SIZE - 1 && y >= 0) {
+                    && z < TerrainGenerator.SIZE - 1 && y >= 0
+                    && y < TerrainGenerator.HEIGHT) {
                 int surface = terrain.getHeight(x, z);
-                boolean topFace = enteredAxis == 1 && dy < 0.0f && y == surface - 1;
+                boolean topFace = enteredAxis == 1 && dy < 0.0f
+                    && y == surface - 1;
                 boolean sideFace = false;
-                if ((enteredAxis == 0 || enteredAxis == 2) && y < surface) {
+
+                if (enteredAxis == 0 || enteredAxis == 2) {
                     int previousHeight = terrain.getHeight(previousX, previousZ);
-                    sideFace = y >= previousHeight;
+                    // A column occupies cells y < height; only the portion
+                    // above the previous column is an exposed vertical face.
+                    sideFace = y < surface && y >= previousHeight;
                 }
+
                 if (topFace || sideFace) {
                     surfaceHitResult[0] = x;
                     surfaceHitResult[1] = z;
@@ -2763,7 +2779,9 @@ final class WorldCanvas extends Canvas implements Runnable {
                     return surfaceHitResult;
                 }
             }
+
             previousX = x;
+            previousY = y;
             previousZ = z;
             if (tx <= ty && tx <= tz) {
                 distance = tx; tx += dtx; x += sx; enteredAxis = 0;
