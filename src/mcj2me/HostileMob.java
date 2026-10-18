@@ -20,7 +20,7 @@ final class HostileMob {
     HostileMob(Group parent, TerrainGenerator terrain, float startX, float startZ) throws Exception {
         this.terrain = terrain;
         parent.addChild(group);
-        zombieAppearance = PassiveMob.textureAppearance(Image.createImage("/mcj2me/zombie.png"));
+        zombieAppearance = PassiveMob.textureAppearance(ResourceImages.load("/mcj2me/zombie.png"));
         for (int i = 0; i < COUNT; i++) {
             int x = startX < 8 ? 12 + i * 3 : (int)startX + (i == 0 ? -9 : 9);
             int z = (int)startZ + (i == 0 ? -8 : 8);
