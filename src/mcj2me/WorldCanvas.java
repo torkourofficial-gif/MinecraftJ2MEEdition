@@ -1225,7 +1225,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void startEating(int item) {
-        if (eatingTicks > 0 || item < 0 || item >= inventory.length
+        if (eatingTicks > 0 || health >= 20 || item < 0 || item >= inventory.length
                 || inventory[item] <= 0 || (item != ITEM_RAW_PORKCHOP && item != ITEM_RAW_BEEF)) return;
         eatingItem = item;
         eatingTicks = EATING_DURATION_TICKS;
@@ -3485,7 +3485,8 @@ final class WorldCanvas extends Canvas implements Runnable {
             miningProgress = 0;
             return;
         }
-        if (++miningProgress >= delay) {
+        if (++miningProgress % 8 == 0) handSwingTicks = 8;
+        if (miningProgress >= delay) {
             breakBlock();
             miningProgress = 0;
             actionCooldown = 4;
