@@ -1269,9 +1269,12 @@ final class WorldCanvas extends Canvas implements Runnable {
                 else if (down) inventoryCursor = 27;
             }
             if (action == FIRE || keyCode == '5' || keyCode == ' ') {
-                if (inventoryCursor == 31) {
+                // Treat the entire crafting area (ingredient grid and result)
+                // as the craft action target. This is easier to use on phones
+                // where reaching the tiny output slot with the D-pad is awkward.
+                if (inventoryCursor >= 27) {
                     craftRecipe(crafts.inventoryRecipeAt(craftingRecipeCursor));
-                } else if (inventoryCursor < 27) {
+                } else {
                     int item = worldMode == IndevViewerMIDlet.MODE_SURVIVAL
                         ? mainInventoryItems[inventoryCursor] : inventoryPageStart + inventoryCursor;
                     if (item >= 0 && item < BLOCK_NAMES.length && item != TerrainGenerator.BLOCK_BEDROCK) {
@@ -2397,11 +2400,25 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (item == crafts.CRAFTING_TABLE || item == crafts.CHEST) color = 0xA87943;
         if (item == crafts.FURNACE) color = 0x777777;
         g.setColor(0x242424); g.fillRect(0, 0, 16, 16);
-        g.setColor(color); g.fillRect(1, 1, 14, 14);
-        g.setColor(0xFFFFFF);
-        String name = item >= 0 && item < BLOCK_NAMES.length ? BLOCK_NAMES[item] : "?";
-        String tag = name.length() > 2 ? name.substring(0, 2) : name;
-        g.drawString(tag, 8, 3, Graphics.TOP | Graphics.HCENTER);
+        if (item == crafts.LEATHER) {
+            // A small hide silhouette instead of tiny "LE" text, which looked
+            // like the nonsensical "LF" abbreviation at the dropped-item scale.
+            g.setColor(0x5A3520);
+            g.fillRect(3, 2, 10, 12);
+            g.fillRect(1, 4, 14, 8);
+            g.setColor(0xA87545);
+            g.fillRect(4, 3, 8, 10);
+            g.fillRect(2, 5, 12, 6);
+            g.setColor(0xC99A62);
+            g.fillRect(5, 4, 6, 2);
+            g.fillRect(4, 7, 8, 4);
+        } else {
+            g.setColor(color); g.fillRect(1, 1, 14, 14);
+            g.setColor(0xFFFFFF);
+            String name = item >= 0 && item < BLOCK_NAMES.length ? BLOCK_NAMES[item] : "?";
+            String tag = name.length() > 2 ? name.substring(0, 2) : name;
+            g.drawString(tag, 8, 3, Graphics.TOP | Graphics.HCENTER);
+        }
         return icon;
     }
 
