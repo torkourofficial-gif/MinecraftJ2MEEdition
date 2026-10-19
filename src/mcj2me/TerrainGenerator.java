@@ -30,6 +30,9 @@ final class TerrainGenerator {
     // Sparse per-voxel edits: mining one block never shifts the rest of its column.
     private int[] removedBlockIds = new int[64];
     private int removedBlockCount;
+    private int[] placedBlockIds = new int[64];
+    private byte[] placedBlockTypes = new byte[64];
+    private int placedBlockCount;
     // 0=unknown, 1=tree, -1=no tree. Tiny cache for the regular tree grid.
     private final byte[][] treeAtCache = new byte[SIZE][SIZE];
     private final int seed;
@@ -324,6 +327,40 @@ final class TerrainGenerator {
         invalidateTreeCache(x, z);
     }
 
+    int getPlacedBlockCount() { return placedBlockCount; }
+    int getPlacedBlockIdAtIndex(int index) { return placedBlockIds[index]; }
+    int getPlacedBlockTypeAtIndex(int index) { return placedBlockTypes[index] & 255; }
+    int getPlacedBlockTypeAt(int x, int y, int z) {
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE || y < 0 || y >= HEIGHT) return -1;
+        int id = blockId(x, y, z);
+        for (int i = 0; i < placedBlockCount; i++) if (placedBlockIds[i] == id) return placedBlockTypes[i] & 255;
+        return -1;
+    }
+    boolean setPlacedBlockAt(int x, int y, int z, int type) {
+        if (x < 1 || z < 1 || x >= SIZE - 1 || z >= SIZE - 1 || y < 0 || y >= HEIGHT) return false;
+        if (type < BLOCK_GRASS || type > BLOCK_WOOL_BLACK || (type >= 16 && type <= 20)) return false;
+        if (getBlockTypeAt(x, y, z) >= 0) return false;
+        if (placedBlockCount == placedBlockIds.length) {
+            int size = placedBlockIds.length * 2;
+            int[] ids = new int[size]; byte[] types = new byte[size];
+            System.arraycopy(placedBlockIds, 0, ids, 0, placedBlockCount);
+            System.arraycopy(placedBlockTypes, 0, types, 0, placedBlockCount);
+            placedBlockIds = ids; placedBlockTypes = types;
+        }
+        placedBlockIds[placedBlockCount] = blockId(x, y, z);
+        placedBlockTypes[placedBlockCount++] = (byte) type;
+        return true;
+    }
+    boolean removePlacedBlockAt(int x, int y, int z) {
+        int id = blockId(x, y, z);
+        for (int i = 0; i < placedBlockCount; i++) if (placedBlockIds[i] == id) {
+            int last = --placedBlockCount;
+            placedBlockIds[i] = placedBlockIds[last]; placedBlockTypes[i] = placedBlockTypes[last];
+            return true;
+        }
+        return false;
+    }
+
     /** True when this exact XYZ voxel has been mined. */
     boolean isBlockRemoved(int x, int y, int z) {
         if (x < 0 || z < 0 || x >= SIZE || z >= SIZE || y < 0 || y >= HEIGHT) return false;
@@ -354,6 +391,8 @@ final class TerrainGenerator {
     /** Returns the block occupying a wall cell, or -1 when that voxel was removed. */
     int getBlockTypeAt(int x, int y, int z) {
         if (x < 0 || z < 0 || x >= SIZE || z >= SIZE || y < 0) return BLOCK_BEDROCK;
+        int placedType = getPlacedBlockTypeAt(x, y, z);
+        if (placedType >= 0) return placedType;
         // Cells at or above the current column height are air, not copies of
         // the surface block. This matters for two-block player clearance.
         if (y >= heights[x][z]) return -1;
@@ -493,6 +532,8 @@ final class TerrainGenerator {
         // Optional appended sparse block edits; older saves remain compatible.
         out.writeInt(removedBlockCount);
         for (int i = 0; i < removedBlockCount; i++) out.writeInt(removedBlockIds[i]);
+        out.writeInt(placedBlockCount);
+        for (int i = 0; i < placedBlockCount; i++) { out.writeInt(placedBlockIds[i]); out.writeByte(placedBlockTypes[i]); }
         out.flush();
         return bytes.toByteArray();
     }
@@ -518,13 +559,21 @@ final class TerrainGenerator {
         }
         if (in.available() >= 4) {
             int blockCount = in.readInt();
-            if (blockCount < 0 || blockCount > SIZE * SIZE * HEIGHT)
-                throw new Exception("Invalid saved block edits");
+            if (blockCount < 0 || blockCount > SIZE * SIZE * HEIGHT) throw new Exception("Invalid saved block edits");
             if (blockCount > removedBlockIds.length) removedBlockIds = new int[blockCount];
             removedBlockCount = blockCount;
             for (int i = 0; i < blockCount; i++) removedBlockIds[i] = in.readInt();
-        } else {
-            removedBlockCount = 0;
+        } else removedBlockCount = 0;
+        placedBlockCount = 0;
+        if (in.available() >= 4) {
+            int placedCount = in.readInt();
+            if (placedCount < 0 || placedCount > SIZE * SIZE * HEIGHT) throw new Exception("Invalid saved placed blocks");
+            if (placedCount > placedBlockIds.length) { placedBlockIds = new int[placedCount]; placedBlockTypes = new byte[placedCount]; }
+            for (int i = 0; i < placedCount; i++) {
+                int id = in.readInt(); byte type = in.readByte();
+                if (id < 0 || id >= SIZE * SIZE * HEIGHT) throw new Exception("Invalid placed block position");
+                placedBlockIds[placedBlockCount] = id; placedBlockTypes[placedBlockCount++] = type;
+            }
         }
         for (int x = 0; x < SIZE; x++)
             for (int z = 0; z < SIZE; z++) treeAtCache[x][z] = 0;
