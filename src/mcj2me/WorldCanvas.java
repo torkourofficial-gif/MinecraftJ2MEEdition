@@ -4148,6 +4148,15 @@ final class WorldCanvas extends Canvas implements Runnable {
                 (short)((BLOCK_TILE_X[tileIndex] + 1) * 16 - 1), (short)((BLOCK_TILE_Y[tileIndex] + 1) * 16 - 1),
                 (short)((BLOCK_TILE_X[tileIndex] + 1) * 16 - 1), (short)(BLOCK_TILE_Y[tileIndex] * 16 + 1)
             };
+            // Natural flowers flip V when their chunk mesh is built. Apply the
+            // same vertical UV flip to placeable flowers so both versions match.
+            if (i == 1 || i == 2) {
+                int flowerTileY = BLOCK_TILE_Y[tileIndex];
+                for (int vertex = 0; vertex < 4; vertex++) {
+                    int vIndex = vertex * 2 + 1;
+                    uv[vIndex] = (short)(flowerTileY * 32 + 16 - uv[vIndex]);
+                }
+            }
             VertexArray va = new VertexArray(4, 3, 2);
             va.set(0, 4, positions);
             VertexArray ta = new VertexArray(4, 2, 2);
@@ -4208,7 +4217,10 @@ final class WorldCanvas extends Canvas implements Runnable {
                 decorationAppearances[variant]);
         }
         if (type == BLOCK_TORCH) mesh.setScale(0.18f, 0.58f, 1.0f);
-        else if (type == BLOCK_SAPLING) mesh.setScale(0.48f, 0.62f, 1.0f);
+        else if (type == BLOCK_YELLOW_FLOWER || type == BLOCK_RED_FLOWER) {
+            // Match naturally generated flowers: a full 1x1 crossed plant.
+            mesh.setScale(1.0f, 1.0f, 1.0f);
+        } else if (type == BLOCK_SAPLING) mesh.setScale(0.48f, 0.62f, 1.0f);
         else if (type != BLOCK_DOOR && type != BLOCK_CRAFTING_TABLE) mesh.setScale(0.38f, 0.48f, 1.0f);
         Group pivot = null;
         float placedYaw = yaw;
