@@ -2439,12 +2439,13 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         if (recipe.output >= 0 && recipe.output < blockIcons.length && blockIcons[recipe.output] != null)
             g.drawImage(blockIcons[recipe.output], ox + 1, oy + 1, Graphics.TOP | Graphics.LEFT);
-        boolean ready = hasIngredients(recipe) && canReceiveCraftOutput(recipe);
-        g.setColor(ready ? 0x66FF66 : 0xFF7777);
+        boolean hasItems = hasIngredients(recipe);
+        boolean hasRoom = hasItems && canReceiveCraftOutput(recipe);
+        g.setColor(hasRoom ? 0x66FF66 : 0xFF7777);
         String resultName = recipe.output >= 0 && recipe.output < BLOCK_NAMES.length ? BLOCK_NAMES[recipe.output] : "ITEM";
         g.drawString(resultName, panelX + 7, panelY + (table ? 96 : 55), Graphics.TOP | Graphics.LEFT);
-        g.drawString(ready ? "READY x" + recipe.outputCount : "NEED MATERIALS",
-            panelX + 7, panelY + (table ? 110 : 67), Graphics.TOP | Graphics.LEFT);
+        String status = !hasItems ? "NEED MATERIALS" : (hasRoom ? "READY x" + recipe.outputCount : "INVENTORY FULL");
+        g.drawString(status, panelX + 7, panelY + (table ? 110 : 67), Graphics.TOP | Graphics.LEFT);
         g.setColor(0xFFFFFF);
         g.drawString((craftingRecipeCursor + 1) + "/" + count + (table ? " 2/8 browse 5 craft" : " 1-3 select 0 craft"),
             panelX + 7, panelY + (table ? 124 : 77), Graphics.TOP | Graphics.LEFT);
@@ -3776,9 +3777,9 @@ final class WorldCanvas extends Canvas implements Runnable {
             short[] positions = {-1, 0, 0, -1, 2, 0, 1, 0, 0, 1, 2, 0};
             short[] uv = {
                 (short)(BLOCK_TILE_X[tileIndex] * 16 + 1), (short)((BLOCK_TILE_Y[tileIndex] + 1) * 16 - 1),
-                (short)(BLOCK_TILE_X[BLOCK_TORCH + i] * 16 + 1), (short)(BLOCK_TILE_Y[BLOCK_TORCH + i] * 16 + 1),
-                (short)((BLOCK_TILE_X[BLOCK_TORCH + i] + 1) * 16 - 1), (short)((BLOCK_TILE_Y[BLOCK_TORCH + i] + 1) * 16 - 1),
-                (short)((BLOCK_TILE_X[BLOCK_TORCH + i] + 1) * 16 - 1), (short)(BLOCK_TILE_Y[BLOCK_TORCH + i] * 16 + 1)
+                (short)(BLOCK_TILE_X[tileIndex] * 16 + 1), (short)(BLOCK_TILE_Y[tileIndex] * 16 + 1),
+                (short)((BLOCK_TILE_X[tileIndex] + 1) * 16 - 1), (short)((BLOCK_TILE_Y[tileIndex] + 1) * 16 - 1),
+                (short)((BLOCK_TILE_X[tileIndex] + 1) * 16 - 1), (short)(BLOCK_TILE_Y[tileIndex] * 16 + 1)
             };
             VertexArray va = new VertexArray(4, 3, 2);
             va.set(0, 4, positions);
