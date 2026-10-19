@@ -127,6 +127,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int frameSkipCounter = 0;
     private final int[] surfaceHitResult = new int[8];
     private final int[] leafHitResult = new int[3];
+    private final int[] treeHitResult = new int[4];
     private boolean paused;
     private boolean pauseOverlayOpen;
     private int pauseSelection;
@@ -216,6 +217,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int lastMiningDelay = 4;
     private boolean breakHeld;
     private int miningProgress;
+    private int miningTargetType = -1;
     private static final int MAX_DROPPED_ITEMS = 8;
     private final Mesh[] droppedMeshes = new Mesh[MAX_DROPPED_ITEMS];
     private final int[] droppedTypes = new int[MAX_DROPPED_ITEMS];
@@ -883,6 +885,15 @@ final class WorldCanvas extends Canvas implements Runnable {
         g.setColor(0xFFFFFF);
         g.drawLine(cx - 3, cy, cx + 3, cy);
         g.drawLine(cx, cy - 3, cx, cy + 3);
+        if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL && breakHeld && miningProgress > 0
+                && lastMiningDelay > 0 && lastMiningDelay < 999) {
+            int diameter = 17;
+            int sweep = (360 * Math.min(miningProgress, lastMiningDelay)) / lastMiningDelay;
+            g.setColor(0x202020);
+            g.drawArc(cx - diameter / 2, cy - diameter / 2, diameter, diameter, 0, 360);
+            g.setColor(0xFFFFFF);
+            g.drawArc(cx - diameter / 2, cy - diameter / 2, diameter, diameter, 90, -sweep);
+        }
         if (splashTicks > 0) {
             g.setColor(0xBDEBFF);
             for (int b = 0; b < 5; b++) {
@@ -2698,6 +2709,20 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void breakBlock() {
+        int[] treeHit = raycastTreeTrunk();
+        if (treeHit != null && terrain.removeTreeAt(treeHit[0], treeHit[1])) {
+            int tx = treeHit[0], tz = treeHit[1], base = terrain.getHeight(tx, tz);
+            if (worldMode == IndevViewerMIDlet.MODE_CREATIVE) {
+                if (inventory[TerrainGenerator.BLOCK_WOOD] < 64) inventory[TerrainGenerator.BLOCK_WOOD]++;
+            } else {
+                spawnDroppedBlock(TerrainGenerator.BLOCK_WOOD, tx + 0.5f,
+                    treeHit[2] + 0.5f, tz + 0.5f);
+            }
+            spawnBlockParticles(TerrainGenerator.BLOCK_WOOD, tx + 0.5f,
+                treeHit[2] + 0.5f, tz + 0.5f);
+            invalidateEditedArea(tx - 2, tx + 2, tz - 2, tz + 2);
+            return;
+        }
         int decorationHit = raycastDecoration();
         if (decorationHit >= 0) {
             int type = decorationTypes[decorationHit];
@@ -3036,6 +3061,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private void tickMining() {
         if (worldMode != IndevViewerMIDlet.MODE_SURVIVAL || !breakHeld || actionCooldown > 0) return;
         int delay = getMiningDelayForTarget();
+        miningTargetType = getMiningTargetType();
+        lastMiningDelay = delay;
         if (delay >= 999) {
             miningProgress = 0;
             return;
@@ -3047,7 +3074,49 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
     }
 
+    private int[] raycastTreeTrunk() {
+        double yr = Math.PI * pitch / 180.0;
+        double xr = Math.PI * yaw / 180.0;
+        float dx = (float)(Math.sin(xr) * Math.cos(yr));
+        float dy = (float)Math.sin(yr);
+        float dz = (float)(-Math.cos(xr) * Math.cos(yr));
+        int[] solid = raycastSurface();
+        float solidDistance = solid == null ? BLOCK_REACH + 1.0f : surfaceHitResult[4] / 1000.0f;
+        float distance;
+        for (distance = 0.05f; distance <= BLOCK_REACH && distance < solidDistance; distance += 0.08f) {
+            int x = floorVoxel(cameraX + dx * distance);
+            int y = floorVoxel(cameraY + dy * distance);
+            int z = floorVoxel(cameraZ + dz * distance);
+            if (terrain.isTreeAt(x, z)) {
+                int base = terrain.getHeight(x, z);
+                if (y >= base && y < base + terrain.getTreeHeight(x, z)) {
+                    treeHitResult[0] = x;
+                    treeHitResult[1] = z;
+                    treeHitResult[2] = y;
+                    treeHitResult[3] = (int)(distance * 1000.0f);
+                    return treeHitResult;
+                }
+            }
+        }
+        return null;
+    }
+
+    private int getMiningTargetType() {
+        if (raycastTreeTrunk() != null) return TerrainGenerator.BLOCK_WOOD;
+        int decoration = raycastDecoration();
+        if (decoration >= 0) return decorationTypes[decoration];
+        if (raycastLeafBlock() != null) return TerrainGenerator.BLOCK_LEAVES;
+        int[] hit = raycastSurface();
+        if (hit == null) return -1;
+        int placed = terrain.getPlacedBlockTypeAt(hit[0], hit[2], hit[1]);
+        if (placed >= 0) return placed;
+        return hit[3] != 0 ? terrain.getBlockTypeAt(hit[0], hit[2], hit[1])
+            : terrain.getTopType(hit[0], hit[1]);
+    }
+
     private int getMiningDelayForTarget() {
+        int[] treeHit = raycastTreeTrunk();
+        if (treeHit != null) return miningDelay(TerrainGenerator.BLOCK_WOOD);
         int decoration = raycastDecoration();
         if (decoration >= 0) return miningDelay(decorationTypes[decoration]);
         int[] leaf = raycastLeafBlock();
