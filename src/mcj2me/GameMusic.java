@@ -5,6 +5,7 @@ import java.util.Random;
 import javax.microedition.media.Manager;
 import javax.microedition.media.Player;
 import javax.microedition.media.PlayerListener;
+import javax.microedition.media.control.VolumeControl;
 
 /**
  * Beta-style background music: loop menu.mid in the menus, then play one
@@ -26,6 +27,24 @@ final class GameMusic implements Runnable, PlayerListener {
     private Thread worker;
     private Player player;
     private int lastCalm = -1;
+    private volatile int volume = 70;
+
+    synchronized void setVolume(int level) {
+        if (level < 0) level = 0;
+        if (level > 100) level = 100;
+        volume = level;
+        applyVolume(player);
+    }
+
+    synchronized int getVolume() { return volume; }
+
+    private void applyVolume(Player target) {
+        if (target == null) return;
+        try {
+            VolumeControl control = (VolumeControl) target.getControl("VolumeControl");
+            if (control != null) control.setLevel(volume);
+        } catch (Exception ignored) { /* Volume control is optional in MMAPI. */ }
+    }
 
     synchronized void startMenu() {
         switchMode(MENU);
@@ -102,6 +121,7 @@ final class GameMusic implements Runnable, PlayerListener {
                 }
                 player = created;
                 trackEnded = false;
+                applyVolume(created);
             }
             created.start();
             if (loop) {
