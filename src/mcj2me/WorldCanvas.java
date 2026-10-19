@@ -156,12 +156,14 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final int[] BLOCK_TILE_X = {
         0, 2, 1, 5, 4, 2, 1, 2, 2, 1, 8, 4, 2, 3, 6, 5, 0, 13, 12, 15, 1,
         6, 7, 8,
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+        11 // 40: crafting-table top tile in terrain.png
     };
     private static final int[] BLOCK_TILE_Y = {
         0, 0, 0, 1, 3, 1, 2, 2, 3, 1, 0, 0, 4, 1, 0, 3, 5, 0, 0, 0, 5,
         1, 1, 1,
-        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+        2 // 40: crafting-table top tile in terrain.png
     };
     // Coordinates are pixel offsets in the 512x512 gui_blocks atlas.
     // The first five entries are the actual grass, dirt, stone, oak-log and
@@ -601,7 +603,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         // These are blocks, not item sprites: Beta 1.6 stores their block
         // faces in terrain.png (loaded as "atlas"). Using items.png here
         // sampled unrelated item sprites and made the recipe icons incorrect.
-        blockIcons[crafts.CRAFTING_TABLE] = createTerrainBlockIcon(atlas, 11, 2);
+        blockIcons[crafts.CRAFTING_TABLE] = createGuiBlockIcon(192, 144); // crafting table item is shown as a block cube in inventory
         mapCraftItemIcon(itemsImage, crafts.COAL, 7, 0);
         mapCraftItemIcon(itemsImage, crafts.CHARCOAL, 7, 0);
         mapCraftItemIcon(itemsImage, crafts.IRON_INGOT, 7, 1);
@@ -2967,6 +2969,11 @@ final class WorldCanvas extends Canvas implements Runnable {
                 sideX = 8; sideY = 0;
                 bottomX = 9; bottomY = 0;
                 break;
+            case TerrainGenerator.BLOCK_CRAFTING_TABLE:
+                topX = 11; topY = 2;
+                sideX = 11; sideY = 3;
+                bottomX = 11; bottomY = 3;
+                break;
         }
         // Classic Minecraft dropped block models render at about quarter scale.
         // Positions are scaled by 1/16, so +/-2 gives a 0.25x0.25x0.25 cube.
@@ -3311,6 +3318,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             int pz = rem / TerrainGenerator.SIZE, px = rem - pz * TerrainGenerator.SIZE;
             if (px < startX || px >= startX + CHUNK || pz < startZ || pz >= startZ + CHUNK) continue;
             int type = terrain.getPlacedBlockTypeAtIndex(p);
+            if (type < 0 || type >= BLOCK_TILE_X.length) continue;
             int sideTx = BLOCK_TILE_X[type], sideTy = BLOCK_TILE_Y[type];
             int topTx = sideTx, topTy = sideTy, bottomTx = sideTx, bottomTy = sideTy;
             // Placed voxels need the same per-face atlas mapping as natural
@@ -3328,6 +3336,11 @@ final class WorldCanvas extends Canvas implements Runnable {
                 sideTx = 8; sideTy = 0;
                 topTx = 9; topTy = 0;
                 bottomTx = 9; bottomTy = 0;
+            } else if (type == TerrainGenerator.BLOCK_CRAFTING_TABLE) {
+                // Beta 1.6 crafting-table faces: side/front at (11,3), top (11,2).
+                sideTx = 11; sideTy = 3;
+                topTx = 11; topTy = 2;
+                bottomTx = 11; bottomTy = 3;
             }
             if (terrain.getBlockTypeAt(px - 1, py, pz) < 0)
                 vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
@@ -3889,8 +3902,9 @@ final class WorldCanvas extends Canvas implements Runnable {
             int placedType = terrain.getPlacedBlockTypeAt(placedHit[0], placedHit[2], placedHit[1]);
             if (placedType >= 0 && terrain.removePlacedBlockAt(placedHit[0], placedHit[2], placedHit[1])) {
                 lastMiningDelay = miningDelay(placedType);
-                if (worldMode == IndevViewerMIDlet.MODE_CREATIVE && placedType < inventory.length && inventory[placedType] < 64) { inventory[placedType]++; addItemToSlots(placedType); }
-                else if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) spawnDroppedBlock(placedType, placedHit[0] + 0.5f, placedHit[2] + 0.5f, placedHit[1] + 0.5f);
+                int dropType = placedType == TerrainGenerator.BLOCK_CRAFTING_TABLE ? crafts.CRAFTING_TABLE : placedType;
+                if (worldMode == IndevViewerMIDlet.MODE_CREATIVE && dropType < inventory.length && inventory[dropType] < 64) { inventory[dropType]++; addItemToSlots(dropType); }
+                else if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) spawnDroppedItem(dropType, blockIcons[dropType], placedHit[0] + 0.5f, placedHit[2] + 0.5f, placedHit[1] + 0.5f);
                 spawnBlockParticles(placedType, placedHit[0] + 0.5f, placedHit[2] + 0.5f, placedHit[1] + 0.5f);
                 invalidateEditedArea(placedHit[0], placedHit[0], placedHit[1], placedHit[1]);
                 return;
@@ -4293,11 +4307,15 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (x < 1 || z < 1 || x >= TerrainGenerator.SIZE - 1 ||
                 z >= TerrainGenerator.SIZE - 1 || y < 0 || y >= TerrainGenerator.HEIGHT) return;
         if (itemType == crafts.CRAFTING_TABLE) {
-            if (decorationCount >= MAX_DECORATIONS) return;
+            // Treat the crafting table as a normal editable voxel, not a scaled
+            // decoration mesh. It occupies exactly one grid cell and can be
+            // stacked on, mined, and targeted using the regular block raycast.
+            int placedType = TerrainGenerator.BLOCK_CRAFTING_TABLE;
             if (!isPlacementSpaceClear(x, y, z, 1)) return;
-            if (placeDecoration(BLOCK_CRAFTING_TABLE, x + 0.5f, y, z + 0.5f)) {
+            if (terrain.setPlacedBlockAt(x, y, z, placedType)) {
                 inventory[itemType]--;
                 removeEmptyItemFromSlots(itemType);
+                invalidateEditedArea(x, x, z, z);
             }
             return;
         }
