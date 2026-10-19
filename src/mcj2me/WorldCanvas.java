@@ -3931,6 +3931,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         int type = sideHit ? terrain.getBlockTypeAt(x, blockY, z)
                            : terrain.getTopType(x, z);
         if (type == TerrainGenerator.BLOCK_BEDROCK) return;
+        // A procedural tree's base is derived from this column's height. Keep
+        // its supporting surface intact until the tree is removed, otherwise
+        // lowering the column shifts the entire generated tree.
+        if (!sideHit && blockY == h - 1 && terrain.isTreeAt(x, z)) return;
         lastMiningDelay = miningDelay(type);
         if (type == TerrainGenerator.BLOCK_TNT) {
             if (tntFuseTicks == 0) {
@@ -3950,12 +3954,6 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         spawnBlockParticles(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
 
-        if (blockY == h - 1 && terrain.isTreeAt(x, z)) {
-            // The generated trunk base is anchored to the terrain height. Do not
-            // lower that column while its tree exists, or the whole procedural
-            // trunk would be regenerated one block lower / appear to disappear.
-            return;
-        }
         if (blockY == h - 1) {
             // Surface mining reveals the next layer at the top.
             int nextType = terrain.getSubsurfaceType(x, h - 2, z);
