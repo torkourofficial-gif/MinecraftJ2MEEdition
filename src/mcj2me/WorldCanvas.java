@@ -867,12 +867,16 @@ final class WorldCanvas extends Canvas implements Runnable {
             int slotX = barX + 1 + i * 20;
             if (block == selectedSlot) g.drawRegion(guiImage, 0, 22, 24, 22, 0,
                 slotX, barY, Graphics.TOP | Graphics.LEFT);
-            g.drawImage(blockIcons[block], slotX + 4, barY + 3,
-                Graphics.TOP | Graphics.LEFT);
-            if (inventory[block] > 1) {
-                g.setColor(0xFFFFFF);
-                g.drawString(Integer.toString(inventory[block]), slotX + 11, barY + 10,
+            boolean available = worldMode != IndevViewerMIDlet.MODE_SURVIVAL
+                || inventory[block] > 0;
+            if (available) {
+                g.drawImage(blockIcons[block], slotX + 4, barY + 3,
                     Graphics.TOP | Graphics.LEFT);
+                if (inventory[block] > 1) {
+                    g.setColor(0xFFFFFF);
+                    g.drawString(Integer.toString(inventory[block]), slotX + 11, barY + 10,
+                        Graphics.TOP | Graphics.LEFT);
+                }
             }
         }
         int cx = w / 2, cy = h / 2;
@@ -1935,6 +1939,8 @@ final class WorldCanvas extends Canvas implements Runnable {
                     || (tileX[face]==1 && tileY[face]==2);
                 // Grass-side UVs are already oriented for the dropped cube.
                 if(ore)uf=1-uf;
+                // Dirt's dropped cube uses vertically flipped terrain UVs.
+                if(type==TerrainGenerator.BLOCK_DIRT)vf=1-vf;
                 uv[b+k*2]=(short)(uf*1024); uv[b+k*2+1]=(short)(vf*1024);
             }
             int[] faceVertexIndices={base,base+1,base+2,base+3};
