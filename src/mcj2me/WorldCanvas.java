@@ -1868,7 +1868,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             droppedMeshes[slot] = null;
         }
         try {
-            Mesh mesh = createDroppedItemMesh(icon);
+            Mesh mesh = type >= 0 ? createDroppedBlockMesh(type) : createDroppedItemMesh(icon);
             droppedMeshes[slot] = mesh;
             droppedTypes[slot] = type;
             droppedX[slot] = x;
@@ -1878,6 +1878,62 @@ final class WorldCanvas extends Canvas implements Runnable {
             mesh.setTranslation(x, y, z);
             droppedItemGroup.addChild(mesh);
         } catch (Exception ignored) { }
+    }
+
+
+    /**
+     * Dropped blocks use the terrain atlas on each face, not the GUI inventory
+     * cube icon. Grass and logs therefore retain their different face textures.
+     */
+    private Mesh createDroppedBlockMesh(int type) {
+        if (type < 0 || type >= BLOCK_TILE_X.length) return createDroppedItemMesh(blockIcons[type]);
+        int topX = BLOCK_TILE_X[type], topY = BLOCK_TILE_Y[type];
+        int sideX = topX, sideY = topY, bottomX = topX, bottomY = topY;
+        if (type == TerrainGenerator.BLOCK_GRASS) {
+            topX = 0; topY = 0;
+            sideX = 3; sideY = 0;
+            bottomX = 2; bottomY = 0;
+        } else if (type == TerrainGenerator.BLOCK_WOOD) {
+            topX = 5; topY = 1;
+            sideX = 4; sideY = 1;
+            bottomX = 5; bottomY = 1;
+        } else if (type == TerrainGenerator.BLOCK_STONE) {
+            topX = 1; topY = 0;
+            sideX = 1; sideY = 0;
+            bottomX = 1; bottomY = 0;
+        }
+        short[] p = {
+            -3,-3,-3, -3,3,-3, 3,-3,-3, 3,3,-3,
+            3,-3,3, 3,3,3, -3,-3,3, -3,3,3,
+            -3,-3,3, -3,3,3, -3,-3,-3, -3,3,-3,
+            3,-3,-3, 3,3,-3, 3,-3,3, 3,3,3,
+            -3,3,-3, -3,3,3, 3,3,-3, 3,3,3,
+            -3,-3,3, -3,-3,-3, 3,-3,3, 3,-3,-3
+        };
+        short[] uv = new short[48];
+        Appearance[] faceAppearances = new Appearance[6];
+        IndexBuffer[] faceIndices = new IndexBuffer[6];
+        int[] tileX = {sideX, sideX, sideX, sideX, topX, bottomX};
+        int[] tileY = {sideY, sideY, sideY, sideY, topY, bottomY};
+        for (int face = 0; face < 6; face++) {
+            int b = face * 8;
+            uv[b] = 0; uv[b+1] = 0;
+            uv[b+2] = 0; uv[b+3] = 1024;
+            uv[b+4] = 1024; uv[b+5] = 0;
+            uv[b+6] = 1024; uv[b+7] = 1024;
+            int base = face * 4;
+            int[] faceVertexIndices = {base, base + 1, base + 2, base + 3};
+            faceIndices[face] = new TriangleStripArray(faceVertexIndices, new int[] {4});
+            faceAppearances[face] = getTerrainTileAppearance((tileY[face] << 4) | tileX[face]);
+        }
+        VertexArray pa = new VertexArray(24, 3, 2);
+        pa.set(0, 24, p);
+        VertexArray ta = new VertexArray(24, 2, 2);
+        ta.set(0, 24, uv);
+        VertexBuffer vb = new VertexBuffer();
+        vb.setPositions(pa, 1.0f / 16.0f, null);
+        vb.setTexCoords(0, ta, 1.0f / 1024.0f, null);
+        return new Mesh(vb, faceIndices, faceAppearances);
     }
 
     private Mesh createDroppedItemMesh(Image icon) {
@@ -3434,9 +3490,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         // Ore tiles alone are mirrored horizontally to correct their artwork.
         boolean oreTile = (tileX == 2 && (tileY == 1 || tileY == 2 || tileY == 3))
             || (tileX == 1 && tileY == 2);
+        boolean grassSideTile = tileX == 3 && tileY == 0;
         u = (corner == 0 || corner == 2) ? left : right;
         v = (corner == 0 || corner == 1) ? bottom : top;
-        if (oreTile) u = (corner == 0 || corner == 2) ? right : left;
+        if (oreTile || grassSideTile) u = (corner == 0 || corner == 2) ? right : left;
         int t = vertex * 2;
         texCoords[t] = (short) u;
         texCoords[t + 1] = (short) v;
