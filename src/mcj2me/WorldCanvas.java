@@ -943,7 +943,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         g.drawRect(cursorX - 2, cursorY - 2, 19, 19);
         int selectedItem = worldMode == IndevViewerMIDlet.MODE_SURVIVAL
             ? mainInventoryItems[inventoryCursor] : inventoryPageStart + inventoryCursor;
-        String selectedName = selectedItem < BLOCK_NAMES.length
+        String selectedName = selectedItem >= 0 && selectedItem < BLOCK_NAMES.length
             ? ((worldMode == IndevViewerMIDlet.MODE_SURVIVAL
                 && inventory[selectedItem] <= 0) ? "EMPTY" : BLOCK_NAMES[selectedItem])
             : "EMPTY";
@@ -1217,15 +1217,17 @@ final class WorldCanvas extends Canvas implements Runnable {
     private void assignHotbarItem(int slot, int item) {
         if (slot < 0 || slot >= hotbarItems.length || item < 0 || item >= inventory.length) return;
         int old = hotbarItems[slot];
-        // Move the existing item to the item's former slot (classic inventory swap).
+        int mainSource = findMainSlot(item);
+        // Swap with an existing hotbar stack, or put the displaced item into
+        // the exact main-inventory slot the selected item came from.
         int other = findHotbarSlot(item);
-        if (other >= 0 && other != slot) hotbarItems[other] = old;
-        else if (old >= 0 && old != item) {
-            int main = findMainSlot(old);
-            if (main >= 0) mainInventoryItems[main] = -1;
+        if (other >= 0 && other != slot) {
+            hotbarItems[other] = old;
+        } else if (old >= 0 && old != item && mainSource >= 0) {
+            mainInventoryItems[mainSource] = old;
         }
         hotbarItems[slot] = item;
-        removeItemFromMain(item);
+        if (mainSource >= 0 && mainInventoryItems[mainSource] == item) mainInventoryItems[mainSource] = -1;
     }
 
     private int findHotbarSlot(int item) {
