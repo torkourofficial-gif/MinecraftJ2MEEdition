@@ -218,6 +218,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     private final int worldMode;
     private int health = 20;
     private int zombieDamageCooldown = 0;
+    private static final int MAX_AIR_SUPPLY = 300; // 12 seconds at 40 ms per tick.
+    private int airSupply = MAX_AIR_SUPPLY;
+    private int drowningDamageCooldown = 0;
+    private float fallDistance = 0.0f;
     private int lastMiningDelay = 4;
     private boolean breakHeld;
     private int miningProgress;
@@ -792,6 +796,9 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     private void respawnPlayer() {
         health = 20;
+        airSupply = MAX_AIR_SUPPLY;
+        drowningDamageCooldown = 0;
+        fallDistance = 0.0f;
         cameraX = 64.0f;
         cameraZ = 105.0f;
         cameraY = terrain.getHeight((int) cameraX, (int) cameraZ) + PLAYER_EYE_HEIGHT + 0.1f;
@@ -941,6 +948,21 @@ final class WorldCanvas extends Canvas implements Runnable {
         g.drawString(daylightLevel > 0.42f ? "DAY" : "NIGHT", w - 5, 4,
             Graphics.TOP | Graphics.RIGHT);
         if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
+            if (isHeadUnderwater()) {
+                int bubbles = (airSupply * 10 + MAX_AIR_SUPPLY - 1) / MAX_AIR_SUPPLY;
+                if (bubbles > 10) bubbles = 10;
+                int airY = h - 47;
+                int airX = (w - 90) / 2;
+                for (int bubble = 0; bubble < 10; bubble++) {
+                    int bx = airX + bubble * 9;
+                    if (hudIconsImage != null) {
+                        // Classic icons.png air bubbles: filled bubble at (16,18), empty at (25,18).
+                        int sx = bubble < bubbles ? 16 : 25;
+                        g.drawRegion(hudIconsImage, sx, 18, 9, 9, 0,
+                            bx, airY, Graphics.TOP | Graphics.LEFT);
+                    }
+                }
+            }
             int heartY=h-36, heartX=(w-90)/2;
             for(int heart=0;heart<10;heart++){
                 int value=health-heart*2;
@@ -1285,7 +1307,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (jumpTapWindowTicks > 0) jumpTapWindowTicks--;
         if (flightTapWindowTicks > 0) flightTapWindowTicks--;
 
+        if (!airborne && !inWater) fallDistance = 0.0f;
         if (flying) {
+            fallDistance = 0.0f;
             // Creative flight: jump held rises; releasing it hovers in place.
             if (jumpHeld) {
                 float nextFlightY = cameraY + 0.20f;
@@ -1296,6 +1320,8 @@ final class WorldCanvas extends Canvas implements Runnable {
             airborne = true;
             changed = true;
         } else if (inWater) {
+            // Entering water cancels accumulated fall damage.
+            fallDistance = 0.0f;
             // Reduced gravity and buoyancy while submerged. Holding Fire/center
             // continuously strokes upward; the camera can cross the surface
             // instead of being clamped just beneath it.
@@ -1318,6 +1344,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
             changed = true;
         } else if (airborne) {
+            if (verticalVelocity < 0.0f) fallDistance -= verticalVelocity;
             float nextCameraY = cameraY + verticalVelocity;
             if (canOccupyAt(cameraX, nextCameraY - PLAYER_EYE_HEIGHT, cameraZ)) cameraY = nextCameraY;
             else { verticalVelocity = 0.0f; }
@@ -1326,6 +1353,11 @@ final class WorldCanvas extends Canvas implements Runnable {
                 cameraY = groundY;
                 verticalVelocity = 0.0f;
                 airborne = false;
+                if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL && fallDistance > 3.0f) {
+                    int fallDamage = (int) Math.ceil(fallDistance - 3.0f);
+                    applyDamage(fallDamage);
+                }
+                fallDistance = 0.0f;
             }
             changed = true;
         } else {
@@ -2192,22 +2224,48 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
     }
 
+    private boolean isHeadUnderwater() {
+        int surface = terrain.getWaterSurfaceLevel((int) cameraX, (int) cameraZ);
+        return surface > 0 && cameraY + PLAYER_HEAD_OFFSET < surface;
+    }
+
+    private void applyDamage(int amount) {
+        if (worldMode != IndevViewerMIDlet.MODE_SURVIVAL || dead || amount <= 0) return;
+        health -= amount;
+        if (health < 0) health = 0;
+        if (health == 0) {
+            dead = true;
+            paused = true;
+            pauseOverlayOpen = false;
+            deathSelection = 0;
+            clearKeys();
+            repaint();
+        }
+    }
+
     private void tickSurvival() {
-        if (worldMode != IndevViewerMIDlet.MODE_SURVIVAL) return;
+        if (worldMode != IndevViewerMIDlet.MODE_SURVIVAL || dead) return;
         if (zombieDamageCooldown > 0) zombieDamageCooldown--;
         if (hostileMobs != null && zombieDamageCooldown == 0
                 && hostileMobs.touchesPlayer(cameraX, cameraZ)) {
-            health -= 2;
-            if (health < 0) health = 0;
+            applyDamage(2);
             zombieDamageCooldown = 25;
-            if (health == 0) {
-                dead = true;
-                paused = true;
-                pauseOverlayOpen = false;
-                deathSelection = 0;
-                clearKeys();
-                repaint();
+        }
+
+        // Air is consumed only while the player's head is below the water surface.
+        if (isHeadUnderwater()) {
+            if (airSupply > 0) {
+                airSupply--;
+            } else {
+                if (drowningDamageCooldown > 0) drowningDamageCooldown--;
+                if (drowningDamageCooldown == 0) {
+                    applyDamage(2);
+                    drowningDamageCooldown = 20;
+                }
             }
+        } else {
+            airSupply = MAX_AIR_SUPPLY;
+            drowningDamageCooldown = 0;
         }
     }
 
