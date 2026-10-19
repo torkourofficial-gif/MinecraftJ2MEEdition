@@ -4794,6 +4794,9 @@ final class WorldCanvas extends Canvas implements Runnable {
                 boolean occupied = terrain.getBlockTypeAt(x, y, z) >= 0;
                 boolean topFace = enteredAxis == 1 && dy < 0.0f && occupied
                     && terrain.getBlockTypeAt(x, y + 1, z) < 0;
+                // Also select the underside when the ray enters a block while looking upward.
+                boolean bottomFace = enteredAxis == 1 && dy > 0.0f && occupied
+                    && terrain.getBlockTypeAt(x, y - 1, z) < 0;
                 boolean sideFace = false;
 
                 if (occupied && (enteredAxis == 0 || enteredAxis == 2)) {
@@ -4802,11 +4805,11 @@ final class WorldCanvas extends Canvas implements Runnable {
                     sideFace = y >= previousHeight || previousType < 0;
                 }
 
-                if (topFace || sideFace) {
+                if (topFace || bottomFace || sideFace) {
                     surfaceHitResult[0] = x;
                     surfaceHitResult[1] = z;
                     surfaceHitResult[2] = y;
-                    surfaceHitResult[3] = sideFace ? 1 : 0;
+                    surfaceHitResult[3] = (sideFace || bottomFace) ? 1 : 0;
                     surfaceHitResult[4] = (int)(distance * 1000.0f);
                     if (topFace) { surfaceHitResult[5] = x; surfaceHitResult[6] = y + 1; surfaceHitResult[7] = z; }
                     else { surfaceHitResult[5] = previousX; surfaceHitResult[6] = previousY; surfaceHitResult[7] = previousZ; }
