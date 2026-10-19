@@ -33,6 +33,8 @@ final class TerrainGenerator {
     private int[] placedBlockIds = new int[64];
     private byte[] placedBlockTypes = new byte[64];
     private int placedBlockCount;
+    private int[] removedTreeIds = new int[16];
+    private int removedTreeCount;
     // 0=unknown, 1=tree, -1=no tree. Tiny cache for the regular tree grid.
     private final byte[][] treeAtCache = new byte[SIZE][SIZE];
     private final int seed;
@@ -434,6 +436,8 @@ final class TerrainGenerator {
 
     boolean isTreeAt(int x, int z) {
         if (x < 4 || z < 4 || x >= SIZE - 4 || z >= SIZE - 4) return false;
+        int treeId = x * SIZE + z;
+        for (int i = 0; i < removedTreeCount; i++) if (removedTreeIds[i] == treeId) return false;
         byte cached = treeAtCache[x][z];
         if (cached != 0) return cached > 0;
         boolean result = isTreeCandidate(x, z);
@@ -453,6 +457,19 @@ final class TerrainGenerator {
         }
         treeAtCache[x][z] = result ? (byte) 1 : (byte) -1;
         return result;
+    }
+
+    boolean removeTreeAt(int x, int z) {
+        if (!isTreeAt(x, z)) return false;
+        int id = x * SIZE + z;
+        if (removedTreeCount == removedTreeIds.length) {
+            int[] expanded = new int[removedTreeIds.length * 2];
+            System.arraycopy(removedTreeIds, 0, expanded, 0, removedTreeIds.length);
+            removedTreeIds = expanded;
+        }
+        removedTreeIds[removedTreeCount++] = id;
+        treeAtCache[x][z] = -1;
+        return true;
     }
 
     int getTreeHeight(int x, int z) {
@@ -534,6 +551,8 @@ final class TerrainGenerator {
         for (int i = 0; i < removedBlockCount; i++) out.writeInt(removedBlockIds[i]);
         out.writeInt(placedBlockCount);
         for (int i = 0; i < placedBlockCount; i++) { out.writeInt(placedBlockIds[i]); out.writeByte(placedBlockTypes[i]); }
+        out.writeInt(removedTreeCount);
+        for (int i = 0; i < removedTreeCount; i++) out.writeInt(removedTreeIds[i]);
         out.flush();
         return bytes.toByteArray();
     }
@@ -575,8 +594,20 @@ final class TerrainGenerator {
                 placedBlockIds[placedBlockCount] = id; placedBlockTypes[placedBlockCount++] = type;
             }
         }
+        removedTreeCount = 0;
+        if (in.available() >= 4) {
+            int treeCount = in.readInt();
+            if (treeCount < 0 || treeCount > SIZE * SIZE) throw new Exception("Invalid saved removed trees");
+            if (treeCount > removedTreeIds.length) removedTreeIds = new int[treeCount];
+            removedTreeCount = treeCount;
+            for (int i = 0; i < treeCount; i++) removedTreeIds[i] = in.readInt();
+        }
         for (int x = 0; x < SIZE; x++)
             for (int z = 0; z < SIZE; z++) treeAtCache[x][z] = 0;
+        for (int i = 0; i < removedTreeCount; i++) {
+            int tx = removedTreeIds[i] / SIZE, tz = removedTreeIds[i] % SIZE;
+            if (tx >= 0 && tx < SIZE && tz >= 0 && tz < SIZE) treeAtCache[tx][tz] = -1;
+        }
         in.close();
     }
 
