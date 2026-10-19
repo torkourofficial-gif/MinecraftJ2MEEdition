@@ -19,6 +19,7 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
     private int selected;
     private boolean creating;
     private int createSelection;
+    private int createMode = IndevViewerMIDlet.MODE_CREATIVE;
     private String worldName = "New World";
     private final Command editName = new Command("Edit name", Command.OK, 1);
     private final Command cancel = new Command("Cancel", Command.BACK, 1);
@@ -71,9 +72,10 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
         if (creating) {
             g.drawString("Create New World", w / 2, 14, Graphics.TOP | Graphics.HCENTER);
             g.drawString("Choose a name and create your world", w / 2, 36, Graphics.TOP | Graphics.HCENTER);
-            drawRow(g, 10, h / 2 - 36, w - 20, 25, "World name: " + worldName, createSelection == 0);
-            drawRow(g, 10, h / 2 - 5, w - 20, 25, "Create New World", createSelection == 1);
-            drawRow(g, 10, h / 2 + 26, w - 20, 25, "Cancel", createSelection == 2);
+            drawRow(g, 10, h / 2 - 55, w - 20, 24, "World name: " + worldName, createSelection == 0);
+            drawRow(g, 10, h / 2 - 27, w - 20, 24, "Mode: " + (createMode == IndevViewerMIDlet.MODE_SURVIVAL ? "SURVIVAL" : "CREATIVE"), createSelection == 1);
+            drawRow(g, 10, h / 2 + 1, w - 20, 24, "Create New World", createSelection == 2);
+            drawRow(g, 10, h / 2 + 29, w - 20, 24, "Cancel", createSelection == 3);
             g.drawString("UP/DOWN: choose   FIRE: select", w / 2, h - 25, Graphics.BOTTOM | Graphics.HCENTER);
             g.drawString("BACK: world list", w / 2, h - 8, Graphics.BOTTOM | Graphics.HCENTER);
             return;
@@ -112,11 +114,16 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
         int action = getGameAction(keyCode);
         if (creating) {
             if (isBackKey(keyCode)) { creating = false; repaint(); return; }
-            if (action == UP || keyCode == '2') { createSelection = (createSelection + 2) % 3; repaint(); return; }
-            if (action == DOWN || keyCode == '8') { createSelection = (createSelection + 1) % 3; repaint(); return; }
+            if (action == UP || keyCode == '2') { createSelection = (createSelection + 3) % 4; repaint(); return; }
+            if (action == DOWN || keyCode == '8') { createSelection = (createSelection + 1) % 4; repaint(); return; }
+            if ((action == LEFT || keyCode == '4' || action == RIGHT || keyCode == '6') && createSelection == 1) {
+                createMode = createMode == IndevViewerMIDlet.MODE_CREATIVE ? IndevViewerMIDlet.MODE_SURVIVAL : IndevViewerMIDlet.MODE_CREATIVE;
+                repaint(); return;
+            }
             if (action == FIRE || keyCode == '5' || keyCode == ' ' || keyCode == 10) {
                 if (createSelection == 0) askName();
-                else if (createSelection == 1) createWorld();
+                else if (createSelection == 1) { createMode = createMode == IndevViewerMIDlet.MODE_CREATIVE ? IndevViewerMIDlet.MODE_SURVIVAL : IndevViewerMIDlet.MODE_CREATIVE; repaint(); }
+                else if (createSelection == 2) createWorld();
                 else { creating = false; repaint(); }
             }
             return;
@@ -141,7 +148,7 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
             if (selected == 0) { creating = true; createSelection = 0; repaint(); }
             else if (selected > 0 && selected <= worlds.length) {
                 WorldStore.WorldInfo world = worlds[selected - 1];
-                try { owner.startGame(world.name, world.seed, world.id); }
+                try { owner.startGame(world.name, world.seed, world.id, world.mode); }
                 catch (Exception e) { owner.showWorldError("Could not open this world."); }
             }
         }
@@ -157,9 +164,9 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
 
     private void createWorld() {
         try {
-            WorldStore.WorldInfo world = WorldStore.create(worldName);
+            WorldStore.WorldInfo world = WorldStore.create(worldName, createMode);
             creating = false;
-            owner.startGame(world.name, world.seed, world.id);
+            owner.startGame(world.name, world.seed, world.id, world.mode);
         } catch (Exception e) {
             owner.showWorldError("Could not create this world.");
         }
