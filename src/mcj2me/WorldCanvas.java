@@ -134,6 +134,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean forward, backward, strafeLeft, strafeRight;
     private boolean lookUp, lookDown, turnLeft, turnRight;
     private boolean jumpHeld;
+    private boolean flying;
+    private int jumpTapWindowTicks;
     // Indev-era terrain atlas tiles: surface blocks, ores, then bedrock.
     private static final int[] BLOCK_TILE_X = {
         0, 2, 1, 5, 4, 2, 1, 2, 2, 1, 8, 4, 2, 3, 6, 5, 0, 13, 12, 15, 1,
@@ -917,14 +919,23 @@ final class WorldCanvas extends Canvas implements Runnable {
             cycleSelectedBlock(1);
         }
 
-        if (IndevViewerMIDlet.controlPressed(CONTROL_JUMP,keyCode,action)) {
+        if (IndevViewerMIDlet.controlPressed(CONTROL_JUMP,keyCode,action) && !jumpHeld) {
             jumpHeld = true;
-            if (isSwimming()) {
+            if (flying) {
+                // A fresh jump press exits creative flight.
+                flying = false;
+                verticalVelocity = 0.0f;
+            } else if (isSwimming()) {
                 verticalVelocity = Math.max(verticalVelocity, 0.24f);
                 airborne = true;
+            } else if (airborne && jumpTapWindowTicks > 0) {
+                // Tap jump twice quickly: enable creative-style flight.
+                flying = true;
+                verticalVelocity = 0.0f;
             } else if (!airborne) {
                 verticalVelocity = JUMP_SPEED;
                 airborne = true;
+                jumpTapWindowTicks = 12;
             }
         }
     }
@@ -1045,7 +1056,19 @@ final class WorldCanvas extends Canvas implements Runnable {
         wasInWater = inWater;
         if (splashTicks > 0) splashTicks--;
 
-        if (inWater) {
+        if (jumpTapWindowTicks > 0) jumpTapWindowTicks--;
+
+        if (flying) {
+            // Creative flight: jump held rises; releasing it hovers in place.
+            if (jumpHeld) {
+                float nextFlightY = cameraY + 0.20f;
+                if (canOccupyAt(cameraX, nextFlightY - PLAYER_EYE_HEIGHT, cameraZ))
+                    cameraY = nextFlightY;
+            }
+            verticalVelocity = 0.0f;
+            airborne = true;
+            changed = true;
+        } else if (inWater) {
             // Reduced gravity and buoyancy while submerged. Holding Fire/center
             // continuously strokes upward; the camera can cross the surface
             // instead of being clamped just beneath it.
@@ -3121,11 +3144,13 @@ final class WorldCanvas extends Canvas implements Runnable {
         int top = tileY * 16 + 1;
         int bottom = (tileY + 1) * 16 - 1;
         int u, v;
-        // addQuad orders corners as bottom-left, top-left, bottom-right,
-        // top-right for cube faces. Keep UVs aligned with the geometry;
-        // the old alternate mapping rotated ore and stone textures.
-        u = (corner == 0 || corner == 1) ? left : right;
-        v = (corner == 0 || corner == 2) ? bottom : top;
+        // Restore the previous UV orientation for plants and ordinary blocks.
+        // Ore tiles alone are mirrored horizontally to correct their artwork.
+        boolean oreTile = (tileX == 2 && (tileY == 1 || tileY == 2 || tileY == 3))
+            || (tileX == 1 && tileY == 2);
+        u = (corner == 0 || corner == 2) ? left : right;
+        v = (corner == 0 || corner == 1) ? bottom : top;
+        if (oreTile) u = (corner == 0 || corner == 2) ? right : left;
         int t = vertex * 2;
         texCoords[t] = (short) u;
         texCoords[t + 1] = (short) v;
