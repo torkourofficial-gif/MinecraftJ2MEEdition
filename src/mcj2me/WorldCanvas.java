@@ -278,6 +278,14 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int miningTargetType = -1;
     private static final int MAX_DROPPED_ITEMS = 8;
     private final Mesh[] droppedMeshes = new Mesh[MAX_DROPPED_ITEMS];
+    // Dropped sprites differ only by texture/UV flip, so share their immutable
+    // quad geometry and common render state across all item entities.
+    private VertexBuffer droppedSpriteBuffer;
+    private IndexBuffer droppedSpriteIndices;
+    private VertexBuffer droppedSpriteFlippedBuffer;
+    private IndexBuffer droppedSpriteFlippedIndices;
+    private PolygonMode droppedSpritePolygonMode;
+    private CompositingMode droppedSpriteCompositingMode;
     private final int[] droppedTypes = new int[MAX_DROPPED_ITEMS];
     private final float[] droppedX = new float[MAX_DROPPED_ITEMS];
     private final float[] droppedY = new float[MAX_DROPPED_ITEMS];
@@ -3255,18 +3263,28 @@ final class WorldCanvas extends Canvas implements Runnable {
         Texture2D texture = getCachedItemIconTexture(icon);
         Appearance appearance = new Appearance();
         appearance.setTexture(0, texture);
-        PolygonMode pm = new PolygonMode();
-        pm.setCulling(PolygonMode.CULL_NONE);
-        pm.setShading(PolygonMode.SHADE_FLAT);
-        appearance.setPolygonMode(pm);
-        // Item icons (including flowers) contain transparent atlas pixels.
-        // Enable alpha blending/cutout so sprites render as plants, not rectangles.
-        CompositingMode itemBlend = new CompositingMode();
-        itemBlend.setBlending(CompositingMode.ALPHA);
-        itemBlend.setAlphaThreshold(0.5f);
-        appearance.setCompositingMode(itemBlend);
+        if (droppedSpritePolygonMode == null) {
+            droppedSpritePolygonMode = new PolygonMode();
+            droppedSpritePolygonMode.setCulling(PolygonMode.CULL_NONE);
+            droppedSpritePolygonMode.setShading(PolygonMode.SHADE_FLAT);
+        }
+        if (droppedSpriteCompositingMode == null) {
+            droppedSpriteCompositingMode = new CompositingMode();
+            droppedSpriteCompositingMode.setBlending(CompositingMode.ALPHA);
+            droppedSpriteCompositingMode.setAlphaThreshold(0.5f);
+        }
+        appearance.setPolygonMode(droppedSpritePolygonMode);
+        appearance.setCompositingMode(droppedSpriteCompositingMode);
+
+        VertexBuffer cachedBuffer = flipVertical ? droppedSpriteFlippedBuffer : droppedSpriteBuffer;
+        IndexBuffer cachedIndices = flipVertical ? droppedSpriteFlippedIndices : droppedSpriteIndices;
+        if (cachedBuffer != null && cachedIndices != null) {
+            return new Mesh(cachedBuffer, cachedIndices, appearance);
+        }
+
         // Item entities use a thin, double-sided sprite plane rather than a cube.
-        // The Y-axis spin in tickDroppedItems reproduces the classic rotating drop.
+        // Cache one buffer for each UV orientation to avoid rebuilding vertex data
+        // whenever a block/item is dropped and later picked up.
         short[] p = {-3,-3,0, -3,3,0, 3,-3,0, 3,3,0};
         short[] uv = flipVertical
             ? new short[] {0,1024, 0,0, 1024,1024, 1024,0}
@@ -3280,7 +3298,15 @@ final class WorldCanvas extends Canvas implements Runnable {
         VertexBuffer vb = new VertexBuffer();
         vb.setPositions(pa, 1.0f / 16.0f, null);
         vb.setTexCoords(0, ta, 1.0f / 1024.0f, null);
-        return new Mesh(vb, new TriangleStripArray(indices, strips), appearance);
+        TriangleStripArray indexBuffer = new TriangleStripArray(indices, strips);
+        if (flipVertical) {
+            droppedSpriteFlippedBuffer = vb;
+            droppedSpriteFlippedIndices = indexBuffer;
+        } else {
+            droppedSpriteBuffer = vb;
+            droppedSpriteIndices = indexBuffer;
+        }
+        return new Mesh(vb, indexBuffer, appearance);
     }
 
     private void tickDroppedItems() {
