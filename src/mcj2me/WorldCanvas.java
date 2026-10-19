@@ -1252,20 +1252,20 @@ final class WorldCanvas extends Canvas implements Runnable {
                 clearKeys();
             } else if (keyCode == '2' || action == UP) {
                 craftingRecipeCursor--;
-                if (craftingRecipeCursor < 0) craftingRecipeCursor = crafts.tableRecipeCount() - 1;
+                if (craftingRecipeCursor < 0) craftingRecipeCursor = craftingTableRecipeCount() - 1;
                 craftingTablePage = craftingRecipeCursor / 27;
             } else if (keyCode == '8' || action == DOWN) {
                 craftingRecipeCursor++;
-                if (craftingRecipeCursor >= crafts.tableRecipeCount()) craftingRecipeCursor = 0;
+                if (craftingRecipeCursor >= craftingTableRecipeCount()) craftingRecipeCursor = 0;
                 craftingTablePage = craftingRecipeCursor / 27;
             } else if (keyCode == '4' || action == LEFT) {
                 craftingRecipeCursor = Math.max(0, craftingRecipeCursor - 1);
                 craftingTablePage = craftingRecipeCursor / 27;
             } else if (keyCode == '6' || action == RIGHT) {
-                craftingRecipeCursor = Math.min(crafts.tableRecipeCount() - 1, craftingRecipeCursor + 1);
+                craftingRecipeCursor = Math.min(craftingTableRecipeCount() - 1, craftingRecipeCursor + 1);
                 craftingTablePage = craftingRecipeCursor / 27;
             } else if (keyCode == '5') {
-                craftRecipe(crafts.tableRecipeAt(craftingRecipeCursor));
+                craftRecipe(craftingTableRecipeAt(craftingRecipeCursor));
             }
             repaint();
             return;
@@ -2603,9 +2603,21 @@ final class WorldCanvas extends Canvas implements Runnable {
         drawGrayableIcon(g, recipe.output, ox + 1, oy + 1, ready);
     }
 
+    /** The table exposes both the player's 2x2 recipes and its own 3x3 recipes. */
+    private int craftingTableRecipeCount() {
+        return crafts.inventoryRecipeCount() + crafts.tableRecipeCount();
+    }
+
+    private crafts.Recipe craftingTableRecipeAt(int index) {
+        int inventoryCount = crafts.inventoryRecipeCount();
+        if (index < 0) return null;
+        if (index < inventoryCount) return crafts.inventoryRecipeAt(index);
+        return crafts.tableRecipeAt(index - inventoryCount);
+    }
+
     /** Container-style recipe browser: every recipe is one icon filling a slot. */
     private void drawCraftingRecipeList(Graphics g, int panelX, int panelY) {
-        int count = crafts.tableRecipeCount(), pageSize = 27;
+        int count = craftingTableRecipeCount(), pageSize = 27;
         int pages = (count + pageSize - 1) / pageSize;
         if (craftingTablePage < 0) craftingTablePage = 0;
         if (craftingTablePage >= pages) craftingTablePage = pages - 1;
@@ -2616,7 +2628,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             g.setColor(0x373737); g.fillRect(x, y, 16, 16);
             int index = start + slot;
             if (index >= count) continue;
-            crafts.Recipe recipe = crafts.tableRecipeAt(index);
+            crafts.Recipe recipe = craftingTableRecipeAt(index);
             boolean ready = hasIngredients(recipe) && canReceiveCraftOutput(recipe);
             drawGrayableIcon(g, recipe.output, x, y, ready);
             if (index == craftingRecipeCursor) { g.setColor(0xFFFFFF); g.drawRect(x - 1, y - 1, 17, 17); }
