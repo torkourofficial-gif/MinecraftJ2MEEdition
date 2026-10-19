@@ -3121,8 +3121,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         int top = tileY * 16 + 1;
         int bottom = (tileY + 1) * 16 - 1;
         int u, v;
-        if (tileX == 3 || tileX == 4) { u = (corner == 0 || corner == 1) ? left : right; v = (corner == 0 || corner == 2) ? bottom : top; }
-        else { u = (corner == 0 || corner == 2) ? left : right; v = (corner == 0 || corner == 1) ? bottom : top; }
+        // addQuad orders corners as bottom-left, top-left, bottom-right,
+        // top-right for cube faces. Keep UVs aligned with the geometry;
+        // the old alternate mapping rotated ore and stone textures.
+        u = (corner == 0 || corner == 1) ? left : right;
+        v = (corner == 0 || corner == 2) ? bottom : top;
         int t = vertex * 2;
         texCoords[t] = (short) u;
         texCoords[t + 1] = (short) v;
