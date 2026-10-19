@@ -9,6 +9,10 @@ final class PassiveMob {
     private static final int COUNT = 5;
     private static final float UNLOAD_DISTANCE_SQUARED = 1600.0f;
     private static Appearance hurtAppearance;
+    // Mob geometry is identical for every instance of a species. Keep one
+    // VertexBuffer/IndexBuffer pair per species and share it between Mesh nodes.
+    private static final VertexBuffer[] sharedMobBuffers = new VertexBuffer[4];
+    private static final IndexBuffer[] sharedMobIndices = new IndexBuffer[4];
     private final TerrainGenerator terrain;
     private final Group group = new Group();
     private final Random random = new Random();
@@ -148,6 +152,13 @@ final class PassiveMob {
 
     /** Build low-poly cuboids using the classic 64x32 mob skin atlas. */
     static Mesh createMobMesh(Appearance appearance, int mobType) {
+        if (mobType >= 0 && mobType < sharedMobBuffers.length
+                && sharedMobBuffers[mobType] != null) {
+            Mesh cached = new Mesh(sharedMobBuffers[mobType],
+                sharedMobIndices[mobType], appearance);
+            setMobScale(cached, mobType);
+            return cached;
+        }
         int[][] boxes;
         int[] parts;
         if (mobType == MOB_ZOMBIE) {
@@ -257,13 +268,22 @@ final class PassiveMob {
         VertexBuffer buffer = new VertexBuffer();
         buffer.setPositions(p, 1.0f / 16.0f, null);
         buffer.setTexCoords(0, t, 1.0f / 1024.0f, null);
-        Mesh result = new Mesh(buffer, new TriangleStripArray(indices, strips), appearance);
+        TriangleStripArray indexBuffer = new TriangleStripArray(indices, strips);
+        if (mobType >= 0 && mobType < sharedMobBuffers.length) {
+            sharedMobBuffers[mobType] = buffer;
+            sharedMobIndices[mobType] = indexBuffer;
+        }
+        Mesh result = new Mesh(buffer, indexBuffer, appearance);
+        setMobScale(result, mobType);
+        return result;
+    }
+
+    private static void setMobScale(Mesh result, int mobType) {
         // Match adult Java Edition proportions while preserving the classic pixel-model silhouettes.
         if (mobType == MOB_COW) result.setScale(1.0f, 1.0f, 1.0f);
-        else if (mobType == MOB_PIG) result.setScale(1.0f, 1.03f, 1.0f);  // preserve the pig scale
+        else if (mobType == MOB_PIG) result.setScale(1.0f, 1.03f, 1.0f);
         else if (mobType == MOB_SHEEP) result.setScale(1.0f, 1.0f, 1.0f);
-        else if (mobType == MOB_ZOMBIE) result.setScale(0.80f, 0.975f, 0.80f); // ~0.6 x 1.95 blocks
-        return result;
+        else if (mobType == MOB_ZOMBIE) result.setScale(0.80f, 0.975f, 0.80f);
     }
 
     /** Returns UV rectangles for front, back, left, right, top and bottom faces. */
