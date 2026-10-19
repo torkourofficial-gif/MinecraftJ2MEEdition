@@ -363,8 +363,16 @@ final class WorldCanvas extends Canvas implements Runnable {
         int terrainLength = in.readInt();
         if (terrainLength < 0 || terrainLength > state.length - 4)
             throw new Exception("Invalid saved world");
-        byte[] terrainData = new byte[terrainLength];
-        in.readFully(terrainData);
+        // The constructor has already restored the terrain payload before
+        // setupScene(). Skip it here instead of allocating a second terrain-sized
+        // byte[] while the M3G scene is alive; that duplicate could trigger an
+        // OutOfMemoryError on small JBed heaps even though the data is unused.
+        int skipped = 0;
+        while (skipped < terrainLength) {
+            int step = in.skipBytes(terrainLength - skipped);
+            if (step <= 0) throw new Exception("Truncated saved terrain");
+            skipped += step;
+        }
         cameraX = in.readFloat(); cameraY = in.readFloat(); cameraZ = in.readFloat();
         yaw = in.readFloat(); pitch = in.readFloat();
         float savedPlayerYaw = yaw;
