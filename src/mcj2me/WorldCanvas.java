@@ -2094,15 +2094,15 @@ final class WorldCanvas extends Canvas implements Runnable {
                 bottomX = 9; bottomY = 0;
                 break;
         }
-        // Dropped blocks are half the width and height of a placed voxel.
-        // Positions are scaled by 1/16, so +/-4 gives a 0.5x0.5x0.5 cube.
+        // Classic Minecraft dropped block models render at about quarter scale.
+        // Positions are scaled by 1/16, so +/-2 gives a 0.25x0.25x0.25 cube.
         short[] p = {
-            -4,-4,-4, -4,4,-4, 4,-4,-4, 4,4,-4,
-            4,-4,4, 4,4,4, -4,-4,4, -4,4,4,
-            -4,-4,4, -4,4,4, -4,-4,-4, -4,4,-4,
-            4,-4,-4, 4,4,-4, 4,-4,4, 4,4,4,
-            -4,4,-4, -4,4,4, 4,4,-4, 4,4,4,
-            -4,-4,4, -4,-4,-4, 4,-4,4, 4,-4,-4
+            -2,-2,-2, -2,2,-2, 2,-2,-2, 2,2,-2,
+            2,-2,2, 2,2,2, -2,-2,2, -2,2,2,
+            -2,-2,2, -2,2,2, -2,-2,-2, -2,2,-2,
+            2,-2,-2, 2,2,-2, 2,-2,2, 2,2,2,
+            -2,2,-2, -2,2,2, 2,2,-2, 2,2,2,
+            -2,-2,2, -2,-2,-2, 2,-2,2, 2,-2,-2
         };
         short[] uv = new short[48];
         Appearance[] faceAppearances = new Appearance[6];
@@ -2200,9 +2200,9 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (droppedVelocityY[i] < 0.0f) {
                 int bx = (int) Math.floor(droppedX[i]);
                 int bz = (int) Math.floor(droppedZ[i]);
-                int by = (int) Math.floor(droppedY[i] - 0.12f);
+                int by = (int) Math.floor(droppedY[i] - 0.06f);
                 if (terrain.getBlockTypeAt(bx, by, bz) >= 0) {
-                    droppedY[i] = by + 1.12f;
+                    droppedY[i] = by + 1.06f;
                     droppedVelocityY[i] = 0.0f;
                 }
             }
