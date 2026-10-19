@@ -13,6 +13,7 @@ public final class IndevViewerMIDlet extends MIDlet {
     static int fogLevel = 1;
     static int frameskip = 0;
     static boolean humbleMode = false;
+    static int musicVolume = 70;
     static final int MODE_CREATIVE = 0;
     static final int MODE_SURVIVAL = 1;
 
@@ -193,6 +194,9 @@ public final class IndevViewerMIDlet extends MIDlet {
         titleScreen.openSettings();
         Display.getDisplay(this).setCurrent(titleScreen);
         titleScreen.start();
+    }
+    void musicVolumeChanged() {
+        music.setVolume(musicVolume);
     }
     void settingsChanged() {
         if (worldCanvas != null) worldCanvas.applySettingsChange();
