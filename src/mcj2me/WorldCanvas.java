@@ -2015,13 +2015,15 @@ final class WorldCanvas extends Canvas implements Runnable {
                 bottomX = 9; bottomY = 0;
                 break;
         }
+        // A dropped block is the same full 1x1x1 voxel as a placed block.
+        // Positions are scaled by 1/16 below, so +/-8 gives +/-0.5 world units.
         short[] p = {
-            -3,-3,-3, -3,3,-3, 3,-3,-3, 3,3,-3,
-            3,-3,3, 3,3,3, -3,-3,3, -3,3,3,
-            -3,-3,3, -3,3,3, -3,-3,-3, -3,3,-3,
-            3,-3,-3, 3,3,-3, 3,-3,3, 3,3,3,
-            -3,3,-3, -3,3,3, 3,3,-3, 3,3,3,
-            -3,-3,3, -3,-3,-3, 3,-3,3, 3,-3,-3
+            -8,-8,-8, -8,8,-8, 8,-8,-8, 8,8,-8,
+            8,-8,8, 8,8,8, -8,-8,8, -8,8,8,
+            -8,-8,8, -8,8,8, -8,-8,-8, -8,8,-8,
+            8,-8,-8, 8,8,-8, 8,-8,8, 8,8,8,
+            -8,8,-8, -8,8,8, 8,8,-8, 8,8,8,
+            -8,-8,8, -8,-8,-8, 8,-8,8, 8,-8,-8
         };
         short[] uv = new short[48];
         Appearance[] faceAppearances = new Appearance[6];
