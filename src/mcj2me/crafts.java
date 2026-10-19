@@ -16,6 +16,7 @@ public final class crafts {
     private crafts() { }
 
     public static final int EMPTY = -1;
+    public static final int WHEAT = 104;
 
     // Existing WorldCanvas IDs.
     public static final int GRASS = 0, DIRT = 1, STONE = 2, WOOD = 3, LEAVES = 4;
@@ -44,7 +45,7 @@ public final class crafts {
     public static final int WOODEN_SWORD = 74, STONE_SWORD = 75, IRON_SWORD = 76;
     public static final int DIAMOND_SWORD = 77, WOODEN_HOE = 78, STONE_HOE = 79;
     public static final int IRON_HOE = 80, DIAMOND_HOE = 81, BOW = 82, ARROW = 83;
-    public static final int BOAT = 84, MINECART = 85, RAIL = 86, PAPER_ITEM = 87;
+    public static final int BOAT = 84, MINECART = 85, RAIL = 86, PAPER_ITEM = PAPER;
     public static final int GLASS = 88, GLASS_PANE = 89, STONE_BRICKS = 90;
     public static final int LEVER = 91, STONE_BUTTON = 92, WOODEN_BUTTON = 93;
     public static final int PRESSURE_PLATE = 94, WOODEN_PRESSURE_PLATE = 95;
@@ -109,14 +110,15 @@ public final class crafts {
                 CRAFTING_TABLE, 1, false),
         // Planks are interchangeable for basic wooden components.
         r(1, 2, new int[] { OAK_PLANKS, OAK_PLANKS }, STICK, 4, false),
-        r(1, 1, new int[] { COAL_ORE }, TORCH, 4, false),
+        r(1, 1, new int[] { COAL }, TORCH, 4, false),
         r(1, 1, new int[] { CHARCOAL }, TORCH, 4, false)
     };
 
     private static final Recipe[] TABLE_RECIPES = {
         // Building and utility blocks.
-        r(3, 2, new int[] { OAK_PLANKS, OAK_PLANKS, OAK_PLANKS,
-                            OAK_PLANKS, OAK_PLANKS, OAK_PLANKS }, DOOR, 3, false),
+        r(2, 3, new int[] { OAK_PLANKS, OAK_PLANKS,
+                            OAK_PLANKS, OAK_PLANKS,
+                            OAK_PLANKS, OAK_PLANKS }, DOOR, 3, false),
         r(3, 3, new int[] { OAK_PLANKS, OAK_PLANKS, OAK_PLANKS,
                             OAK_PLANKS, EMPTY, OAK_PLANKS,
                             OAK_PLANKS, OAK_PLANKS, OAK_PLANKS }, CHEST, 1, false),
@@ -127,8 +129,8 @@ public final class crafts {
                             EMPTY, OAK_PLANKS, EMPTY,
                             EMPTY, OAK_PLANKS, EMPTY }, LADDER, 3, false),
         r(3, 3, new int[] { OAK_PLANKS, OAK_PLANKS, OAK_PLANKS,
-                            EMPTY, OAK_PLANKS, EMPTY,
-                            EMPTY, OAK_PLANKS, EMPTY }, SIGN, 3, false),
+                            OAK_PLANKS, OAK_PLANKS, OAK_PLANKS,
+                            EMPTY, STICK, EMPTY }, SIGN, 3, false),
         r(3, 3, new int[] { OAK_PLANKS, EMPTY, OAK_PLANKS,
                             OAK_PLANKS, EMPTY, OAK_PLANKS,
                             OAK_PLANKS, EMPTY, OAK_PLANKS }, WOODEN_FENCE, 2, false),
@@ -187,9 +189,9 @@ public final class crafts {
         r(3, 3, new int[] { STONE, STONE, STONE,
                             STONE, STONE, STONE,
                             STONE, STONE, STONE }, STONE_BRICKS, 1, false),
-        r(3, 3, new int[] { STONE, STONE, STONE,
-                            STONE, EMPTY, STONE,
-                            STONE, STONE, STONE }, OBSIDIAN, 1, false),
+        r(3, 3, new int[] { EMPTY, EMPTY, EMPTY,
+                            EMPTY, EMPTY, EMPTY,
+                            EMPTY, EMPTY, EMPTY }, OBSIDIAN, 0, false),
 
         // Tools. Each recipe uses the classic shaped layout.
         r(3, 3, new int[] { OAK_PLANKS, OAK_PLANKS, OAK_PLANKS,
@@ -254,26 +256,20 @@ public final class crafts {
                             EMPTY, STICK, EMPTY }, DIAMOND_HOE, 1, true),
 
         // Combat, food and miscellaneous classic recipes.
-        r(3, 3, new int[] { EMPTY, STICK, FEATHER,
-                            EMPTY, FEATHER, STICK,
-                            STICK, EMPTY, FEATHER }, ARROW, 4, false),
-        r(3, 3, new int[] { STICK, STRING, STICK,
-                            STICK, STRING, STICK,
-                            STICK, STRING, STICK }, BOW, 1, true),
+        r(1, 3, new int[] { FLINT, STICK, FEATHER }, ARROW, 4, false),
+        r(3, 3, new int[] { EMPTY, STICK, STRING,
+                            STICK, EMPTY, STRING,
+                            EMPTY, STICK, STRING }, BOW, 1, true),
         r(3, 3, new int[] { EMPTY, EMPTY, EMPTY,
                             WHEAT, WHEAT, WHEAT,
                             EMPTY, EMPTY, EMPTY }, BREAD, 1, false),
         r(3, 3, new int[] { EMPTY, STICK, EMPTY,
                             STICK, EMPTY, STICK,
                             EMPTY, STICK, EMPTY }, RAIL, 16, false),
-        r(3, 3, new int[] { EMPTY, IRON_INGOT, EMPTY,
-                            IRON_INGOT, EMPTY, IRON_INGOT,
-                            EMPTY, IRON_INGOT, EMPTY }, FLINT_AND_STEEL, 1, false)
+        r(2, 1, new int[] { FLINT, IRON_INGOT }, FLINT_AND_STEEL, 1, true)
     };
 
-    // Reserved ingredient used by bread recipe; kept separate from the current
-    // WorldCanvas block IDs until wheat is implemented.
-    public static final int WHEAT = 104;
+    // Wheat is a reserved ingredient until farming is implemented.
 
     public static int inventoryRecipeCount() { return INVENTORY_RECIPES.length; }
     public static int tableRecipeCount() { return TABLE_RECIPES.length; }
