@@ -136,6 +136,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean jumpHeld;
     private boolean flying;
     private int jumpTapWindowTicks;
+    private int flightTapWindowTicks;
     // Indev-era terrain atlas tiles: surface blocks, ores, then bedrock.
     private static final int[] BLOCK_TILE_X = {
         0, 2, 1, 5, 4, 2, 1, 2, 2, 1, 8, 4, 2, 3, 6, 5, 0, 13, 12, 15, 1,
@@ -919,15 +920,18 @@ final class WorldCanvas extends Canvas implements Runnable {
             cycleSelectedBlock(1);
         }
 
-        if (keyCode == '0' && flying) {
-            flying = false;
-            verticalVelocity = 0.0f;
-            airborne = true;
-        }
         if (IndevViewerMIDlet.controlPressed(CONTROL_JUMP,keyCode,action) && !jumpHeld) {
             jumpHeld = true;
             if (flying) {
-                // In flight, holding jump rises and releasing it hovers.
+                // Like Minecraft creative: tap jump twice quickly to stop flying.
+                if (flightTapWindowTicks > 0) {
+                    flying = false;
+                    flightTapWindowTicks = 0;
+                    verticalVelocity = 0.0f;
+                    airborne = true;
+                } else {
+                    flightTapWindowTicks = 12;
+                }
             } else if (isSwimming()) {
                 verticalVelocity = Math.max(verticalVelocity, 0.24f);
                 airborne = true;
@@ -1060,6 +1064,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (splashTicks > 0) splashTicks--;
 
         if (jumpTapWindowTicks > 0) jumpTapWindowTicks--;
+        if (flightTapWindowTicks > 0) flightTapWindowTicks--;
 
         if (flying) {
             // Creative flight: jump held rises; releasing it hovers in place.
