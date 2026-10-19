@@ -787,12 +787,16 @@ final class WorldCanvas extends Canvas implements Runnable {
             int sx = gridX + (slot % 9) * 18;
             int sy = gridY + (slot / 9) * 18;
             if (item < blockIcons.length) {
-                g.drawImage(blockIcons[item], sx + 1, sy + 1,
-                    Graphics.TOP | Graphics.LEFT);
-                if (inventory[item] > 0) {
-                    g.setColor(0xFFFFFF);
-                    g.drawString(Integer.toString(inventory[item]), sx + 10,
-                        sy + 8, Graphics.TOP | Graphics.LEFT);
+                boolean available = worldMode != IndevViewerMIDlet.MODE_SURVIVAL
+                    || inventory[item] > 0;
+                if (available) {
+                    g.drawImage(blockIcons[item], sx + 1, sy + 1,
+                        Graphics.TOP | Graphics.LEFT);
+                    if (inventory[item] > 0) {
+                        g.setColor(0xFFFFFF);
+                        g.drawString(Integer.toString(inventory[item]), sx + 10,
+                            sy + 8, Graphics.TOP | Graphics.LEFT);
+                    }
                 }
             }
         }
@@ -803,7 +807,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         g.drawRect(cursorX - 2, cursorY - 2, 19, 19);
         int selectedItem = inventoryPageStart + inventoryCursor;
         String selectedName = selectedItem < BLOCK_NAMES.length
-            ? BLOCK_NAMES[selectedItem] : "EMPTY";
+            ? ((worldMode == IndevViewerMIDlet.MODE_SURVIVAL
+                && inventory[selectedItem] <= 0) ? "EMPTY" : BLOCK_NAMES[selectedItem])
+            : "EMPTY";
         g.setColor(0xFFFFFF);
         g.drawString(selectedName + "  (5: select, 7/9: page, *: close)",
             Math.max(2, panelX), Math.min(getHeight() - 16, panelY + panelH + 2),
