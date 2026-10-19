@@ -3075,9 +3075,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Mesh createDroppedBlockMesh(int type) {
         if (type < 0 || type >= BLOCK_TILE_X.length || type >= BLOCK_TILE_Y.length
                 || type >= blockIcons.length) return createDroppedItemMesh(blockIcons[0]);
-        // Resolve each face explicitly. Do not infer the dropped-block face
-        // textures from the GUI icon coordinates: those are a different atlas.
-        // Terrain tiles are 16x16 cells in terrain.png.
+        // Resolve each face explicitly. Do not infer dropped-block face textures
+        // from GUI icon coordinates: those are a different atlas.
         int topX = BLOCK_TILE_X[type], topY = BLOCK_TILE_Y[type];
         int sideX = topX, sideY = topY, bottomX = topX, bottomY = topY;
         switch (type) {
@@ -3117,8 +3116,13 @@ final class WorldCanvas extends Canvas implements Runnable {
                 bottomX = 11; bottomY = 3;
                 break;
         }
-        // Classic Minecraft dropped block models render at about quarter scale.
-        // Positions are scaled by 1/16, so +/-2 gives a 0.25x0.25x0.25 cube.
+        // Solid dropped cubes can share the terrain atlas and a single M3G
+        // appearance/index buffer. The old six-submesh path created six
+        // appearance references per cube and lazily built tiny tile textures.
+        // Keep the legacy path for leaves (whose atlas alpha is deliberately
+        // forced opaque) and non-cube decorations/doors.
+        boolean atlasCube = type != TerrainGenerator.BLOCK_LEAVES
+            && !(type >= BLOCK_TORCH && type <= BLOCK_DOOR);
         short[] p = {
             -2,-2,-2, -2,2,-2, 2,-2,-2, 2,2,-2,
             2,-2,2, 2,2,2, -2,-2,2, -2,2,2,
@@ -3128,36 +3132,45 @@ final class WorldCanvas extends Canvas implements Runnable {
             -2,-2,2, -2,-2,-2, 2,-2,2, 2,-2,-2
         };
         short[] uv = new short[48];
-        Appearance[] faceAppearances = new Appearance[6];
-        IndexBuffer[] faceIndices = new IndexBuffer[6];
         int[] tileX = {sideX, sideX, sideX, sideX, topX, bottomX};
         int[] tileY = {sideY, sideY, sideY, sideY, topY, bottomY};
+        int[] stripLengths = {4, 4, 4, 4, 4, 4};
+        IndexBuffer[] faceIndices = atlasCube ? null : new IndexBuffer[6];
+        Appearance[] faceAppearances = atlasCube ? null : new Appearance[6];
         for (int face = 0; face < 6; face++) {
-            int b=face*8, base=face*4;
-            boolean horizontal=face>=4, xFace=face==2 || face==3;
-            int minX=32767,maxX=-32768,minY=32767,maxY=-32768,minZ=32767,maxZ=-32768;
-            for(int k=0;k<4;k++){
-                int pi=(base+k)*3,xx=p[pi],yy=p[pi+1],zz=p[pi+2];
-                if(xx<minX)minX=xx; if(xx>maxX)maxX=xx;
-                if(yy<minY)minY=yy; if(yy>maxY)maxY=yy;
-                if(zz<minZ)minZ=zz; if(zz>maxZ)maxZ=zz;
+            int b = face * 8, base = face * 4;
+            boolean horizontal = face >= 4, xFace = face == 2 || face == 3;
+            int minX = 32767, maxX = -32768, minY = 32767, maxY = -32768;
+            int minZ = 32767, maxZ = -32768;
+            for (int k = 0; k < 4; k++) {
+                int pi = (base + k) * 3, xx = p[pi], yy = p[pi + 1], zz = p[pi + 2];
+                if (xx < minX) minX = xx; if (xx > maxX) maxX = xx;
+                if (yy < minY) minY = yy; if (yy > maxY) maxY = yy;
+                if (zz < minZ) minZ = zz; if (zz > maxZ) maxZ = zz;
             }
-            for(int k=0;k<4;k++){
-                int pi=(base+k)*3,xx=p[pi],yy=p[pi+1],zz=p[pi+2];
-                int uf=(horizontal || !xFace)?(xx==maxX?1:0):(zz==maxZ?1:0);
-                int vf=horizontal?(zz==maxZ?1:0):(yy==maxY?1:0);
-                boolean ore = (type == TerrainGenerator.BLOCK_COAL_ORE
+            for (int k = 0; k < 4; k++) {
+                int pi = (base + k) * 3, xx = p[pi], yy = p[pi + 1], zz = p[pi + 2];
+                int uf = (horizontal || !xFace) ? (xx == maxX ? 1 : 0) : (zz == maxZ ? 1 : 0);
+                int vf = horizontal ? (zz == maxZ ? 1 : 0) : (yy == maxY ? 1 : 0);
+                boolean ore = type == TerrainGenerator.BLOCK_COAL_ORE
                     || type == TerrainGenerator.BLOCK_IRON_ORE
                     || type == TerrainGenerator.BLOCK_GOLD_ORE
-                    || type == TerrainGenerator.BLOCK_DIAMOND_ORE);
-                // Keep the ore pattern orientation tied to the block type, not
-                // to a coincidental atlas coordinate shared by unrelated tiles.
+                    || type == TerrainGenerator.BLOCK_DIAMOND_ORE;
                 if (ore) uf = 1 - uf;
-                uv[b+k*2]=(short)(uf*1024); uv[b+k*2+1]=(short)(vf*1024);
+                if (atlasCube) {
+                    // The shared terrain atlas is 256x256; each tile is 16px.
+                    uv[b + k * 2] = (short)(tileX[face] * 16 + uf * 16);
+                    uv[b + k * 2 + 1] = (short)(tileY[face] * 16 + vf * 16);
+                } else {
+                    uv[b + k * 2] = (short)(uf * 1024);
+                    uv[b + k * 2 + 1] = (short)(vf * 1024);
+                }
             }
-            int[] faceVertexIndices={base,base+1,base+2,base+3};
-            faceIndices[face]=new TriangleStripArray(faceVertexIndices,new int[]{4});
-            faceAppearances[face]=getTerrainTileAppearance((tileY[face]<<4)|tileX[face]);
+            if (!atlasCube) {
+                int[] faceVertexIndices = {base, base + 1, base + 2, base + 3};
+                faceIndices[face] = new TriangleStripArray(faceVertexIndices, new int[] {4});
+                faceAppearances[face] = getTerrainTileAppearance((tileY[face] << 4) | tileX[face]);
+            }
         }
         VertexArray pa = new VertexArray(24, 3, 2);
         pa.set(0, 24, p);
@@ -3165,7 +3178,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         ta.set(0, 24, uv);
         VertexBuffer vb = new VertexBuffer();
         vb.setPositions(pa, 1.0f / 16.0f, null);
-        vb.setTexCoords(0, ta, 1.0f / 1024.0f, null);
+        vb.setTexCoords(0, ta, atlasCube ? 1.0f / 256.0f : 1.0f / 1024.0f, null);
+        if (atlasCube) {
+            return new Mesh(vb, new TriangleStripArray(0, stripLengths), groundAppearance);
+        }
         return new Mesh(vb, faceIndices, faceAppearances);
     }
 
