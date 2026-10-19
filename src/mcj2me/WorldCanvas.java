@@ -2730,8 +2730,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
             return;
         }
-        if (selectedSlot == TerrainGenerator.BLOCK_BEDROCK ||
-                selectedSlot > TerrainGenerator.BLOCK_WOOL_BLACK) return;
+        if (selectedSlot > TerrainGenerator.BLOCK_WOOL_BLACK) return;
         if (!isPlacementSpaceClear(x, y, z, 1)) return;
         if (terrain.setPlacedBlockAt(x, y, z, selectedSlot)) {
             inventory[selectedSlot]--;
