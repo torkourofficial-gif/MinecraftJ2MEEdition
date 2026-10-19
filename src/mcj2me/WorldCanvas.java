@@ -1049,6 +1049,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void drawInventory(Graphics g) {
+        // Clear the previous gameplay frame first. Otherwise the hotbar/HUD
+        // from the last frame can remain visible behind the inventory panel.
+        g.setColor(0x101010);
+        g.fillRect(0, 0, getWidth(), getHeight());
         int panelW = Math.min(176, inventoryImage.getWidth());
         int panelH = Math.min(166, inventoryImage.getHeight());
         int panelX = (getWidth() - panelW) / 2;
@@ -1319,8 +1323,12 @@ final class WorldCanvas extends Canvas implements Runnable {
                 else if (right && col < 8) col++;
                 else if (up) {
                     if (row > 0) row--;
-                    else if (col >= 4 && col <= 7) {
-                        inventoryCursor = (col == 7) ? 31 : 27 + ((col - 5) < 0 ? 0 : (col - 5));
+                    else if (col == 4 || col == 5) {
+                        inventoryCursor = 27 + (col - 4);
+                        repaint();
+                        return;
+                    } else if (col == 6 || col == 7) {
+                        inventoryCursor = 31;
                         repaint();
                         return;
                     }
@@ -1332,22 +1340,21 @@ final class WorldCanvas extends Canvas implements Runnable {
                 int row = craftSlot / 2;
                 if (left) {
                     if (col > 0) inventoryCursor--;
-                    else inventoryCursor = 31;
+                    else inventoryCursor = row * 9 + 3;
                 } else if (right) {
                     if (col < 1) inventoryCursor++;
-                    else inventoryCursor = 31;
+                    else inventoryCursor = row * 9 + 6;
                 } else if (up) {
                     if (row > 0) inventoryCursor -= 2;
-                    else inventoryCursor = 31;
+                    else inventoryCursor = 4 + col;
                 } else if (down) {
                     if (row < 1) inventoryCursor += 2;
-                    else inventoryCursor = 31;
+                    else inventoryCursor = 4 + col;
                 }
             } else if (inventoryCursor == 31) {
                 if (left) inventoryCursor = 28;
                 else if (right) inventoryCursor = 27;
-                else if (up) inventoryCursor = 29;
-                else if (down) inventoryCursor = 27;
+                else if (up || down) inventoryCursor = 4;
             }
             if (action == FIRE || keyCode == '5' || keyCode == ' ') {
                 // Treat the entire crafting area (ingredient grid and result)
