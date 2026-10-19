@@ -216,6 +216,12 @@ final class PassiveMob {
                         py = 19 + pz;
                         pz = oldY + 2;
                     }
+                    // Classic Minecraft zombie pose: arms held forward horizontally.
+                    if (mobType == MOB_ZOMBIE && (boxIndex == 2 || boxIndex == 3)) {
+                        int oldY = py;
+                        py = 24 - pz;
+                        pz = oldY - 24;
+                    }
                     positions[v * 3] = (short)px;
                     positions[v * 3 + 1] = (short)py;
                     positions[v * 3 + 2] = (short)pz;
