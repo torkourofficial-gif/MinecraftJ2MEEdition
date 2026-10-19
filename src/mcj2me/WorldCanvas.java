@@ -122,6 +122,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Group[][] activeChunks = new Group[8][8];
     // Tracks even empty chunks whose terrain/water builders return no mesh.
     private boolean[][] builtChunks = new boolean[8][8];
+    // Edited chunks are rebuilt before ordinary streaming gaps, so a nearby
+    // block change becomes visible without waiting for the whole view to fill.
+    private boolean[][] editedChunks = new boolean[8][8];
     private int loadedCenterX = -99;
     private int loadedCenterZ = -99;
     private int loadedFacingSector = -99;
@@ -2379,6 +2382,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 if (!inRange) {
                     removeChunkMeshes(x, z);
                     builtChunks[x][z] = false;
+                    editedChunks[x][z] = false;
                 }
             }
         }
@@ -2392,6 +2396,9 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         // Prioritize the nearest missing chunk so the area around the player
         // becomes usable first instead of filling the cache in array order.
+        int bestEditedX = -1;
+        int bestEditedZ = -1;
+        float bestEditedDistance = Float.MAX_VALUE;
         int bestX = -1;
         int bestZ = -1;
         float bestDistance = Float.MAX_VALUE;
@@ -2404,7 +2411,13 @@ final class WorldCanvas extends Canvas implements Runnable {
                     float dx = x * CHUNK + CHUNK * 0.5f - cameraX;
                     float dz = z * CHUNK + CHUNK * 0.5f - cameraZ;
                     float distance = dx * dx + dz * dz;
-                    if (distance < bestDistance) {
+                    if (editedChunks[x][z]) {
+                        if (distance < bestEditedDistance) {
+                            bestEditedDistance = distance;
+                            bestEditedX = x;
+                            bestEditedZ = z;
+                        }
+                    } else if (distance < bestDistance) {
                         bestDistance = distance;
                         bestX = x;
                         bestZ = z;
@@ -2413,6 +2426,10 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
         }
 
+        if (bestEditedX >= 0) {
+            bestX = bestEditedX;
+            bestZ = bestEditedZ;
+        }
         if (bestX >= 0) {
             // An edited chunk keeps its old mesh visible until its replacement
             // is ready. Detach it only now, immediately before rebuilding, so
@@ -2435,6 +2452,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 waterGroup.addChild(waterMesh);
             }
             builtChunks[bestX][bestZ] = true;
+            editedChunks[bestX][bestZ] = false;
             updateChunkVisibility();
             return; // chunksDirty remains true; continue next tick
         }
@@ -2448,9 +2466,9 @@ final class WorldCanvas extends Canvas implements Runnable {
      * water cells from its ground surface up to WATER_LEVEL; tops and shoreline
      * walls are emitted as block faces instead of one continuous flat sheet.
      */
-    /** Force a fresh terrain/water mesh rebuild after an edit, even if the
-     * player remains inside the same chunk. Synchronization prevents the game
-     * loop from racing the key handler while meshes are removed and recreated. */
+    /** Mark terrain/water meshes stale after an edit, even if the player
+     * remains inside the same chunk. Synchronization protects the chunk-state
+     * flags shared by input handling and the game-loop streaming pass. */
     private synchronized void invalidateEditedArea(int minX, int maxX, int minZ, int maxZ) {
         // A voxel can change the exposed faces of its horizontal neighbors.
         // Expand by one cell, which naturally includes the adjacent chunk only
@@ -2467,6 +2485,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 // This coalesces rapid edits (especially spreading water) and
                 // avoids a blank chunk while its replacement waits in the queue.
                 builtChunks[x][z] = false;
+                editedChunks[x][z] = true;
             }
         }
         // The regular game loop rebuilds at most one dirty chunk per tick.
@@ -2508,6 +2527,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                     activeWaterChunks[x][z] = null;
                 }
                 builtChunks[x][z] = false;
+                editedChunks[x][z] = false;
             }
         }
         loadedCenterX = -99;
