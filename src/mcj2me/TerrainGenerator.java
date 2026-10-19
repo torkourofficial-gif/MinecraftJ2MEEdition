@@ -429,14 +429,17 @@ final class TerrainGenerator {
     }
     private boolean isTreeCandidate(int x, int z) {
         if (x < 4 || z < 4 || x >= SIZE - 4 || z >= SIZE - 4) return false;
-        int h = getHeight(x, z);
-        // Indev-like trees grow on grassy, mostly level ground, away from water.
-        if (h < 12 || h > HEIGHT - 9 || getTopType(x, z) != BLOCK_GRASS || isWaterAt(x, z)) return false;
+        // Tree placement is decided from the original generated terrain only.
+        // Mining or replacing the supporting surface must not regenerate/move
+        // the tree or make its trunk and canopy vanish.
+        int h = originalHeights[x][z];
+        if (h < 12 || h > HEIGHT - 9 || originalTopTypes[x][z] != BLOCK_GRASS
+                || (waterBasins[x][z] && h < WATER_LEVEL)) return false;
         int min = h, max = h, n;
-        n = getHeight(x - 1, z); if (n < min) min = n; if (n > max) max = n;
-        n = getHeight(x + 1, z); if (n < min) min = n; if (n > max) max = n;
-        n = getHeight(x, z - 1); if (n < min) min = n; if (n > max) max = n;
-        n = getHeight(x, z + 1); if (n < min) min = n; if (n > max) max = n;
+        n = originalHeights[x - 1][z]; if (n < min) min = n; if (n > max) max = n;
+        n = originalHeights[x + 1][z]; if (n < min) min = n; if (n > max) max = n;
+        n = originalHeights[x][z - 1]; if (n < min) min = n; if (n > max) max = n;
+        n = originalHeights[x][z + 1]; if (n < min) min = n; if (n > max) max = n;
         return max - min <= 2 && (hash(x * 17 + 31, z * 23 - 19) & 63) < 3;
     }
 
@@ -478,11 +481,17 @@ final class TerrainGenerator {
         return true;
     }
 
+    /** Fixed spawn-time Y of the procedural tree, unaffected by terrain edits. */
+    int getTreeBaseHeight(int x, int z) {
+        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return 0;
+        return originalHeights[x][z];
+    }
+
     /** True when this exact generated log voxel still exists. */
     boolean isTreeTrunkAt(int x, int y, int z) {
         if (x < 4 || z < 4 || x >= SIZE - 4 || z >= SIZE - 4 || y < 0 || y >= HEIGHT) return false;
         if (!isTreeAt(x, z)) return false;
-        int base = getHeight(x, z);
+        int base = getTreeBaseHeight(x, z);
         if (y < base || y >= base + getTreeHeight(x, z)) return false;
         int id = leafId(x, y, z);
         for (int i = 0; i < removedTreeBlockCount; i++) if (removedTreeBlockIds[i] == id) return false;
@@ -534,7 +543,7 @@ final class TerrainGenerator {
         for (int tx = Math.max(4, x - 2); tx <= Math.min(SIZE - 5, x + 2); tx++) {
             for (int tz = Math.max(4, z - 2); tz <= Math.min(SIZE - 5, z + 2); tz++) {
                 if (!isTreeAt(tx, tz)) continue;
-                int crown = getHeight(tx, tz) + getTreeHeight(tx, tz) - 1;
+                int crown = getTreeBaseHeight(tx, tz) + getTreeHeight(tx, tz) - 1;
                 int layer = y - (crown - 1);
                 if (layer < 0 || layer > 2) continue;
                 int radius = layer == 2 ? 1 : 2;
@@ -654,7 +663,7 @@ final class TerrainGenerator {
 
     int countTreeLeaves(int tx, int tz) {
         if (!isTreeAt(tx, tz)) return 0;
-        int crown = getHeight(tx, tz) + getTreeHeight(tx, tz) - 1;
+        int crown = getTreeBaseHeight(tx, tz) + getTreeHeight(tx, tz) - 1;
         int count = 0;
         for (int layer = 0; layer < 3; layer++) {
             int y = crown - 1 + layer;
@@ -683,7 +692,7 @@ final class TerrainGenerator {
             
             for (int tz = minTreeZ; tz <= maxTreeZ; tz++) {
                 if (!isTreeAt(tx, tz)) continue;
-                int crown = getHeight(tx, tz) + getTreeHeight(tx, tz) - 1;
+                int crown = getTreeBaseHeight(tx, tz) + getTreeHeight(tx, tz) - 1;
                 for (int layer = 0; layer < 3; layer++) {
                     int leafY = crown - 1 + layer;
                     int radius = layer == 2 ? 1 : 2;
