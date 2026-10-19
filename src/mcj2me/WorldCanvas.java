@@ -378,7 +378,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             // Search outwards for a clear surface column instead of leaving
             // the camera inside terrain, trees, leaves, or water.
             boolean found = false;
-            for (int radius = 1; radius <= 12 && !found; radius++) {
+            for (int radius = 1; radius < TerrainGenerator.SIZE / 2 && !found; radius++) {
                 for (int dx = -radius; dx <= radius && !found; dx++) {
                     for (int dz = -radius; dz <= radius; dz++) {
                         if (Math.abs(dx) != radius && Math.abs(dz) != radius) continue;
@@ -398,8 +398,31 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
         }
 
+        // If the local search failed, scan the full map for a safe surface.
+        // Never knowingly keep a spawn coordinate inside a solid voxel.
+        if (!isPlayerColumnClear(spawnX, spawnZ)) {
+            boolean found = false;
+            for (int x = 3; x < TerrainGenerator.SIZE - 3 && !found; x++) {
+                for (int z = 3; z < TerrainGenerator.SIZE - 3; z++) {
+                    if (isPlayerColumnClear(x, z)) {
+                        spawnX = x;
+                        spawnZ = z;
+                        cameraX = x + 0.5f;
+                        cameraZ = z + 0.5f;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+        }
+
         float groundY = terrain.getHeight(spawnX, spawnZ) + PLAYER_EYE_HEIGHT;
-        if (cameraY < groundY || !isPlayerColumnClear(spawnX, spawnZ)) {
+        if (cameraY < groundY || !isPlayerColumnClear(spawnX, spawnZ)
+                || !canOccupyAt(cameraX, groundY - PLAYER_EYE_HEIGHT, cameraZ)) {
+            cameraY = groundY;
+            verticalVelocity = 0.0f;
+            airborne = false;
+        } else if (!canOccupyAt(cameraX, cameraY - PLAYER_EYE_HEIGHT, cameraZ)) {
             cameraY = groundY;
             verticalVelocity = 0.0f;
             airborne = false;
@@ -411,11 +434,33 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (x < 2 || z < 2 || x >= TerrainGenerator.SIZE - 2 ||
             z >= TerrainGenerator.SIZE - 2) return false;
         int ground = terrain.getHeight(x, z);
-        if (terrain.isWaterAt(x, z) || terrain.isTreeAt(x, z)) return false;
-        // The player occupies roughly two vertical cells above the ground.
+        if (terrain.isWaterAt(x, z)) return false;
+
+        // Check the player's entire standing space, including player-placed
+        // blocks and individual leaves. The ground voxel below the feet is
+        // deliberately excluded because standing on it is valid.
         for (int y = ground; y <= ground + 2; y++) {
-            if (terrain.isLeafBlockAt(x, y, z)) return false;
+            if (terrain.getBlockTypeAt(x, y, z) >= 0 ||
+                    terrain.isLeafBlockAt(x, y, z)) return false;
         }
+
+        // Logs are separate voxels and can overlap a surface column.
+        if (terrain.isTreeAt(x, z)) {
+            int treeBase = terrain.getHeight(x, z);
+            int treeTop = treeBase + terrain.getTreeHeight(x, z);
+            if (treeTop > ground && treeBase <= ground + 2) return false;
+        }
+
+        // Decorations such as doors also occupy physical space.
+        for (int d = 0; d < decorationCount; d++) {
+            float halfWidth = decorationTypes[d] == BLOCK_DOOR ? 0.48f : 0.22f;
+            float height = decorationTypes[d] == BLOCK_DOOR ? 2.0f : 1.0f;
+            if (Math.abs(decorationX[d] - (x + 0.5f)) < halfWidth + PLAYER_HALF_WIDTH &&
+                    Math.abs(decorationZ[d] - (z + 0.5f)) < halfWidth + PLAYER_HALF_WIDTH &&
+                    decorationY[d] < ground + 2.0f &&
+                    decorationY[d] + height > ground) return false;
+        }
+
         // Avoid sharp ledges where the camera can clip into a neighboring column.
         if (Math.abs(ground - terrain.getHeight(x - 1, z)) > 1 ||
             Math.abs(ground - terrain.getHeight(x + 1, z)) > 1 ||
@@ -750,6 +795,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         cameraX = 64.0f;
         cameraZ = 105.0f;
         cameraY = terrain.getHeight((int) cameraX, (int) cameraZ) + PLAYER_EYE_HEIGHT + 0.1f;
+        // Reuse the same safe-position search used for initial world entry.
+        ensurePlayerNotBuried();
         velocityX = 0.0f;
         velocityZ = 0.0f;
         verticalVelocity = 0.0f;
