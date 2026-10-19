@@ -1025,7 +1025,10 @@ final class WorldCanvas extends Canvas implements Runnable {
                 && inventory[selectedItem] <= 0) ? "EMPTY" : BLOCK_NAMES[selectedItem])
             : "EMPTY";
         g.setColor(0xFFFFFF);
-        g.drawString(selectedName + " (5 select, 1-3 recipe, 0 craft, 7/9 page)",
+        String inventoryHelp = worldMode == IndevViewerMIDlet.MODE_SURVIVAL
+            ? "5 select, 1-3 recipe, 0 craft, * close"
+            : "5 select, 1-3 recipe, 0 craft, 7/9 page";
+        g.drawString(selectedName + " (" + inventoryHelp + ")",
             Math.max(2, panelX), Math.min(getHeight() - 16, panelY + panelH + 2),
             Graphics.TOP | Graphics.LEFT);
         drawRecipePreview(g, false, panelX, panelY);
