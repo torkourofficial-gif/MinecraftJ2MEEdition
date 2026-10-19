@@ -193,7 +193,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         "BROWN WOOL", "GREEN WOOL", "RED WOOL", "BLACK WOOL", "WATER BUCKET", "EMPTY BUCKET",
         "RAW PORKCHOP", "RAW BEEF", "STICK", "CRAFTING TABLE", "COAL", "CHARCOAL",
         "IRON INGOT", "GOLD INGOT", "DIAMOND", "FLINT", "STRING", "FEATHER", "PAPER", "BOOK",
-        "CHEST", "FURNACE", "LADDER", "SIGN", "BOWL", "BREAD",
+        "CHEST", "UNUSED", "LADDER", "SIGN", "BOWL", "BREAD",
         "WOODEN PICKAXE", "STONE PICKAXE", "IRON PICKAXE", "DIAMOND PICKAXE",
         "WOODEN AXE", "STONE AXE", "IRON AXE", "DIAMOND AXE",
         "WOODEN SHOVEL", "STONE SHOVEL", "IRON SHOVEL", "DIAMOND SHOVEL",
@@ -617,7 +617,6 @@ final class WorldCanvas extends Canvas implements Runnable {
         mapCraftItemIcon(itemsImage, crafts.PAPER, 10, 3);
         mapCraftItemIcon(itemsImage, crafts.BOOK, 11, 3);
         blockIcons[crafts.CHEST] = createTerrainBlockIcon(atlas, 11, 1);
-        blockIcons[crafts.FURNACE] = createTerrainBlockIcon(atlas, 12, 2);
         blockIcons[crafts.LADDER] = createTerrainBlockIcon(atlas, 3, 5);
         mapCraftItemIcon(itemsImage, crafts.SIGN, 10, 2);
         mapCraftItemIcon(itemsImage, crafts.BOWL, 7, 4);
@@ -2583,7 +2582,6 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (item >= crafts.WOODEN_PICKAXE && item <= crafts.DIAMOND_HOE) color = 0x78634A;
         if (item >= crafts.LEATHER_HELMET && item <= crafts.DIAMOND_BOOTS) color = 0x7B8A9A;
         if (item == crafts.CRAFTING_TABLE || item == crafts.CHEST) color = 0xA87943;
-        if (item == crafts.FURNACE) color = 0x777777;
         g.setColor(0x242424); g.fillRect(0, 0, 16, 16);
         if (item == crafts.LEATHER) {
             // A small hide silhouette instead of tiny "LE" text, which looked
@@ -2951,13 +2949,14 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private boolean attackMobs() {
-        if (hostileMobs != null && hostileMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch)) {
+        int damage = selectedSwordDamage();
+        if (hostileMobs != null && hostileMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch, damage)) {
             if (hostileMobs.consumeDeathEvent()) {
                 spawnMobDeathParticles(hostileMobs.getDeathX(), hostileMobs.getDeathY(), hostileMobs.getDeathZ());
             }
             return true;
         }
-        if (passiveMobs != null && passiveMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch)) {
+        if (passiveMobs != null && passiveMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch, damage)) {
             if (passiveMobs.consumeDeathEvent()) {
                 float dx = passiveMobs.getDeathX(), dy = passiveMobs.getDeathY(), dz = passiveMobs.getDeathZ();
                 spawnMobDeathParticles(dx, dy, dz);
@@ -4040,6 +4039,8 @@ final class WorldCanvas extends Canvas implements Runnable {
                 spawnDroppedItem(crafts.COAL, blockIcons[crafts.COAL], x + 0.5f, blockY + 0.5f, z + 0.5f);
             else if (type == TerrainGenerator.BLOCK_DIAMOND_ORE)
                 spawnDroppedItem(crafts.DIAMOND, blockIcons[crafts.DIAMOND], x + 0.5f, blockY + 0.5f, z + 0.5f);
+            else if (type == TerrainGenerator.BLOCK_IRON_ORE)
+                spawnDroppedItem(crafts.IRON_INGOT, blockIcons[crafts.IRON_INGOT], x + 0.5f, blockY + 0.5f, z + 0.5f);
             else
                 spawnDroppedBlock(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
         }
@@ -4388,6 +4389,26 @@ final class WorldCanvas extends Canvas implements Runnable {
         return -1;
     }
 
+    /** Wooden, stone, iron and diamond shovel tiers. */
+    private int selectedShovelTier() {
+        int item = selectedItemType();
+        if (item == crafts.WOODEN_SHOVEL) return 0;
+        if (item == crafts.STONE_SHOVEL) return 1;
+        if (item == crafts.IRON_SHOVEL) return 2;
+        if (item == crafts.DIAMOND_SHOVEL) return 3;
+        return -1;
+    }
+
+    /** Swords deal increasing damage; an empty hand or other item deals 1. */
+    private int selectedSwordDamage() {
+        int item = selectedItemType();
+        if (item == crafts.WOODEN_SWORD) return 2;
+        if (item == crafts.STONE_SWORD) return 3;
+        if (item == crafts.IRON_SWORD) return 5;
+        if (item == crafts.DIAMOND_SWORD) return 7;
+        return 1;
+    }
+
     private boolean isPickaxeEffectiveBlock(int type) {
         return type == TerrainGenerator.BLOCK_STONE
             || type == TerrainGenerator.BLOCK_COAL_ORE
@@ -4437,7 +4458,14 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (type == TerrainGenerator.BLOCK_PLANKS) return 45;
         if (type == TerrainGenerator.BLOCK_BRICK) return 90;
         if (type == TerrainGenerator.BLOCK_DIRT || type == TerrainGenerator.BLOCK_SAND
-                || type == TerrainGenerator.BLOCK_GRAVEL) return 15;
+                || type == TerrainGenerator.BLOCK_GRAVEL) {
+            int shovel = selectedShovelTier();
+            if (shovel >= 0) {
+                int speed = shovel == 0 ? 3 : shovel == 1 ? 5 : shovel == 2 ? 7 : 9;
+                return Math.max(1, 15 / speed);
+            }
+            return 15;
+        }
         if (type == TerrainGenerator.BLOCK_LEAVES) return 8;
         if (type == TerrainGenerator.BLOCK_GRASS) return 18;
         return 20;
