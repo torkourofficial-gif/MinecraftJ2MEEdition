@@ -354,8 +354,11 @@ final class TerrainGenerator {
     /** Returns the block occupying a wall cell, or -1 when that voxel was removed. */
     int getBlockTypeAt(int x, int y, int z) {
         if (x < 0 || z < 0 || x >= SIZE || z >= SIZE || y < 0) return BLOCK_BEDROCK;
+        // Cells at or above the current column height are air, not copies of
+        // the surface block. This matters for two-block player clearance.
+        if (y >= heights[x][z]) return -1;
         if (isBlockRemoved(x, y, z)) return -1;
-        if (y >= heights[x][z] - 1) return topTypes[x][z];
+        if (y == heights[x][z] - 1) return topTypes[x][z];
         return getSubsurfaceType(x, y, z);
     }
 
