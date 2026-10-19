@@ -92,7 +92,7 @@ final class HostileMob {
         return false;
     }
 
-    boolean hit(float px, float py, float pz, float yaw, float pitch) {
+    boolean hit(float px, float py, float pz, float yaw, float pitch, int damage) {
         if (!nightActive) return false;
         Mob target = null;
         float best = 4.6f;
@@ -107,7 +107,7 @@ final class HostileMob {
             if (score >= 0.0f && score < best) { best = score; target = mob; }
         }
         if (target == null) return false;
-        target.health--;
+        target.health -= Math.max(1, damage);
         target.hurtTicks = 5;
         target.mesh.setAppearance(0, PassiveMob.getHurtAppearance());
         if (target.health <= 0) {
