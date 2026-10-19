@@ -4025,7 +4025,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         // A procedural tree's base is derived from this column's height. Keep
         // its supporting surface intact until the tree is removed, otherwise
         // lowering the column shifts the entire generated tree.
-        if (!sideHit && blockY == h - 1 && terrain.isTreeAt(x, z)) return;
+        if (blockY == h - 1 && terrain.isTreeAt(x, z)) return;
         lastMiningDelay = miningDelay(type);
         if (type == TerrainGenerator.BLOCK_TNT) {
             if (tntFuseTicks == 0) {
