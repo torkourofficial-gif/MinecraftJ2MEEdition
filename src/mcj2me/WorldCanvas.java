@@ -1302,7 +1302,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         short[] uv = new short[48];
         // The camera sees the +Z face of the held arm. Map that face to
         // the front rectangle in char.png; the opposite face gets the back.
-        int[] uvFace = {1,0,2,3,4,5};
+        int[] uvFace = {0,1,2,3,4,5};
         for (int face=0; face<6; face++) {
             int[] r=rects[uvFace[face]];
             for (int k=0;k<4;k++) {
@@ -1335,7 +1335,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         Mesh arm = new Mesh(buffer,new TriangleStripArray(indices,strips),heldArmAppearance);
         // The first-person arm should read smaller than a full block on the
         // narrow portrait display; scale uniformly to avoid an oversized fist.
-        arm.setScale(0.78f,0.78f,0.78f);
+        arm.setScale(0.52f,0.52f,0.52f);
         return arm;
     }
 
