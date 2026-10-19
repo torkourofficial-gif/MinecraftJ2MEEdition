@@ -110,8 +110,8 @@ public final class crafts {
                 CRAFTING_TABLE, 1, false),
         // Planks are interchangeable for basic wooden components.
         r(1, 2, new int[] { OAK_PLANKS, OAK_PLANKS }, STICK, 4, false),
-        r(1, 1, new int[] { COAL }, TORCH, 4, false),
-        r(1, 1, new int[] { CHARCOAL }, TORCH, 4, false)
+        r(1, 2, new int[] { COAL, STICK }, TORCH, 4, false),
+        r(1, 2, new int[] { CHARCOAL, STICK }, TORCH, 4, false)
     };
 
     private static final Recipe[] TABLE_RECIPES = {
@@ -146,28 +146,23 @@ public final class crafts {
         r(3, 3, new int[] { STONE, STONE, STONE,
                             EMPTY, EMPTY, EMPTY,
                             EMPTY, EMPTY, EMPTY }, SLAB, 6, false),
-        r(3, 3, new int[] { OAK_PLANKS, OAK_PLANKS, EMPTY,
-                            OAK_PLANKS, OAK_PLANKS, EMPTY,
-                            EMPTY, EMPTY, EMPTY }, WOODEN_PRESSURE_PLATE, 1, false),
+        r(2, 2, new int[] { OAK_PLANKS, OAK_PLANKS,
+                            OAK_PLANKS, OAK_PLANKS }, WOODEN_PRESSURE_PLATE, 1, false),
         r(2, 1, new int[] { STONE, STONE }, STONE_BUTTON, 1, false),
         r(2, 1, new int[] { OAK_PLANKS, OAK_PLANKS }, WOODEN_BUTTON, 1, false),
-        r(3, 3, new int[] { EMPTY, STICK, EMPTY,
-                            STICK, STONE, STICK,
-                            EMPTY, EMPTY, EMPTY }, LEVER, 1, false),
-        r(3, 3, new int[] { EMPTY, STICK, EMPTY,
-                            STICK, STICK, STICK,
-                            EMPTY, EMPTY, EMPTY }, REDSTONE_TORCH, 1, false),
+        r(2, 2, new int[] { STICK, EMPTY,
+                            STONE, STONE }, LEVER, 1, false),
+        r(1, 2, new int[] { STICK, COAL }, REDSTONE_TORCH, 1, false),
 
         // Storage, transport and paper.
         r(3, 3, new int[] { OAK_PLANKS, EMPTY, OAK_PLANKS,
                             OAK_PLANKS, EMPTY, OAK_PLANKS,
                             OAK_PLANKS, OAK_PLANKS, OAK_PLANKS }, BOAT, 1, false),
-        r(3, 3, new int[] { IRON_INGOT, EMPTY, IRON_INGOT,
+        r(3, 3, new int[] { EMPTY, EMPTY, EMPTY,
                             IRON_INGOT, EMPTY, IRON_INGOT,
                             IRON_INGOT, IRON_INGOT, IRON_INGOT }, MINECART, 1, false),
-        r(3, 3, new int[] { IRON_INGOT, EMPTY, IRON_INGOT,
-                            IRON_INGOT, IRON_INGOT, IRON_INGOT,
-                            IRON_INGOT, EMPTY, IRON_INGOT }, BUCKET, 1, false),
+        r(3, 2, new int[] { IRON_INGOT, EMPTY, IRON_INGOT,
+                            EMPTY, IRON_INGOT, EMPTY }, BUCKET, 1, false),
         r(3, 3, new int[] { IRON_INGOT, IRON_INGOT, IRON_INGOT,
                             IRON_INGOT, EMPTY, IRON_INGOT,
                             IRON_INGOT, IRON_INGOT, IRON_INGOT }, IRON_BLOCK, 1, false),
@@ -189,9 +184,6 @@ public final class crafts {
         r(3, 3, new int[] { STONE, STONE, STONE,
                             STONE, STONE, STONE,
                             STONE, STONE, STONE }, STONE_BRICKS, 1, false),
-        r(3, 3, new int[] { EMPTY, EMPTY, EMPTY,
-                            EMPTY, EMPTY, EMPTY,
-                            EMPTY, EMPTY, EMPTY }, OBSIDIAN, 0, false),
 
         // Tools. Each recipe uses the classic shaped layout.
         r(3, 3, new int[] { OAK_PLANKS, OAK_PLANKS, OAK_PLANKS,
