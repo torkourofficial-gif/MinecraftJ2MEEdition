@@ -135,7 +135,7 @@ final class TitleScreen extends Canvas implements Runnable {
             g.drawString(help, w/2, h-38, Graphics.BOTTOM|Graphics.HCENTER);
             g.drawString("UP/DOWN: choose control", w/2, h-20, Graphics.BOTTOM|Graphics.HCENTER);
         } else if (settingsOpen) {
-            int settingsTop = h/2 - 96;
+            int settingsTop = h/2 - 110;
             drawButton(g, 12, settingsTop, w-24, 24,
                 "Sensitivity: " + IndevViewerMIDlet.sensitivity, selected==0);
             String fog = IndevViewerMIDlet.fogLevel==0 ? "Near" :
@@ -145,8 +145,10 @@ final class TitleScreen extends Canvas implements Runnable {
                 "Frameskip: " + IndevViewerMIDlet.frameskip, selected==2);
             drawButton(g, 12, settingsTop+84, w-24, 24,
                 "Modo humilde: " + (IndevViewerMIDlet.humbleMode ? "ON" : "OFF"), selected==3);
-            drawButton(g, 12, settingsTop+112, w-24, 24, "Controls", selected==4);
-            drawButton(g, 12, settingsTop+140, w-24, 24, "Back", selected==5);
+            drawButton(g, 12, settingsTop+112, w-24, 24,
+                "Music volume: " + IndevViewerMIDlet.musicVolume + "%", selected==4);
+            drawButton(g, 12, settingsTop+140, w-24, 24, "Controls", selected==5);
+            drawButton(g, 12, settingsTop+168, w-24, 24, "Back", selected==6);
             g.setColor(0xFFFFFF);
             g.drawString("LEFT/RIGHT: change", w/2, h-43, Graphics.BOTTOM|Graphics.HCENTER);
             g.drawString("UP/DOWN: select  FIRE: open", w/2, h-25, Graphics.BOTTOM|Graphics.HCENTER);
@@ -269,28 +271,30 @@ final class TitleScreen extends Canvas implements Runnable {
             } else if (action==FIRE || keyCode=='5' || keyCode==' ' || keyCode=='\n') {
                 waitingForBinding=true;
             } else if (keyCode=='*' || keyCode==42) {
-                controlsOpen=false; settingsOpen=true; selected=3;
+                controlsOpen=false; settingsOpen=true; selected=5;
             }
             repaint();
             return;
         }
         if (settingsOpen) {
-            if (action==UP || keyCode=='2') selected=(selected+5)%6;
-            else if (action==DOWN || keyCode=='8') selected=(selected+1)%6;
+            if (action==UP || keyCode=='2') selected=(selected+6)%7;
+            else if (action==DOWN || keyCode=='8') selected=(selected+1)%7;
             else if (action==LEFT || keyCode=='4') {
                 if (selected==0 && IndevViewerMIDlet.sensitivity>1) IndevViewerMIDlet.sensitivity--;
                 else if (selected==1 && IndevViewerMIDlet.fogLevel>0) IndevViewerMIDlet.fogLevel--;
                 else if (selected==2 && IndevViewerMIDlet.frameskip>0) { IndevViewerMIDlet.frameskip--; owner.settingsChanged(); }
                 else if (selected==3) { IndevViewerMIDlet.humbleMode=!IndevViewerMIDlet.humbleMode; owner.settingsChanged(); }
+                else if (selected==4 && IndevViewerMIDlet.musicVolume>0) { IndevViewerMIDlet.musicVolume=Math.max(0,IndevViewerMIDlet.musicVolume-10); owner.musicVolumeChanged(); }
             } else if (action==RIGHT || keyCode=='6') {
                 if (selected==0 && IndevViewerMIDlet.sensitivity<6) IndevViewerMIDlet.sensitivity++;
                 else if (selected==1 && IndevViewerMIDlet.fogLevel<2) IndevViewerMIDlet.fogLevel++;
                 else if (selected==2 && IndevViewerMIDlet.frameskip<5) { IndevViewerMIDlet.frameskip++; owner.settingsChanged(); }
                 else if (selected==3) { IndevViewerMIDlet.humbleMode=!IndevViewerMIDlet.humbleMode; owner.settingsChanged(); }
-            } else if (action==FIRE || keyCode=='5' || keyCode==' ' || keyCode=='\n') {
+                else if (selected==4 && IndevViewerMIDlet.musicVolume<100) { IndevViewerMIDlet.musicVolume=Math.min(100,IndevViewerMIDlet.musicVolume+10); owner.musicVolumeChanged(); }
+            } else if (action==FIRE || keyCode=='5' || keyCode==' ' || keyCode=='\\n') {
                 if (selected==3) { IndevViewerMIDlet.humbleMode=!IndevViewerMIDlet.humbleMode; owner.settingsChanged(); }
-                else if (selected==4) { controlsOpen=true; controlSelection=0; waitingForBinding=false; }
-                else if (selected==5) { settingsOpen=false; selected=pauseMenu ? 0 : 1; }
+                else if (selected==5) { controlsOpen=true; controlSelection=0; waitingForBinding=false; }
+                else if (selected==6) { settingsOpen=false; selected=pauseMenu ? 0 : 1; }
             } else if (keyCode=='*' || keyCode==42) { settingsOpen=false; selected=pauseMenu ? 0 : 1; }
             repaint();
             return;
