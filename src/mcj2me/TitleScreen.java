@@ -291,7 +291,7 @@ final class TitleScreen extends Canvas implements Runnable {
                 else if (selected==2 && IndevViewerMIDlet.frameskip<5) { IndevViewerMIDlet.frameskip++; owner.settingsChanged(); }
                 else if (selected==3) { IndevViewerMIDlet.humbleMode=!IndevViewerMIDlet.humbleMode; owner.settingsChanged(); }
                 else if (selected==4 && IndevViewerMIDlet.musicVolume<100) { IndevViewerMIDlet.musicVolume=Math.min(100,IndevViewerMIDlet.musicVolume+10); owner.musicVolumeChanged(); }
-            } else if (action==FIRE || keyCode=='5' || keyCode==' ' || keyCode=='\\n') {
+            } else if (action==FIRE || keyCode=='5' || keyCode==' ' || keyCode=='\n') {
                 if (selected==3) { IndevViewerMIDlet.humbleMode=!IndevViewerMIDlet.humbleMode; owner.settingsChanged(); }
                 else if (selected==5) { controlsOpen=true; controlSelection=0; waitingForBinding=false; }
                 else if (selected==6) { settingsOpen=false; selected=pauseMenu ? 0 : 1; }
