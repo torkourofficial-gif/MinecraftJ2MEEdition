@@ -1109,10 +1109,10 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         float feetY = cameraY - PLAYER_EYE_HEIGHT;
         float headY = feetY + PLAYER_HEIGHT;
-        int minX = (int) Math.floor(x - 0.20f);
-        int maxX = (int) Math.floor(x + 0.20f);
-        int minZ = (int) Math.floor(z - 0.20f);
-        int maxZ = (int) Math.floor(z + 0.20f);
+        int minX = (int) Math.floor(x - 0.30f);
+        int maxX = (int) Math.floor(x + 0.30f);
+        int minZ = (int) Math.floor(z - 0.30f);
+        int maxZ = (int) Math.floor(z + 0.30f);
         int firstBodyY = Math.max(0, (int) Math.floor(feetY + 0.02f));
         int lastBodyY = Math.min(TerrainGenerator.HEIGHT - 1,
             (int) Math.floor(headY - 0.02f));
