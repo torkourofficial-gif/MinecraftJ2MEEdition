@@ -2386,6 +2386,9 @@ final class WorldCanvas extends Canvas implements Runnable {
                 }
             }
         }
+        // Removed scene-graph branches can release sizeable native M3G meshes.
+        // Reclaim them before allocating the replacement chunk when heap is tight.
+        if (Runtime.getRuntime().freeMemory() < 1024 * 1024) System.gc();
 
         loadedCenterX = centerX;
         loadedCenterZ = centerZ;
