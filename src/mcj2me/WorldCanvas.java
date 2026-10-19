@@ -135,7 +135,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean running;
     private int frameSkipCounter = 0;
     private final int[] surfaceHitResult = new int[8];
-    private final int[] leafHitResult = new int[3];
+    private final int[] leafHitResult = new int[4];
     private final int[] treeHitResult = new int[4];
     private boolean paused;
     private boolean pauseOverlayOpen;
