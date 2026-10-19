@@ -957,8 +957,10 @@ final class WorldCanvas extends Canvas implements Runnable {
                 breakHeld = false;
                 actionCooldown = 4;
             } else if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
-                breakHeld = true;
-                miningProgress = 0;
+                if (!breakHeld) {
+                    breakHeld = true;
+                    miningProgress = 0;
+                }
             } else {
                 breakBlock();
                 actionCooldown = 4;
