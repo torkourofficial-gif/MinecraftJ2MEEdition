@@ -972,8 +972,13 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (IndevViewerMIDlet.controlPressed(CONTROL_JUMP,keyCode,action) && !jumpHeld) {
             jumpHeld = true;
             if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
-                verticalVelocity = JUMP_SPEED;
-                airborne = true;
+                if (isSwimming()) {
+                    verticalVelocity = Math.max(verticalVelocity, 0.24f);
+                    airborne = true;
+                } else if (!airborne) {
+                    verticalVelocity = JUMP_SPEED;
+                    airborne = true;
+                }
             } else if (flying) {
                 // Like Minecraft creative: tap jump twice quickly to stop flying.
                 if (flightTapWindowTicks > 0) {
