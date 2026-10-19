@@ -24,10 +24,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final float PLAYER_EYE_HEIGHT = 1.62f;
     private static final float PLAYER_HEAD_OFFSET = PLAYER_HEIGHT - PLAYER_EYE_HEIGHT;
     private static final float BLOCK_REACH = 5.0f;
-    private static final float PLAYER_HEIGHT = 2.0f;
-    private static final float PLAYER_EYE_HEIGHT = 1.62f;
-    private static final float PLAYER_HEAD_OFFSET = PLAYER_HEIGHT - PLAYER_EYE_HEIGHT;
-    private static final float BLOCK_REACH = 5.0f;
+
     private static final float MOVE_SPEED = 0.20f;
     private static final float MOVE_ACCEL = 0.035f;
     private static final float FRICTION = 0.78f;
