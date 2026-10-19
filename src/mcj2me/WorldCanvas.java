@@ -1466,21 +1466,21 @@ final class WorldCanvas extends Canvas implements Runnable {
         float forward=0.46f, right=0.24f, down=0.20f;
         // The empty arm needs its own portrait placement: keep it lower-right
         // like Minecraft, but pull it inward/up so the forearm stays visible.
-        if (arm && !foodItem) { right=0.16f; down=0.13f; }
+        if (arm && !foodItem) { right=0.16f; down=0.22f; }
         // Held blocks sit only slightly farther right/down than the hand.
         if (hasItem && !foodItem && !arm) { right += 0.025f; down += 0.02f; }
         float swingX=0.0f, swingY=0.0f, swingZ=0.0f;
         if (eatingTicks > 0) {
             int elapsed=EATING_DURATION_TICKS-eatingTicks;
             float eatPhase=(float)elapsed/(float)EATING_DURATION_TICKS;
-            // Lift the food toward the face, bob it in short bites, and tilt it
-            // inward. The same transform works on the compact 240x320 view.
+            // Keep the bite animation around the center of the portrait view
+            // instead of lifting the food beyond the top edge. Use a gentle bob.
             float bite=(float)Math.abs(Math.sin(elapsed*Math.PI/5.0));
-            forward=0.34f;
-            down=0.02f-bite*0.10f;
-            right=0.25f-(float)Math.sin(eatPhase*Math.PI)*0.04f;
-            swingX=-18.0f-bite*12.0f;
-            swingZ=-12.0f-bite*8.0f;
+            forward=0.38f;
+            down=0.16f-bite*0.04f;
+            right=0.16f-(float)Math.sin(eatPhase*Math.PI)*0.025f;
+            swingX=-10.0f-bite*7.0f;
+            swingZ=-8.0f-bite*5.0f;
         } else if (handSwingTicks > 0) {
             float phase=(8-handSwingTicks)%8;
             float swing=(float)Math.sin(phase*Math.PI/4.0);
