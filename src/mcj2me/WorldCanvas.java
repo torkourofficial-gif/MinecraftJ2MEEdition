@@ -1651,7 +1651,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (isItemsAtlasIconItem(item)) {
             // Every icon sourced from items.png is a cut-out sprite, not a cube.
             // Keep the atlas alpha for buckets, food, materials, tools, and armor alike.
-            Mesh sprite = createDroppedItemMesh(blockIcons[item], true);
+            boolean flipSprite = !(item >= ITEM_WATER_BUCKET && item <= ITEM_RAW_BEEF);
+            Mesh sprite = createDroppedItemMesh(blockIcons[item], flipSprite);
             Appearance spriteAppearance = sprite.getAppearance(0);
             if (spriteAppearance != null) {
                 spriteAppearance.setLayer(7);
