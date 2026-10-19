@@ -133,6 +133,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int pauseSelection;
     private Image pauseOverlay;
     private int pauseOverlayWidth = -1, pauseOverlayHeight = -1;
+    private boolean dead;
+    private int deathSelection;
+    private Image deathOverlay;
+    private int deathOverlayWidth = -1, deathOverlayHeight = -1;
     private boolean forward, backward, strafeLeft, strafeRight;
     private boolean lookUp, lookDown, turnLeft, turnRight;
     private boolean jumpHeld;
@@ -703,6 +707,61 @@ final class WorldCanvas extends Canvas implements Runnable {
         drawUnderwaterOverlay(g);
         drawHud(g);
         if (pauseOverlayOpen) drawPauseOverlay(g);
+        if (dead) drawDeathOverlay(g);
+    }
+
+    private void drawDeathOverlay(Graphics g) {
+        int w = getWidth(), h = getHeight();
+        if (deathOverlay == null || deathOverlayWidth != w || deathOverlayHeight != h) {
+            int[] pixels = new int[w * h];
+            for (int i = 0; i < pixels.length; i++) pixels[i] = 0xAA8B0000;
+            deathOverlay = Image.createRGBImage(pixels, w, h, true);
+            deathOverlayWidth = w;
+            deathOverlayHeight = h;
+        }
+        g.drawImage(deathOverlay, 0, 0, Graphics.TOP | Graphics.LEFT);
+
+        Font titleFont = Font.getFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_LARGE);
+        g.setFont(titleFont);
+        g.setColor(0xFFFFFF);
+        g.drawString("You Died!", w / 2 + 2, h / 3 + 2,
+            Graphics.TOP | Graphics.HCENTER);
+        g.setColor(0x551111);
+        g.drawString("You Died!", w / 2, h / 3,
+            Graphics.TOP | Graphics.HCENTER);
+
+        int bw = Math.min(w - 32, 200);
+        if (bw < 1) bw = w;
+        int bh = Math.min(30, Math.max(24, h / 10));
+        int bx = (w - bw) / 2;
+        int gap = 9;
+        int firstY = h / 2;
+        drawPauseButton(g, bx, firstY, bw, bh, "Respawn", deathSelection == 0);
+        drawPauseButton(g, bx, firstY + bh + gap, bw, bh, "Main Menu", deathSelection == 1);
+        g.setFont(Font.getDefaultFont());
+        g.setColor(0xFFFFFF);
+        g.drawString("UP/DOWN: select   FIRE: choose", w / 2, h - 12,
+            Graphics.BOTTOM | Graphics.HCENTER);
+    }
+
+    private void respawnPlayer() {
+        health = 20;
+        cameraX = 64.0f;
+        cameraZ = 105.0f;
+        cameraY = terrain.getHeight((int) cameraX, (int) cameraZ) + PLAYER_EYE_HEIGHT + 0.1f;
+        velocityX = 0.0f;
+        velocityZ = 0.0f;
+        verticalVelocity = 0.0f;
+        airborne = false;
+        flying = false;
+        dead = false;
+        paused = false;
+        pauseOverlayOpen = false;
+        deathSelection = 0;
+        zombieDamageCooldown = 25;
+        clearKeys();
+        updateCamera();
+        repaint();
     }
 
     private void drawPauseOverlay(Graphics g) {
@@ -908,6 +967,17 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     protected synchronized void keyPressed(int keyCode) {
         int action = getGameAction(keyCode);
+
+        if (dead) {
+            if (action == UP || action == DOWN || keyCode == '2' || keyCode == '8') {
+                deathSelection = 1 - deathSelection;
+                repaint();
+            } else if (action == FIRE || keyCode == '5' || keyCode == ' ' || keyCode == 10) {
+                if (deathSelection == 0) respawnPlayer();
+                else midlet.returnToMainMenu();
+            }
+            return;
+        }
 
         if (isBackKey(keyCode)) {
             if (inventoryOpen) {
@@ -2066,13 +2136,12 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (health < 0) health = 0;
             zombieDamageCooldown = 25;
             if (health == 0) {
-                health = 10;
-                cameraX = 64.0f;
-                cameraZ = 105.0f;
-                cameraY = terrain.getHeight((int)cameraX, (int)cameraZ) + PLAYER_EYE_HEIGHT + 0.1f;
-                verticalVelocity = 0.0f;
-                airborne = false;
-                updateCamera();
+                dead = true;
+                paused = true;
+                pauseOverlayOpen = false;
+                deathSelection = 0;
+                clearKeys();
+                repaint();
             }
         }
     }
