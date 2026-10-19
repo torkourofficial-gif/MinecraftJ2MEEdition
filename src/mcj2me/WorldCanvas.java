@@ -1288,8 +1288,11 @@ final class WorldCanvas extends Canvas implements Runnable {
             -2,-6,2, -2,-6,-2, 2,-6,2, 2,-6,-2
         };
         short[] uv = new short[48];
+        // The camera sees the +Z face of the held arm. Map that face to
+        // the front rectangle in char.png; the opposite face gets the back.
+        int[] uvFace = {1,0,2,3,4,5};
         for (int face=0; face<6; face++) {
-            int[] r=rects[face];
+            int[] r=rects[uvFace[face]];
             for (int k=0;k<4;k++) {
                 int u, v;
                 if (face==4) {
