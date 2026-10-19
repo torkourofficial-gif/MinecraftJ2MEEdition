@@ -507,7 +507,7 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         // Logs are separate voxels and can overlap a surface column.
         if (terrain.isTreeAt(x, z)) {
-            int treeBase = terrain.getHeight(x, z);
+            int treeBase = terrain.getTreeBaseHeight(x, z);
             int treeTop = treeBase + terrain.getTreeHeight(x, z);
             if (treeTop > ground && treeBase <= ground + 2) return false;
         }
@@ -2141,7 +2141,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 // each remaining log individually so mining one segment
                 // immediately removes collision only for that segment.
                 if (terrain.isTreeAt(bx, bz)) {
-                    int treeBase = terrain.getHeight(bx, bz);
+                    int treeBase = terrain.getTreeBaseHeight(bx, bz);
                     int treeTop = treeBase + terrain.getTreeHeight(bx, bz);
                     int firstTreeY = Math.max(treeBase, firstBodyY);
                     int lastTreeY = Math.min(treeTop - 1, lastBodyY);
@@ -3274,7 +3274,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 int flowerType = terrain.getFlowerType(x, z);
                 if (flowerType >= 0) flowerQuads += 2;
                 if (terrain.isTreeAt(x, z)) {
-                    int treeBase = h;
+                    int treeBase = terrain.getTreeBaseHeight(x, z);
                     int treeHeight = terrain.getTreeHeight(x, z);
                     int treeY;
                     for (treeY = 0; treeY < treeHeight; treeY++) {
@@ -3383,7 +3383,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                         x, h, z + 1, x + 1, h + 1, z, x, h + 1, z + 1, fx, fy);
                 }
                 if (terrain.isTreeAt(x, z)) {
-                    int base = h, th = terrain.getTreeHeight(x, z), y;
+                    int base = terrain.getTreeBaseHeight(x, z), th = terrain.getTreeHeight(x, z), y;
                     for (y = 0; y < th; y++) {
                         if (terrain.isTreeTrunkAt(x, base + y, z)) {
                             int exposed = countExposedTreeFaces(x, base + y, z);
@@ -4025,7 +4025,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         // A procedural tree's base is derived from this column's height. Keep
         // its supporting surface intact until the tree is removed, otherwise
         // lowering the column shifts the entire generated tree.
-        if (blockY == h - 1 && terrain.isTreeAt(x, z)) return;
+        // Trees retain their spawn-time base height; the ground block beneath them can be mined.
         lastMiningDelay = miningDelay(type);
         if (type == TerrainGenerator.BLOCK_TNT) {
             if (tntFuseTicks == 0) {
@@ -4599,7 +4599,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (x < 1 || z < 1 || x >= TerrainGenerator.SIZE - 1 || z >= TerrainGenerator.SIZE - 1)
             return true;
         if (terrain.getHeight(x, z) >= level) return true;
-        if (terrain.isTreeAt(x, z) && level <= terrain.getHeight(x, z) + terrain.getTreeHeight(x, z))
+        if (terrain.isTreeAt(x, z) && level <= terrain.getTreeBaseHeight(x, z) + terrain.getTreeHeight(x, z))
             return true;
         if (terrain.isLeafBlockAt(x, level, z)) return true;
         for (int i = 0; i < decorationCount; i++) {
