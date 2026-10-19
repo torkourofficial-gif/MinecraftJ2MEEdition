@@ -1886,7 +1886,8 @@ final class WorldCanvas extends Canvas implements Runnable {
      * cube icon. Grass and logs therefore retain their different face textures.
      */
     private Mesh createDroppedBlockMesh(int type) {
-        if (type < 0 || type >= BLOCK_TILE_X.length) return createDroppedItemMesh(blockIcons[type]);
+        if (type < 0 || type >= BLOCK_TILE_X.length || type >= BLOCK_TILE_Y.length
+                || type >= blockIcons.length) return createDroppedItemMesh(blockIcons[0]);
         int topX = BLOCK_TILE_X[type], topY = BLOCK_TILE_Y[type];
         int sideX = topX, sideY = topY, bottomX = topX, bottomY = topY;
         if (type == TerrainGenerator.BLOCK_GRASS) {
@@ -3062,18 +3063,28 @@ final class WorldCanvas extends Canvas implements Runnable {
         return miningDelay(type);
     }
 
+    /**
+     * Approximate classic Minecraft Indev bare-hand mining time.
+     * The game loop runs much faster than a Minecraft game tick on some
+     * Java ME devices, so use deliberate frame counts rather than tiny
+     * single-digit delays. There are no mining tools yet, so stone and ores
+     * take substantially longer than wood, dirt, sand or gravel.
+     */
     private int miningDelay(int type) {
-        if (worldMode == IndevViewerMIDlet.MODE_CREATIVE) return 4;
-        if (type == TerrainGenerator.BLOCK_OBSIDIAN) return 45;
+        if (worldMode == IndevViewerMIDlet.MODE_CREATIVE) return 1;
         if (type == TerrainGenerator.BLOCK_BEDROCK) return 999;
+        if (type == TerrainGenerator.BLOCK_OBSIDIAN) return 240;
         if (type == TerrainGenerator.BLOCK_STONE || type == TerrainGenerator.BLOCK_COAL_ORE
                 || type == TerrainGenerator.BLOCK_IRON_ORE || type == TerrainGenerator.BLOCK_GOLD_ORE
-                || type == TerrainGenerator.BLOCK_DIAMOND_ORE) return 18;
-        if (type == TerrainGenerator.BLOCK_WOOD || type == TerrainGenerator.BLOCK_PLANKS
-                || type == TerrainGenerator.BLOCK_BRICK) return 12;
+                || type == TerrainGenerator.BLOCK_DIAMOND_ORE) return 150;
+        if (type == TerrainGenerator.BLOCK_WOOD) return 60;
+        if (type == TerrainGenerator.BLOCK_PLANKS) return 45;
+        if (type == TerrainGenerator.BLOCK_BRICK) return 90;
         if (type == TerrainGenerator.BLOCK_DIRT || type == TerrainGenerator.BLOCK_SAND
-                || type == TerrainGenerator.BLOCK_GRAVEL) return 7;
-        return 5;
+                || type == TerrainGenerator.BLOCK_GRAVEL) return 15;
+        if (type == TerrainGenerator.BLOCK_LEAVES) return 8;
+        if (type == TerrainGenerator.BLOCK_GRASS) return 18;
+        return 20;
     }
 
     private void placeBlock() {
