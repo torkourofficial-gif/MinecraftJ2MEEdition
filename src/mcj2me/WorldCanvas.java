@@ -2791,6 +2791,11 @@ final class WorldCanvas extends Canvas implements Runnable {
                 sideX = 1; sideY = 0;
                 bottomX = 1; bottomY = 0;
                 break;
+            case TerrainGenerator.BLOCK_PLANKS:
+                topX = 4; topY = 0;
+                sideX = 4; sideY = 0;
+                bottomX = 4; bottomY = 0;
+                break;
             case TerrainGenerator.BLOCK_WOOD:
                 topX = 5; topY = 1;
                 sideX = 4; sideY = 1;
@@ -3821,7 +3826,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         int variant = type - BLOCK_TORCH;
         if (variant < 0 || variant >= decorationBuffers.length) return false;
         Mesh mesh;
-        if (type == BLOCK_DOOR) {
+        if (type == BLOCK_CRAFTING_TABLE) {
+            // Use a full 1x1x1 block instead of the thin crossed-plant quad.
+            mesh = createDroppedBlockMesh(TerrainGenerator.BLOCK_PLANKS);
+            mesh.setScale(4.0f, 4.0f, 4.0f);
+        } else if (type == BLOCK_DOOR) {
             // Keep door placement from silently failing if a handset's M3G
             // implementation rejects the multi-strip custom mesh. Fall back
             // to the already-supported decoration quad, scaled to door height.
@@ -3838,7 +3847,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         if (type == BLOCK_TORCH) mesh.setScale(0.18f, 0.58f, 1.0f);
         else if (type == BLOCK_SAPLING) mesh.setScale(0.48f, 0.62f, 1.0f);
-        else if (type != BLOCK_DOOR) mesh.setScale(0.38f, 0.48f, 1.0f);
+        else if (type != BLOCK_DOOR && type != BLOCK_CRAFTING_TABLE) mesh.setScale(0.38f, 0.48f, 1.0f);
         Group pivot = null;
         float placedYaw = yaw;
         if (type == BLOCK_DOOR) {
@@ -3857,7 +3866,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             decorationGroup.addChild(pivot);
         } else {
             mesh.setOrientation(yaw, 0.0f, 1.0f, 0.0f);
-            mesh.setTranslation(x, y, z);
+            mesh.setTranslation(x, type == BLOCK_CRAFTING_TABLE ? y + 0.5f : y, z);
             decorationGroup.addChild(mesh);
         }
         int at = decorationCount++;
