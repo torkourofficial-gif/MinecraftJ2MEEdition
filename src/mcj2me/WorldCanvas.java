@@ -51,8 +51,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Group cloudGroup;
     private Group decorationGroup;
     private Texture2D terrainTexture;
-    private VertexBuffer[] decorationBuffers = new VertexBuffer[5];
-    private Appearance[] decorationAppearances = new Appearance[5];
+    private VertexBuffer[] decorationBuffers = new VertexBuffer[6];
+    private Appearance[] decorationAppearances = new Appearance[6];
     private TriangleStripArray decorationTriangles;
     private static final int MAX_DECORATIONS = 32;
     private final Mesh[] decorationMeshes = new Mesh[MAX_DECORATIONS];
@@ -73,7 +73,11 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Image hudIconsImage;
     private Image guiBlocksImage;
     private Image inventoryImage;
-    private final Image[] blockIcons = new Image[44];
+    private Image containerImage;
+    private boolean craftingMenuOpen = false;
+    private boolean craftingMenuTable = false;
+    private int craftingRecipeCursor = 0;
+    private final Image[] blockIcons = new Image[123];
     private boolean inventoryOpen = false;
     private int inventoryCursor = 0;
     private int inventoryPageStart = 0;
@@ -162,7 +166,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     // leaves cube icons; the remaining blocks are mapped by their own atlas cells.
     private static final int[] GUI_ICON_X = {432, 384, 0, 288, 192};
     private static final int[] GUI_ICON_Y = {0, 0, 0, 48, 0};
-    private static final int BLOCK_TORCH = 16, BLOCK_YELLOW_FLOWER = 17, BLOCK_RED_FLOWER = 18, BLOCK_SAPLING = 19, BLOCK_DOOR = 20;
+    private static final int BLOCK_TORCH = 16, BLOCK_YELLOW_FLOWER = 17, BLOCK_RED_FLOWER = 18, BLOCK_SAPLING = 19, BLOCK_DOOR = 20, BLOCK_CRAFTING_TABLE = 21;
     private static final int ITEM_WATER_BUCKET = 40, ITEM_EMPTY_BUCKET = 41;
     private static final int ITEM_RAW_PORKCHOP = 42, ITEM_RAW_BEEF = 43;
     private static final int MAX_WATER_SOURCES = 8;
@@ -181,15 +185,26 @@ final class WorldCanvas extends Canvas implements Runnable {
         "WHITE WOOL", "ORANGE WOOL", "MAGENTA WOOL", "LIGHT BLUE WOOL", "YELLOW WOOL", "LIME WOOL",
         "PINK WOOL", "GRAY WOOL", "LIGHT GRAY WOOL", "CYAN WOOL", "PURPLE WOOL", "BLUE WOOL",
         "BROWN WOOL", "GREEN WOOL", "RED WOOL", "BLACK WOOL", "WATER BUCKET", "EMPTY BUCKET",
-        "RAW PORKCHOP", "RAW BEEF"
+        "RAW PORKCHOP", "RAW BEEF", "STICK", "CRAFTING TABLE", "COAL", "CHARCOAL",
+        "IRON INGOT", "GOLD INGOT", "DIAMOND", "FLINT", "STRING", "FEATHER", "PAPER", "BOOK",
+        "CHEST", "FURNACE", "LADDER", "SIGN", "BOWL", "BREAD",
+        "WOODEN PICKAXE", "STONE PICKAXE", "IRON PICKAXE", "DIAMOND PICKAXE",
+        "WOODEN AXE", "STONE AXE", "IRON AXE", "DIAMOND AXE",
+        "WOODEN SHOVEL", "STONE SHOVEL", "IRON SHOVEL", "DIAMOND SHOVEL",
+        "WOODEN SWORD", "STONE SWORD", "IRON SWORD", "DIAMOND SWORD",
+        "WOODEN HOE", "STONE HOE", "IRON HOE", "DIAMOND HOE",
+        "BOW", "ARROW", "BOAT", "MINECART", "RAIL", "PAPER",
+        "GLASS", "GLASS PANE", "STONE BRICKS", "LEVER", "STONE BUTTON", "WOOD BUTTON",
+        "PRESSURE PLATE", "WOOD PRESSURE PLATE", "REDSTONE TORCH", "WOOD FENCE", "FENCE GATE",
+        "WOOD STAIRS", "STONE STAIRS", "SLAB", "BUCKET", "FLINT AND STEEL", "WHEAT", "REDSTONE",
+        "LEATHER", "LEATHER HELMET", "LEATHER CHESTPLATE", "LEATHER LEGGINGS", "LEATHER BOOTS",
+        "IRON HELMET", "IRON CHESTPLATE", "IRON LEGGINGS", "IRON BOOTS",
+        "GOLD HELMET", "GOLD CHESTPLATE", "GOLD LEGGINGS", "GOLD BOOTS",
+        "DIAMOND HELMET", "DIAMOND CHESTPLATE", "DIAMOND LEGGINGS", "DIAMOND BOOTS"
     };
     // Creative-style starter inventory: every block stack starts at 64.
     // Buckets remain individual items; mining can never grow a stack past 64.
-    private final int[] inventory = {
-        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-        64, 64, 64, 64, 64, 64, 64, 64,
-        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 1, 0, 0, 0
-    };
+    private final int[] inventory = new int[123];
     private static final int SLOT_SAVE_MARKER = 0x534C4F54; // 'SLOT'
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
     private int handSwingTicks = 0;
@@ -266,10 +281,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         worldSeed = seed;
         worldId = id;
         worldMode = mode == IndevViewerMIDlet.MODE_SURVIVAL ? IndevViewerMIDlet.MODE_SURVIVAL : IndevViewerMIDlet.MODE_CREATIVE;
+        for (int i = 0; i < inventory.length; i++) inventory[i] = 0;
         if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
-            for (int i = 0; i < inventory.length; i++) inventory[i] = 0;
             selectedSlot = 0;
         } else {
+            for (int i = 0; i < 40; i++) inventory[i] = 64;
+            inventory[ITEM_WATER_BUCKET] = 1;
             for (int i = 0; i < hotbarItems.length; i++) hotbarItems[i] = i;
         }
         for (int i = 0; i < mainInventoryItems.length; i++) mainInventoryItems[i] = -1;
@@ -535,6 +552,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         guiBlocksImage = ResourceImages.load("/mcj2me/gui_blocks.png");
         setupStage = "loading /mcj2me/inventory.png";
         inventoryImage = ResourceImages.load("/mcj2me/inventory.png");
+        setupStage = "loading /mcj2me/container.png";
+        containerImage = ResourceImages.load("/mcj2me/container.png");
         setupStage = "loading /mcj2me/items.png";
         Image itemsImage = ResourceImages.load("/mcj2me/items.png");
         setupStage = "loading /mcj2me/char.png";
@@ -569,6 +588,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         // The steak sprite is immediately to the right of the porkchop on row 5.
         // Row 6, column 8 is the saddle, which was accidentally used before.
         blockIcons[ITEM_RAW_BEEF] = createFoodItemsIcon(itemsImage, 8, 5);
+        for (int ci = 44; ci < blockIcons.length; ci++) blockIcons[ci] = createCraftIcon(ci);
         setupStage = "loading /mcj2me/clouds.png";
         Image cloudsImage = ResourceImages.load("/mcj2me/clouds.png");
         setupStage = "creating terrain Image2D/Texture2D";
@@ -2398,7 +2418,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             g.setColor(0x383838); g.fillRect(sx, sy, 16, 16);
             g.setColor(0xA0A0A0); g.drawRect(sx, sy, 16, 16);
         }
-        int ox = table ? 124 : panelX + 140;
+        int ox = panelX + (table ? 124 : 140);
         int oy = panelY + 35;
         g.setColor(0x383838); g.fillRect(ox, oy, 18, 18);
         g.setColor(0xDDDDDD); g.drawRect(ox, oy, 18, 18);
@@ -3743,10 +3763,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         int[] indices = {0, 1, 2, 3};
         int[] stripLengths = {4};
         decorationTriangles = new TriangleStripArray(indices, stripLengths);
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 6; i++) {
+            int tileIndex = i == 5 ? 11 : BLOCK_TORCH + i;
             short[] positions = {-1, 0, 0, -1, 2, 0, 1, 0, 0, 1, 2, 0};
             short[] uv = {
-                (short)(BLOCK_TILE_X[BLOCK_TORCH + i] * 16 + 1), (short)((BLOCK_TILE_Y[BLOCK_TORCH + i] + 1) * 16 - 1),
+                (short)(BLOCK_TILE_X[tileIndex] * 16 + 1), (short)((BLOCK_TILE_Y[tileIndex] + 1) * 16 - 1),
                 (short)(BLOCK_TILE_X[BLOCK_TORCH + i] * 16 + 1), (short)(BLOCK_TILE_Y[BLOCK_TORCH + i] * 16 + 1),
                 (short)((BLOCK_TILE_X[BLOCK_TORCH + i] + 1) * 16 - 1), (short)((BLOCK_TILE_Y[BLOCK_TORCH + i] + 1) * 16 - 1),
                 (short)((BLOCK_TILE_X[BLOCK_TORCH + i] + 1) * 16 - 1), (short)(BLOCK_TILE_Y[BLOCK_TORCH + i] * 16 + 1)
