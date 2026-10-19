@@ -83,6 +83,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     private final Image[] grayBlockIcons = new Image[123];
     // Reuse GPU textures for repeated dropped/held sprites; recreating one per drop wastes memory.
     private final Texture2D[] itemIconTextures = new Texture2D[123];
+    // Lazily cache immutable solid dropped-block geometry per block type. Mesh
+    // nodes keep their own transforms/appearances, while vertex/index data is shared.
+    private final VertexBuffer[] droppedCubeBuffers = new VertexBuffer[BLOCK_TILE_X.length];
+    private final IndexBuffer[] droppedCubeIndices = new IndexBuffer[BLOCK_TILE_X.length];
     private int craftingTablePage = 0;
     private boolean inventoryOpen = false;
     private int inventoryCursor = 0;
@@ -3147,6 +3151,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         // forced opaque) and non-cube decorations/doors.
         boolean atlasCube = type != TerrainGenerator.BLOCK_LEAVES
             && !(type >= BLOCK_TORCH && type <= BLOCK_DOOR);
+        if (atlasCube && droppedCubeBuffers[type] != null) {
+            return new Mesh(droppedCubeBuffers[type], droppedCubeIndices[type], groundAppearance);
+        }
         short[] p = {
             -2,-2,-2, -2,2,-2, 2,-2,-2, 2,2,-2,
             2,-2,2, 2,2,2, -2,-2,2, -2,2,2,
@@ -3204,7 +3211,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         vb.setPositions(pa, 1.0f / 16.0f, null);
         vb.setTexCoords(0, ta, atlasCube ? 1.0f / 256.0f : 1.0f / 1024.0f, null);
         if (atlasCube) {
-            return new Mesh(vb, new TriangleStripArray(0, stripLengths), groundAppearance);
+            TriangleStripArray indices = new TriangleStripArray(0, stripLengths);
+            droppedCubeBuffers[type] = vb;
+            droppedCubeIndices[type] = indices;
+            return new Mesh(vb, indices, groundAppearance);
         }
         return new Mesh(vb, faceIndices, faceAppearances);
     }
