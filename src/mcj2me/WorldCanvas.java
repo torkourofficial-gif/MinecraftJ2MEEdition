@@ -1301,7 +1301,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                     u=(k==0||k==2)?r[2]:r[0]; v=(k<2)?r[1]:r[3];
                 } else {
                     u=(k<2)?r[0]:r[2]; v=(k==0||k==2)?r[3]:r[1];
-                    if (face==1 || face==2) u=(k<2)?r[2]:r[0];
+                    if (uvFace[face]==1 || uvFace[face]==2) u=(k<2)?r[2]:r[0];
                 }
                 uv[face*8+k*2]=(short)(u*1024/64);
                 uv[face*8+k*2+1]=(short)(v*1024/32);
