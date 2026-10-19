@@ -1657,6 +1657,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 spriteAppearance.setLayer(7);
                 CompositingMode spritePass = new CompositingMode();
                 spritePass.setBlending(CompositingMode.ALPHA);
+                spritePass.setAlphaThreshold(0.5f);
                 spritePass.setDepthTestEnable(false);
                 spritePass.setDepthWriteEnable(false);
                 spriteAppearance.setCompositingMode(spritePass);
