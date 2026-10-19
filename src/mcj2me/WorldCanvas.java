@@ -2197,7 +2197,12 @@ final class WorldCanvas extends Canvas implements Runnable {
                 }
                 if (terrain.isTreeAt(x, z)) {
                     int base = h, th = terrain.getTreeHeight(x, z), y;
-                    for (y = 0; y < th; y++) { vertex = addTreeCube(positions, texCoords, colors, stripLengths, vertex, strip, x, base + y, z, 4, 1); strip += countExposedTreeFaces(x, base + y, z); }
+                    for (y = 0; y < th; y++) {
+                        if (terrain.isTreeTrunkAt(x, base + y, z)) {
+                            vertex = addTreeCube(positions, texCoords, colors, stripLengths, vertex, strip, x, base + y, z, 4, 1);
+                            strip += countExposedTreeFaces(x, base + y, z);
+                        }
+                    }
                     int crown = base + th - 1;
                     for (y = crown - 1; y <= crown + 1; y++) { int radius = (y == crown + 1) ? 1 : 2, lx, lz;
                         for (lx = x - radius; lx <= x + radius; lx++) for (lz = z - radius; lz <= z + radius; lz++) {
@@ -2406,9 +2411,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean isTreeVoxelAt(int x, int y, int z) {
         if (y < 0 || y >= TerrainGenerator.HEIGHT) return false;
         if (terrain.isLeafBlockAt(x, y, z)) return true;
-        if (!terrain.isTreeAt(x, z)) return false;
-        int base = terrain.getHeight(x, z);
-        return y >= base && y < base + terrain.getTreeHeight(x, z);
+        return terrain.isTreeTrunkAt(x, y, z);
     }
 
     /** Number of tree-cube faces not touching another tree voxel. */
@@ -2710,16 +2713,16 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     private void breakBlock() {
         int[] treeHit = raycastTreeTrunk();
-        if (treeHit != null && terrain.removeTreeAt(treeHit[0], treeHit[1])) {
-            int tx = treeHit[0], tz = treeHit[1], base = terrain.getHeight(tx, tz);
+        if (treeHit != null && terrain.removeTreeBlockAt(treeHit[0], treeHit[2], treeHit[1])) {
+            int tx = treeHit[0], tz = treeHit[1], logY = treeHit[2];
             if (worldMode == IndevViewerMIDlet.MODE_CREATIVE) {
                 if (inventory[TerrainGenerator.BLOCK_WOOD] < 64) inventory[TerrainGenerator.BLOCK_WOOD]++;
             } else {
                 spawnDroppedBlock(TerrainGenerator.BLOCK_WOOD, tx + 0.5f,
-                    treeHit[2] + 0.5f, tz + 0.5f);
+                    logY + 0.5f, tz + 0.5f);
             }
             spawnBlockParticles(TerrainGenerator.BLOCK_WOOD, tx + 0.5f,
-                treeHit[2] + 0.5f, tz + 0.5f);
+                logY + 0.5f, tz + 0.5f);
             invalidateEditedArea(tx - 2, tx + 2, tz - 2, tz + 2);
             return;
         }
@@ -3089,7 +3092,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             int z = floorVoxel(cameraZ + dz * distance);
             if (terrain.isTreeAt(x, z)) {
                 int base = terrain.getHeight(x, z);
-                if (y >= base && y < base + terrain.getTreeHeight(x, z)) {
+                if (terrain.isTreeTrunkAt(x, y, z)) {
                     treeHitResult[0] = x;
                     treeHitResult[1] = z;
                     treeHitResult[2] = y;
