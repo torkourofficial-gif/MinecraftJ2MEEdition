@@ -77,6 +77,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean inventoryOpen = false;
     private int inventoryCursor = 0;
     private int inventoryPageStart = 0;
+    // Slot -> item ID. Counts remain indexed by item ID for compatibility with gameplay code.
+    private final int[] hotbarItems = {-1,-1,-1,-1,-1,-1,-1,-1,-1};
+    private final int[] mainInventoryItems = new int[27];
     private float cloudPhase = 0.0f;
     private Appearance waterAppearance;
     private Fog distanceFog;
@@ -255,7 +258,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
             for (int i = 0; i < inventory.length; i++) inventory[i] = 0;
             selectedSlot = 0;
+        } else {
+            for (int i = 0; i < hotbarItems.length; i++) hotbarItems[i] = i;
         }
+        for (int i = 0; i < mainInventoryItems.length; i++) mainInventoryItems[i] = -1;
         terrain = new TerrainGenerator(seed);
         setFullScreenMode(true);
         try {
@@ -293,6 +299,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         out.writeInt(dayTick); out.writeInt(selectedSlot);
         out.writeInt(inventory.length);
         for (int i = 0; i < inventory.length; i++) out.writeInt(inventory[i]);
+        for (int i = 0; i < hotbarItems.length; i++) out.writeInt(hotbarItems[i]);
+        for (int i = 0; i < mainInventoryItems.length; i++) out.writeInt(mainInventoryItems[i]);
         out.writeInt(decorationCount);
         for (int i = 0; i < decorationCount; i++) {
             out.writeInt(decorationTypes[i]);
@@ -322,7 +330,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         float savedPlayerYaw = yaw;
         dayTick = in.readInt();
         selectedSlot = in.readInt();
-        if (selectedSlot < 0 || selectedSlot >= inventory.length) selectedSlot = 0;
+        if (selectedSlot < 0 || selectedSlot >= hotbarItems.length) selectedSlot = 0;
         int invCount = in.readInt();
         // Older save records can contain the pre-bucket inventory (40 slots).
         // Keep defaults for newly added slots, then overwrite slots present in
@@ -330,6 +338,16 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (invCount < 0 || invCount > inventory.length)
             throw new Exception("Invalid saved inventory");
         for (int i = 0; i < invCount; i++) inventory[i] = Math.max(0, in.readInt());
+        // New saves persist the exact slot arrangement. Older saves are migrated
+        // into hotbar-first order without changing the amount of any item.
+        if (in.available() >= (hotbarItems.length + mainInventoryItems.length) * 4 + 4) {
+            for (int i = 0; i < hotbarItems.length; i++) hotbarItems[i] = in.readInt();
+            for (int i = 0; i < mainInventoryItems.length; i++) mainInventoryItems[i] = in.readInt();
+        } else {
+            for (int i = 0; i < hotbarItems.length; i++) hotbarItems[i] = -1;
+            for (int i = 0; i < mainInventoryItems.length; i++) mainInventoryItems[i] = -1;
+            for (int type = 0; type < inventory.length; type++) if (inventory[type] > 0) addItemToSlots(type);
+        }
         int savedCount = in.readInt();
         if (savedCount < 0 || savedCount > MAX_DECORATIONS)
             throw new Exception("Invalid saved decorations");
@@ -906,20 +924,15 @@ final class WorldCanvas extends Canvas implements Runnable {
         int gridX = panelX + 8;
         int gridY = panelY + 84;
         for (int slot = 0; slot < 27; slot++) {
-            int item = inventoryPageStart + slot;
+            int item = worldMode == IndevViewerMIDlet.MODE_SURVIVAL
+                ? mainInventoryItems[slot] : inventoryPageStart + slot;
             int sx = gridX + (slot % 9) * 18;
             int sy = gridY + (slot / 9) * 18;
-            if (item < blockIcons.length) {
-                boolean available = worldMode != IndevViewerMIDlet.MODE_SURVIVAL
-                    || inventory[item] > 0;
-                if (available) {
-                    g.drawImage(blockIcons[item], sx + 1, sy + 1,
-                        Graphics.TOP | Graphics.LEFT);
-                    if (inventory[item] > 0) {
-                        g.setColor(0xFFFFFF);
-                        g.drawString(Integer.toString(inventory[item]), sx + 10,
-                            sy + 8, Graphics.TOP | Graphics.LEFT);
-                    }
+            if (item >= 0 && item < blockIcons.length && (worldMode != IndevViewerMIDlet.MODE_SURVIVAL || inventory[item] > 0)) {
+                g.drawImage(blockIcons[item], sx + 1, sy + 1, Graphics.TOP | Graphics.LEFT);
+                if (inventory[item] > 1) {
+                    g.setColor(0xFFFFFF);
+                    g.drawString(Integer.toString(inventory[item]), sx + 10, sy + 8, Graphics.TOP | Graphics.LEFT);
                 }
             }
         }
@@ -928,7 +941,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         g.setColor(0xFFFFFF);
         g.drawRect(cursorX - 1, cursorY - 1, 17, 17);
         g.drawRect(cursorX - 2, cursorY - 2, 19, 19);
-        int selectedItem = inventoryPageStart + inventoryCursor;
+        int selectedItem = worldMode == IndevViewerMIDlet.MODE_SURVIVAL
+            ? mainInventoryItems[inventoryCursor] : inventoryPageStart + inventoryCursor;
         String selectedName = selectedItem < BLOCK_NAMES.length
             ? ((worldMode == IndevViewerMIDlet.MODE_SURVIVAL
                 && inventory[selectedItem] <= 0) ? "EMPTY" : BLOCK_NAMES[selectedItem])
@@ -997,16 +1011,13 @@ final class WorldCanvas extends Canvas implements Runnable {
         int barX = (w - 182) / 2;
         int barY = h - 23;
         g.drawRegion(guiImage, 0, 0, 182, 22, 0, barX, barY, Graphics.TOP | Graphics.LEFT);
-        int firstBlock = selectedSlot - 4;
-        if (firstBlock < 0) firstBlock = 0;
-        if (firstBlock > BLOCK_NAMES.length - 9) firstBlock = BLOCK_NAMES.length - 9;
         for (int i = 0; i < 9; i++) {
-            int block = firstBlock + i;
+            int block = hotbarItems[i];
             int slotX = barX + 1 + i * 20;
-            if (block == selectedSlot) g.drawRegion(guiImage, 0, 22, 24, 22, 0,
+            if (i == selectedSlot) g.drawRegion(guiImage, 0, 22, 24, 22, 0,
                 slotX, barY, Graphics.TOP | Graphics.LEFT);
-            boolean available = worldMode != IndevViewerMIDlet.MODE_SURVIVAL
-                || inventory[block] > 0;
+            boolean available = block >= 0 && block < blockIcons.length &&
+                (worldMode != IndevViewerMIDlet.MODE_SURVIVAL || inventory[block] > 0);
             if (available) {
                 g.drawImage(blockIcons[block], slotX + 4, barY + 3,
                     Graphics.TOP | Graphics.LEFT);
@@ -1090,12 +1101,12 @@ final class WorldCanvas extends Canvas implements Runnable {
                 repaint();
                 return;
             }
-            if (keyCode == '9' && inventoryPageStart == 0) {
+            if (worldMode != IndevViewerMIDlet.MODE_SURVIVAL && keyCode == '9' && inventoryPageStart == 0) {
                 inventoryPageStart = 15;
                 repaint();
                 return;
             }
-            if (keyCode == '7' && inventoryPageStart != 0) {
+            if (worldMode != IndevViewerMIDlet.MODE_SURVIVAL && keyCode == '7' && inventoryPageStart != 0) {
                 inventoryPageStart = 0;
                 repaint();
                 return;
@@ -1113,8 +1124,13 @@ final class WorldCanvas extends Canvas implements Runnable {
             inventoryCursor = row * 9 + col;
             if (action == FIRE || keyCode == '5' || keyCode == ' ') {
                 int item = inventoryPageStart + inventoryCursor;
-                if (item < BLOCK_NAMES.length && item != TerrainGenerator.BLOCK_BEDROCK)
-                    selectedSlot = item;
+                if (item >= 0 && item < BLOCK_NAMES.length && item != TerrainGenerator.BLOCK_BEDROCK) {
+                    if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
+                        if (inventory[item] > 0) assignHotbarItem(selectedSlot, item);
+                    } else {
+                        assignHotbarItem(selectedSlot, item);
+                    }
+                }
             }
             repaint();
             return;
@@ -1189,13 +1205,62 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void cycleSelectedBlock(int direction) {
-        int next = selectedSlot;
-        for (int tries = 0; tries < BLOCK_NAMES.length; tries++) {
-            next += direction;
-            if (next < 0) next = BLOCK_NAMES.length - 1;
-            if (next >= BLOCK_NAMES.length) next = 0;
-            if (next != TerrainGenerator.BLOCK_BEDROCK) { selectedSlot = next; return; }
+        selectedSlot += direction;
+        if (selectedSlot < 0) selectedSlot = hotbarItems.length - 1;
+        if (selectedSlot >= hotbarItems.length) selectedSlot = 0;
+    }
+
+    private int selectedItemType() {
+        return selectedSlot >= 0 && selectedSlot < hotbarItems.length ? hotbarItems[selectedSlot] : -1;
+    }
+
+    private void assignHotbarItem(int slot, int item) {
+        if (slot < 0 || slot >= hotbarItems.length || item < 0 || item >= inventory.length) return;
+        int old = hotbarItems[slot];
+        // Move the existing item to the item's former slot (classic inventory swap).
+        int other = findHotbarSlot(item);
+        if (other >= 0 && other != slot) hotbarItems[other] = old;
+        else if (old >= 0 && old != item) {
+            int main = findMainSlot(old);
+            if (main >= 0) mainInventoryItems[main] = -1;
         }
+        hotbarItems[slot] = item;
+        removeItemFromMain(item);
+    }
+
+    private int findHotbarSlot(int item) {
+        for (int i = 0; i < hotbarItems.length; i++) if (hotbarItems[i] == item) return i;
+        return -1;
+    }
+
+    private int findMainSlot(int item) {
+        for (int i = 0; i < mainInventoryItems.length; i++) if (mainInventoryItems[i] == item) return i;
+        return -1;
+    }
+
+    private void removeItemFromMain(int item) {
+        int at = findMainSlot(item);
+        if (at >= 0) mainInventoryItems[at] = -1;
+    }
+
+    private boolean addItemToSlots(int item) {
+        if (item < 0 || item >= inventory.length) return false;
+        if (findHotbarSlot(item) >= 0 || findMainSlot(item) >= 0) return true;
+        for (int i = 0; i < hotbarItems.length; i++) if (hotbarItems[i] < 0) { hotbarItems[i] = item; return true; }
+        for (int i = 0; i < mainInventoryItems.length; i++) if (mainInventoryItems[i] < 0) { mainInventoryItems[i] = item; return true; }
+        return false;
+    }
+
+    private void removeEmptyItemFromSlots(int item) {
+        if (item < 0 || item >= inventory.length || inventory[item] > 0) return;
+        int h = findHotbarSlot(item); if (h >= 0) hotbarItems[h] = -1;
+        int m = findMainSlot(item); if (m >= 0) mainInventoryItems[m] = -1;
+    }
+
+    private void collectInventoryItem(int item) {
+        if (item < 0 || item >= inventory.length || inventory[item] >= 64) return;
+        if (findHotbarSlot(item) < 0 && findMainSlot(item) < 0 && !addItemToSlots(item)) return;
+        inventory[item]++;
     }
 
     private boolean isBackKey(int keyCode) {
@@ -2220,8 +2285,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             float dz = droppedZ[i] - cameraZ;
             if (dx*dx + dy*dy + dz*dz < 1.75f * 1.75f) {
                 if (droppedTypes[i] < 0) { droppedItemGroup.removeChild(mesh); droppedMeshes[i]=null; droppedTypes[i]=0; continue; }
-                if (droppedTypes[i] < inventory.length && inventory[droppedTypes[i]] < 64)
-                    inventory[droppedTypes[i]]++;
+                collectInventoryItem(droppedTypes[i]);
                 droppedItemGroup.removeChild(mesh);
                 droppedMeshes[i] = null;
             } else if (droppedAge[i] > 250) {
@@ -2967,7 +3031,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (treeHit != null && terrain.removeTreeBlockAt(treeHit[0], treeHit[2], treeHit[1])) {
             int tx = treeHit[0], tz = treeHit[1], logY = treeHit[2];
             if (worldMode == IndevViewerMIDlet.MODE_CREATIVE) {
-                if (inventory[TerrainGenerator.BLOCK_WOOD] < 64) inventory[TerrainGenerator.BLOCK_WOOD]++;
+                collectInventoryItem(TerrainGenerator.BLOCK_WOOD);
             } else {
                 spawnDroppedBlock(TerrainGenerator.BLOCK_WOOD, tx + 0.5f,
                     logY + 0.5f, tz + 0.5f);
@@ -2984,7 +3048,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             int removedDecorationX = (int)decorationX[decorationHit];
             int removedDecorationZ = (int)decorationZ[decorationHit];
             if (worldMode == IndevViewerMIDlet.MODE_CREATIVE) {
-                if (inventory[type] < 64) inventory[type]++;
+                collectInventoryItem(type);
             } else {
                 spawnDroppedBlock(type, decorationX[decorationHit], decorationY[decorationHit] + 0.35f, decorationZ[decorationHit]);
             }
@@ -3033,7 +3097,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             int placedType = terrain.getPlacedBlockTypeAt(placedHit[0], placedHit[2], placedHit[1]);
             if (placedType >= 0 && terrain.removePlacedBlockAt(placedHit[0], placedHit[2], placedHit[1])) {
                 lastMiningDelay = miningDelay(placedType);
-                if (worldMode == IndevViewerMIDlet.MODE_CREATIVE && placedType < inventory.length && inventory[placedType] < 64) inventory[placedType]++;
+                if (worldMode == IndevViewerMIDlet.MODE_CREATIVE && placedType < inventory.length && inventory[placedType] < 64) { inventory[placedType]++; addItemToSlots(placedType); }
                 else if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) spawnDroppedBlock(placedType, placedHit[0] + 0.5f, placedHit[2] + 0.5f, placedHit[1] + 0.5f);
                 spawnBlockParticles(placedType, placedHit[0] + 0.5f, placedHit[2] + 0.5f, placedHit[1] + 0.5f);
                 invalidateEditedArea(placedHit[0], placedHit[0], placedHit[1], placedHit[1]);
@@ -3059,7 +3123,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
             return;
         }
-        if (worldMode == IndevViewerMIDlet.MODE_CREATIVE && type >= 0 && type < inventory.length && type != TerrainGenerator.BLOCK_BEDROCK && inventory[type] < 64) inventory[type]++;
+        if (worldMode == IndevViewerMIDlet.MODE_CREATIVE && type >= 0 && type < inventory.length && type != TerrainGenerator.BLOCK_BEDROCK && inventory[type] < 64) { inventory[type]++; addItemToSlots(type); }
         else if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) spawnDroppedBlock(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
         spawnBlockParticles(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
 
@@ -3414,29 +3478,32 @@ final class WorldCanvas extends Canvas implements Runnable {
             toggleDoor(decorationHit);
             return;
         }
-        if (selectedSlot < 0 || selectedSlot >= inventory.length || inventory[selectedSlot] <= 0) return;
-        if (selectedSlot == ITEM_EMPTY_BUCKET) { collectWaterBucket(); return; }
+        int itemType = selectedItemType();
+        if (itemType < 0 || itemType >= inventory.length || inventory[itemType] <= 0) return;
+        if (itemType == ITEM_EMPTY_BUCKET) { collectWaterBucket(); return; }
         int[] hit = raycastSurface();
         if (hit == null) return;
         int x = hit[5], y = hit[6], z = hit[7];
         if (x < 1 || z < 1 || x >= TerrainGenerator.SIZE - 1 ||
                 z >= TerrainGenerator.SIZE - 1 || y < 0 || y >= TerrainGenerator.HEIGHT) return;
-        if (selectedSlot == ITEM_WATER_BUCKET) { placeWaterBucket(x, z, y); return; }
-        if (selectedSlot >= BLOCK_TORCH && selectedSlot <= BLOCK_DOOR) {
+        if (itemType == ITEM_WATER_BUCKET) { placeWaterBucket(x, z, y); return; }
+        if (itemType >= BLOCK_TORCH && itemType <= BLOCK_DOOR) {
             if (decorationCount >= MAX_DECORATIONS) return;
-            int decorationHeight = selectedSlot == BLOCK_DOOR ? 2 : 1;
+            int decorationHeight = itemType == BLOCK_DOOR ? 2 : 1;
             if (!isPlacementSpaceClear(x, y, z, decorationHeight)) return;
-            if (placeDecoration(selectedSlot, x + 0.5f, y, z + 0.5f)) {
-                inventory[selectedSlot]--;
+            if (placeDecoration(itemType, x + 0.5f, y, z + 0.5f)) {
+                inventory[itemType]--;
+                removeEmptyItemFromSlots(itemType);
                 updateTorchLights();
-                if (selectedSlot == BLOCK_TORCH) invalidateEditedArea(x, x, z, z);
+                if (itemType == BLOCK_TORCH) invalidateEditedArea(x, x, z, z);
             }
             return;
         }
-        if (selectedSlot > TerrainGenerator.BLOCK_WOOL_BLACK) return;
+        if (itemType > TerrainGenerator.BLOCK_WOOL_BLACK) return;
         if (!isPlacementSpaceClear(x, y, z, 1)) return;
-        if (terrain.setPlacedBlockAt(x, y, z, selectedSlot)) {
-            inventory[selectedSlot]--;
+        if (terrain.setPlacedBlockAt(x, y, z, itemType)) {
+            inventory[itemType]--;
+            removeEmptyItemFromSlots(itemType);
             invalidateEditedArea(x, x, z, z);
         }
     }
@@ -3484,7 +3551,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (free < 0) return;
         terrain.setPlacedWaterLevel(x, z, level);
         inventory[ITEM_WATER_BUCKET]--;
+        removeEmptyItemFromSlots(ITEM_WATER_BUCKET);
         inventory[ITEM_EMPTY_BUCKET]++;
+        addItemToSlots(ITEM_EMPTY_BUCKET);
         waterFlowX[free] = x;
         waterFlowZ[free] = z;
         waterFlowLevel[free] = level;
@@ -3536,7 +3605,9 @@ final class WorldCanvas extends Canvas implements Runnable {
                 waterFlowActive[i] = false;
         }
         inventory[ITEM_EMPTY_BUCKET]--;
+        removeEmptyItemFromSlots(ITEM_EMPTY_BUCKET);
         inventory[ITEM_WATER_BUCKET]++;
+        addItemToSlots(ITEM_WATER_BUCKET);
     }
 
     private boolean isWaterFlowBlocked(int x, int z, int level) {
