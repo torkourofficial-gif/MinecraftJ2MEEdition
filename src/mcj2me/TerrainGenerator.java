@@ -38,6 +38,9 @@ final class TerrainGenerator {
     // Each mined log is saved independently, using the same packed voxel ID as leaves.
     private int[] removedTreeBlockIds = new int[32];
     private int removedTreeBlockCount;
+    // Sparse flower removals persist independently from deterministic generation.
+    private int[] removedFlowerIds = new int[32];
+    private int removedFlowerCount;
     // 0=unknown, 1=tree, -1=no tree. Tiny cache for the regular tree grid.
     private final byte[][] treeAtCache = new byte[SIZE][SIZE];
     private final int seed;
@@ -520,6 +523,9 @@ final class TerrainGenerator {
     /** Sparse yellow/red flowers; never on sand, dirt, stone or water. */
     int getFlowerType(int x, int z) {
         if (x < 1 || z < 1 || x >= SIZE - 1 || z >= SIZE - 1) return -1;
+        int flowerId = x * SIZE + z;
+        for (int i = 0; i < removedFlowerCount; i++)
+            if (removedFlowerIds[i] == flowerId) return -1;
         if (getTopType(x, z) != BLOCK_GRASS || isWaterAt(x, z) || isTreeAt(x, z)) return -1;
         int chance = hash(x * 29 + 53, z * 31 - 17) & 63;
         if (chance > 2) return -1;
@@ -531,6 +537,19 @@ final class TerrainGenerator {
             Math.abs(h - getHeight(x, z - 1)) > 1 ||
             Math.abs(h - getHeight(x, z + 1)) > 1) return -1;
         return (hash(x - 41, z + 67) & 1) == 0 ? 17 : 18;
+    }
+
+    /** Remove a naturally generated flower from this surface column. */
+    boolean removeFlowerAt(int x, int z) {
+        if (getFlowerType(x, z) < 0) return false;
+        int id = x * SIZE + z;
+        if (removedFlowerCount == removedFlowerIds.length) {
+            int[] expanded = new int[removedFlowerIds.length * 2];
+            System.arraycopy(removedFlowerIds, 0, expanded, 0, removedFlowerCount);
+            removedFlowerIds = expanded;
+        }
+        removedFlowerIds[removedFlowerCount++] = id;
+        return true;
     }
 
     /** True when a generated canopy leaf still occupies this block cell. */
@@ -595,6 +614,9 @@ final class TerrainGenerator {
         // Optional per-log removals; appended so older save formats still load.
         out.writeInt(removedTreeBlockCount);
         for (int i = 0; i < removedTreeBlockCount; i++) out.writeInt(removedTreeBlockIds[i]);
+        // Optional flower removals appended for compatibility with older saves.
+        out.writeInt(removedFlowerCount);
+        for (int i = 0; i < removedFlowerCount; i++) out.writeInt(removedFlowerIds[i]);
         out.flush();
         return bytes.toByteArray();
     }
@@ -651,6 +673,14 @@ final class TerrainGenerator {
             if (logCount > removedTreeBlockIds.length) removedTreeBlockIds = new int[logCount];
             removedTreeBlockCount = logCount;
             for (int i = 0; i < logCount; i++) removedTreeBlockIds[i] = in.readInt();
+        }
+        removedFlowerCount = 0;
+        if (in.available() >= 4) {
+            int flowerCount = in.readInt();
+            if (flowerCount < 0 || flowerCount > SIZE * SIZE) throw new Exception("Invalid saved flower data");
+            if (flowerCount > removedFlowerIds.length) removedFlowerIds = new int[flowerCount];
+            removedFlowerCount = flowerCount;
+            for (int i = 0; i < flowerCount; i++) removedFlowerIds[i] = in.readInt();
         }
         for (int x = 0; x < SIZE; x++)
             for (int z = 0; z < SIZE; z++) treeAtCache[x][z] = 0;
