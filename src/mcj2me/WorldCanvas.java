@@ -429,7 +429,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         // Coordinates are 16x16 cells in the 256x256 classic items atlas.
         // Keep these distinct from the armor icons near the top-left of the sheet.
         setupStage = "creating inventory icon 20 (door from items.png)";
-        blockIcons[BLOCK_DOOR] = createItemsIcon(itemsImage, 1, 2);
+        blockIcons[BLOCK_DOOR] = createTerrainBlockIcon(atlas, BLOCK_TILE_X[BLOCK_DOOR], BLOCK_TILE_Y[BLOCK_DOOR]);
         setupStage = "creating inventory icon 40 (water bucket from items.png)";
         blockIcons[ITEM_WATER_BUCKET] = createItemsIcon(itemsImage, 11, 4);
         setupStage = "creating inventory icon 41 (empty bucket from items.png)";
@@ -2638,6 +2638,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (selectedSlot >= BLOCK_TORCH && selectedSlot <= BLOCK_DOOR) {
             if (decorationCount >= MAX_DECORATIONS) return;
             if (h >= TerrainGenerator.HEIGHT - 3) return;
+            int decorationHeight = (selectedSlot == BLOCK_DOOR) ? 2 : 1;
+            if (!isPlacementSpaceClear(x, h, z, decorationHeight)) return;
             if (placeDecoration(selectedSlot, x + 0.5f, h, z + 0.5f)) {
                 inventory[selectedSlot]--;
                 updateTorchLights();
@@ -2646,11 +2648,44 @@ final class WorldCanvas extends Canvas implements Runnable {
             return;
         }
         if (h >= TerrainGenerator.HEIGHT - 3) return;
+        if (!isPlacementSpaceClear(x, h, z, 1)) return;
         terrain.setHeight(x, z, h + 1);
         terrain.setTopType(x, z, selectedSlot);
         inventory[selectedSlot]--;
         invalidateEditedArea(x, x, z, z);
         resolvePlayerAfterTerrainEdit();
+    }
+
+    /**
+     * Prevent placing blocks or decorations inside existing terrain, leaves,
+     * tree trunks, decorations, or the player's occupied space.
+     */
+    private boolean isPlacementSpaceClear(int x, int y, int z, int height) {
+        if (x < 1 || z < 1 || x >= TerrainGenerator.SIZE - 1 ||
+            z >= TerrainGenerator.SIZE - 1 || y < 0 ||
+            y + height >= TerrainGenerator.HEIGHT) return false;
+        float feetY = cameraY - PLAYER_EYE_HEIGHT;
+        float headY = feetY + PLAYER_HEIGHT;
+        for (int by = y; by < y + height; by++) {
+            if (terrain.getBlockTypeAt(x, by, z) >= 0 ||
+                terrain.isLeafBlockAt(x, by, z)) return false;
+            if (terrain.isTreeAt(x, z)) {
+                int treeBase = terrain.getHeight(x, z);
+                int treeTop = treeBase + terrain.getTreeHeight(x, z);
+                if (by >= treeBase && by < treeTop) return false;
+            }
+            for (int d = 0; d < decorationCount; d++) {
+                if (Math.abs(decorationX[d] - (x + 0.5f)) < 0.48f &&
+                    Math.abs(decorationZ[d] - (z + 0.5f)) < 0.48f &&
+                    by >= decorationY[d] &&
+                    by < decorationY[d] + (decorationTypes[d] == BLOCK_DOOR ? 2 : 1))
+                    return false;
+            }
+            if (Math.abs(cameraX - (x + 0.5f)) < 0.25f &&
+                Math.abs(cameraZ - (z + 0.5f)) < 0.25f &&
+                by + 1.0f > feetY && by < headY) return false;
+        }
+        return true;
     }
 
     private void placeWaterBucket(int x, int z, int groundHeight) {
