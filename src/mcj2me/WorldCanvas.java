@@ -1430,11 +1430,6 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         if (quads == 0) return null;
         int vertexCount = quads * 4;
-        int flowerVertexCount = flowerQuads * 4;
-        short[] flowerPositions = new short[flowerVertexCount * 3];
-        short[] flowerTexCoords = new short[flowerVertexCount * 2];
-        byte[] flowerColors = new byte[flowerVertexCount * 3];
-        int[] flowerStripLengths = new int[flowerQuads];
         short[] positions = new short[vertexCount * 3];
         short[] texCoords = new short[vertexCount * 2];
         int[] stripLengths = new int[quads];
@@ -1773,6 +1768,11 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
         }
         int vertexCount = quads * 4;
+        int flowerVertexCount = flowerQuads * 4;
+        short[] flowerPositions = new short[flowerVertexCount * 3];
+        short[] flowerTexCoords = new short[flowerVertexCount * 2];
+        byte[] flowerColors = new byte[flowerVertexCount * 3];
+        int[] flowerStripLengths = new int[flowerQuads];
         short[] positions = new short[vertexCount * 3];
         short[] texCoords = new short[vertexCount * 2];
         byte[] colors = new byte[vertexCount * 3];
