@@ -313,6 +313,9 @@ final class WorldCanvas extends Canvas implements Runnable {
                 in.readFully(terrainData);
                 terrain.loadState(terrainData);
                 in.close();
+                // The serialized terrain buffer is temporary. Ask small CLDC
+                // heaps to reclaim it before M3G textures and chunk meshes peak.
+                System.gc();
             }
             setupScene();
             if (savedTerrain != null) restorePlayerState(savedTerrain);
