@@ -430,6 +430,7 @@ final class TerrainGenerator {
         if (chance > 2) return -1;
         // Avoid a flower on a steep edge or directly under a tree canopy.
         int h = getHeight(x, z);
+        if (isLeafBlockAt(x, h, z)) return -1;
         if (Math.abs(h - getHeight(x - 1, z)) > 1 ||
             Math.abs(h - getHeight(x + 1, z)) > 1 ||
             Math.abs(h - getHeight(x, z - 1)) > 1 ||
@@ -440,6 +441,8 @@ final class TerrainGenerator {
     /** True when a generated canopy leaf still occupies this block cell. */
     boolean isLeafBlockAt(int x, int y, int z) {
         if (x < 0 || z < 0 || x >= SIZE || z >= SIZE || y < 0 || y >= HEIGHT) return false;
+        // A canopy leaf must never occupy a cell already filled by terrain.
+        if (getBlockTypeAt(x, y, z) >= 0) return false;
         int id = leafId(x, y, z);
         for (int i = 0; i < removedLeafCount; i++) if (removedLeafIds[i] == id) return false;
         for (int tx = Math.max(4, x - 2); tx <= Math.min(SIZE - 5, x + 2); tx++) {
