@@ -564,10 +564,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         setupStage = "creating inventory icon 41 (empty bucket from items.png)";
         blockIcons[ITEM_EMPTY_BUCKET] = createItemsIcon(itemsImage, 10, 4);
         setupStage = "creating inventory icon 42 (raw porkchop from items.png)";
-        blockIcons[ITEM_RAW_PORKCHOP] = createItemsIcon(itemsImage, 7, 5);
+        blockIcons[ITEM_RAW_PORKCHOP] = createFoodItemsIcon(itemsImage, 7, 5);
         setupStage = "creating inventory icon 43 (raw beef from items.png)";
-        // Reuse the cooked-beef (steak) sprite for cow meat, as requested.
-        blockIcons[ITEM_RAW_BEEF] = createItemsIcon(itemsImage, 8, 6);
+        // The steak sprite is immediately to the right of the porkchop on row 5.
+        // Row 6, column 8 is the saddle, which was accidentally used before.
+        blockIcons[ITEM_RAW_BEEF] = createFoodItemsIcon(itemsImage, 8, 5);
         setupStage = "loading /mcj2me/clouds.png";
         Image cloudsImage = ResourceImages.load("/mcj2me/clouds.png");
         setupStage = "creating terrain Image2D/Texture2D";
@@ -1302,7 +1303,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         short[] uv = new short[48];
         // The camera sees the +Z face of the held arm. Map that face to
         // the front rectangle in char.png; the opposite face gets the back.
-        int[] uvFace = {0,1,2,3,4,5};
+        int[] uvFace = {1,0,2,3,4,5};
         for (int face=0; face<6; face++) {
             int[] r=rects[uvFace[face]];
             for (int k=0;k<4;k++) {
@@ -2248,6 +2249,45 @@ final class WorldCanvas extends Canvas implements Runnable {
         int[] pixels = new int[16 * 16];
         items.getRGB(pixels, 0, 16, tileX * 16, tileY * 16, 16, 16);
         return Image.createRGBImage(pixels, 16, 16, true);
+    }
+
+    // Food sprites in some classic items.png variants have a solid matte
+    // around them. Remove only matte-coloured pixels connected to the icon's
+    // border, so pale highlights inside the meat remain untouched.
+    private Image createFoodItemsIcon(Image items, int tileX, int tileY) {
+        final int size = 16;
+        int[] pixels = new int[size * size];
+        items.getRGB(pixels, 0, size, tileX * size, tileY * size, size, size);
+        boolean[] visited = new boolean[size * size];
+        int[] queue = new int[size * size];
+        int head = 0, tail = 0;
+        int corner = pixels[0];
+        int br = (corner >> 16) & 255, bg = (corner >> 8) & 255, bb = corner & 255;
+        for (int i = 0; i < pixels.length; i++) {
+            int a = (pixels[i] >>> 24) & 255;
+            int r = (pixels[i] >> 16) & 255, g = (pixels[i] >> 8) & 255, b = pixels[i] & 255;
+            if (a == 0 || (Math.abs(r-br) <= 20 && Math.abs(g-bg) <= 20 && Math.abs(b-bb) <= 20)) {
+                visited[i] = true;
+                queue[tail++] = i;
+            }
+        }
+        while (head < tail) {
+            int p = queue[head++];
+            int x = p % size, y = p / size;
+            if (x > 0) { int n = p - 1; if (!visited[n] && sameFoodMatte(pixels[n], br, bg, bb)) { visited[n] = true; queue[tail++] = n; } }
+            if (x + 1 < size) { int n = p + 1; if (!visited[n] && sameFoodMatte(pixels[n], br, bg, bb)) { visited[n] = true; queue[tail++] = n; } }
+            if (y > 0) { int n = p - size; if (!visited[n] && sameFoodMatte(pixels[n], br, bg, bb)) { visited[n] = true; queue[tail++] = n; } }
+            if (y + 1 < size) { int n = p + size; if (!visited[n] && sameFoodMatte(pixels[n], br, bg, bb)) { visited[n] = true; queue[tail++] = n; } }
+        }
+        for (int i = 0; i < pixels.length; i++) if (visited[i]) pixels[i] = 0;
+        return Image.createRGBImage(pixels, size, size, true);
+    }
+
+    private boolean sameFoodMatte(int pixel, int r, int g, int b) {
+        if (((pixel >>> 24) & 255) == 0) return true;
+        return Math.abs(((pixel >> 16) & 255) - r) <= 20
+            && Math.abs(((pixel >> 8) & 255) - g) <= 20
+            && Math.abs((pixel & 255) - b) <= 20;
     }
 
     private Image createGuiBlockInventoryIcon(int block, Image terrain) {
