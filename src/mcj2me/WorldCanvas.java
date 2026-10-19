@@ -2377,6 +2377,10 @@ final class WorldCanvas extends Canvas implements Runnable {
                 activeChunks[bestX][bestZ] = mesh;
                 terrainGroup.addChild(mesh);
             }
+            // Chunk meshing uses temporary CPU arrays that are no longer needed
+            // after buildChunk returns. On tiny heaps, reclaim them before the
+            // water mesh allocates its own vertex buffers.
+            if (Runtime.getRuntime().freeMemory() < 768 * 1024) System.gc();
             Mesh waterMesh = buildWaterChunk(bestX, bestZ);
             if (waterMesh != null) {
                 activeWaterChunks[bestX][bestZ] = waterMesh;
@@ -3576,6 +3580,19 @@ final class WorldCanvas extends Canvas implements Runnable {
             chunkGroup.addChild(new Mesh(flowerBuffer,
                 new TriangleStripArray(0, flowerStripLengths), flowerAppearance));
         }
+        // VertexArray.set copies the supplied primitive data into M3G's
+        // vertex arrays. Drop the large Java-side staging buffers before greedy
+        // top surfaces allocate their own buffers; this lowers the peak heap
+        // during streamed chunk construction without changing mesh geometry.
+        positions = null;
+        texCoords = null;
+        colors = null;
+        stripLengths = null;
+        flowerPositions = null;
+        flowerTexCoords = null;
+        flowerColors = null;
+        flowerStripLengths = null;
+        if (Runtime.getRuntime().freeMemory() < 1024 * 1024) System.gc();
         buildGreedyTopMeshes(chunkGroup, chunkX, chunkZ);
         return chunkGroup;
     }
