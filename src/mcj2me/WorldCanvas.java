@@ -192,6 +192,13 @@ final class WorldCanvas extends Canvas implements Runnable {
     };
     private static final int SLOT_SAVE_MARKER = 0x534C4F54; // 'SLOT'
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
+    private int handSwingTicks = 0;
+    private int eatingTicks = 0;
+    private int eatingItem = -1;
+    private Image heldItemScaled;
+    private int heldItemScaledType = -2;
+    private int heldItemScaledSize = -1;
+    private static final int EATING_DURATION_TICKS = 50; // 2 seconds at the 40 ms game tick.
     private int tntFuseTicks = 0, tntX = -1, tntZ = -1, tntFlashCounter = 0;
     private boolean tntFlashOn = false;
     private static final int BLOCK_PARTICLE_COUNT = 16;
@@ -550,9 +557,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         setupStage = "creating inventory icon 41 (empty bucket from items.png)";
         blockIcons[ITEM_EMPTY_BUCKET] = createItemsIcon(itemsImage, 10, 4);
         setupStage = "creating inventory icon 42 (raw porkchop from items.png)";
-        blockIcons[ITEM_RAW_PORKCHOP] = createItemsIcon(itemsImage, 0, 7);
+        blockIcons[ITEM_RAW_PORKCHOP] = createItemsIcon(itemsImage, 7, 5);
         setupStage = "creating inventory icon 43 (raw beef from items.png)";
-        blockIcons[ITEM_RAW_BEEF] = createItemsIcon(itemsImage, 1, 7);
+        blockIcons[ITEM_RAW_BEEF] = createItemsIcon(itemsImage, 7, 6);
         setupStage = "loading /mcj2me/clouds.png";
         Image cloudsImage = ResourceImages.load("/mcj2me/clouds.png");
         setupStage = "creating terrain Image2D/Texture2D";
@@ -716,6 +723,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         while (running) {
             if (!paused) {
                 updateMovement();
+                tickEating();
+                if (handSwingTicks > 0) handSwingTicks--;
                 tickMining();
                 tickSurvival();
                 tickDroppedItems();
@@ -1032,6 +1041,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 }
             }
         }
+        drawHeldItem(g);
         int cx = w / 2, cy = h / 2;
         g.setColor(0xFFFFFF);
         g.drawLine(cx - 3, cy, cx + 3, cy);
@@ -1165,7 +1175,13 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
         } else if (IndevViewerMIDlet.controlPressed(CONTROL_PLACE,keyCode,action)
                 && actionCooldown == 0) {
-            placeBlock();
+            int selected = selectedItemType();
+            if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL
+                    && (selected == ITEM_RAW_PORKCHOP || selected == ITEM_RAW_BEEF)) {
+                startEating(selected);
+            } else {
+                placeBlock();
+            }
             actionCooldown = 4;
         } else if (keyCode == '*' || keyCode == 42) {
             cycleSelectedBlock(1);
@@ -1206,6 +1222,83 @@ final class WorldCanvas extends Canvas implements Runnable {
                 verticalVelocity=JUMP_SPEED; airborne=true; jumpTapWindowTicks=12;
             }
         }
+    }
+
+    private void startEating(int item) {
+        if (eatingTicks > 0 || item < 0 || item >= inventory.length
+                || inventory[item] <= 0 || (item != ITEM_RAW_PORKCHOP && item != ITEM_RAW_BEEF)) return;
+        eatingItem = item;
+        eatingTicks = EATING_DURATION_TICKS;
+        handSwingTicks = EATING_DURATION_TICKS;
+    }
+
+    private void tickEating() {
+        if (eatingTicks <= 0) return;
+        eatingTicks--;
+        if (eatingTicks == 0) {
+            int item = eatingItem;
+            eatingItem = -1;
+            if (item >= 0 && item < inventory.length && inventory[item] > 0) {
+                inventory[item]--;
+                removeEmptyItemFromSlots(item);
+                health += item == ITEM_RAW_PORKCHOP ? 2 : 3;
+                if (health > 20) health = 20;
+            }
+        }
+    }
+
+    private Image scaleHeldIcon(Image source, int size) {
+        if (source == null || size <= 0) return source;
+        int sw = source.getWidth(), sh = source.getHeight();
+        int[] src = new int[sw * sh];
+        source.getRGB(src, 0, sw, 0, 0, sw, sh);
+        int[] dst = new int[size * size];
+        for (int y = 0; y < size; y++) {
+            int sy = y * sh / size;
+            for (int x = 0; x < size; x++) dst[y * size + x] = src[sy * sw + x * sw / size];
+        }
+        return Image.createRGBImage(dst, size, size, true);
+    }
+
+    private void drawHeldItem(Graphics g) {
+        int item = eatingTicks > 0 ? eatingItem : selectedItemType();
+        if (item < 0 || item >= blockIcons.length) return;
+        if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL && inventory[item] <= 0) return;
+        int w = getWidth(), h = getHeight();
+        int swing = handSwingTicks > 0 ? handSwingTicks : 0;
+        int phase = swing > 0 ? (swing % 10) : 0;
+        int offsetY = swing > 0 ? (int)(Math.sin(phase * Math.PI / 5.0) * 9.0) : 0;
+        if (eatingTicks > 0) {
+            int elapsed = EATING_DURATION_TICKS - eatingTicks;
+            offsetY -= (elapsed % 8 < 4 ? 5 : 0);
+        }
+        int handX = w - 45;
+        int handY = h - 70 + offsetY;
+        // Lightweight first-person hand silhouette: no extra M3G mesh allocations.
+        g.setColor(0x7B5138);
+        g.fillRect(handX + 8, handY + 24, 20, 31);
+        g.setColor(0xD7A477);
+        g.fillRect(handX + 5, handY + 13, 21, 18);
+        g.fillTriangle(handX + 5, handY + 14, handX + 1, handY + 25,
+                       handX + 9, handY + 28);
+        int itemX = handX - 3;
+        int itemY = handY - 3;
+        if (swing > 0 && eatingTicks == 0) {
+            itemX += (phase < 5 ? phase : 10 - phase) - 2;
+            itemY += phase < 5 ? phase * 2 : (10 - phase) * 2;
+        }
+        if (eatingTicks > 0) {
+            itemX -= 8;
+            itemY -= 16 + ((EATING_DURATION_TICKS - eatingTicks) % 8 < 4 ? 4 : 0);
+        }
+        int size = (item == ITEM_RAW_PORKCHOP || item == ITEM_RAW_BEEF
+                || item == ITEM_WATER_BUCKET || item == ITEM_EMPTY_BUCKET) ? 25 : 31;
+        if (heldItemScaled == null || heldItemScaledType != item || heldItemScaledSize != size) {
+            heldItemScaled = scaleHeldIcon(blockIcons[item], size);
+            heldItemScaledType = item;
+            heldItemScaledSize = size;
+        }
+        g.drawImage(heldItemScaled, itemX, itemY, Graphics.TOP | Graphics.LEFT);
     }
 
     private void cycleSelectedBlock(int direction) {
@@ -3033,6 +3126,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void breakBlock() {
+        handSwingTicks = 8;
         int[] treeHit = raycastTreeTrunk();
         if (treeHit != null && terrain.removeTreeBlockAt(treeHit[0], treeHit[2], treeHit[1])) {
             int tx = treeHit[0], tz = treeHit[1], logY = treeHit[2];
@@ -3479,6 +3573,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void placeBlock() {
+        handSwingTicks = 8;
         int decorationHit = raycastDecoration();
         if (decorationHit >= 0 && decorationTypes[decorationHit] == BLOCK_DOOR) {
             toggleDoor(decorationHit);
