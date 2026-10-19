@@ -215,6 +215,14 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int zombieDamageCooldown = 0;
     private int lastMiningDelay = 4;
     private int foodMessageTicks = 0;
+    private static final int MAX_DROPPED_ITEMS = 8;
+    private final Mesh[] droppedMeshes = new Mesh[MAX_DROPPED_ITEMS];
+    private final int[] droppedTypes = new int[MAX_DROPPED_ITEMS];
+    private final float[] droppedX = new float[MAX_DROPPED_ITEMS];
+    private final float[] droppedY = new float[MAX_DROPPED_ITEMS];
+    private final float[] droppedZ = new float[MAX_DROPPED_ITEMS];
+    private final int[] droppedAge = new int[MAX_DROPPED_ITEMS];
+    private Group droppedItemGroup;
 
     WorldCanvas(IndevViewerMIDlet owner, String name, int seed) {
         this(owner, name, seed, 0, IndevViewerMIDlet.MODE_CREATIVE, null);
@@ -423,6 +431,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         waterGroup = new Group();
         cloudGroup = new Group();
         blockParticleGroup = new Group();
+        droppedItemGroup = new Group();
         decorationGroup = new Group();
         camera = new Camera();
 
@@ -554,6 +563,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         world.addChild(terrainGroup);
         world.addChild(waterGroup);
         world.addChild(decorationGroup);
+        world.addChild(droppedItemGroup);
         setupStage = "creating decorations and torch lights";
         setupDecorations();
         setupTorchLights();
@@ -622,6 +632,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (!paused) {
                 updateMovement();
                 tickSurvival();
+                tickDroppedItems();
                 tickWaterFlow();
                 // Stream at most one missing chunk pair per tick to avoid large
                 // mesh-allocation spikes on memory-constrained J2ME devices.
@@ -1788,18 +1799,128 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (hostileMobs != null && hostileMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch)) {
             if (hostileMobs.consumeDeathEvent()) {
                 spawnMobDeathParticles(hostileMobs.getDeathX(), hostileMobs.getDeathY(), hostileMobs.getDeathZ());
-                if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) addFood(1);
+                if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) spawnDroppedFood(hostileMobs.getDeathX(), hostileMobs.getDeathY(), hostileMobs.getDeathZ());
             }
             return true;
         }
         if (passiveMobs != null && passiveMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch)) {
             if (passiveMobs.consumeDeathEvent()) {
                 spawnMobDeathParticles(passiveMobs.getDeathX(), passiveMobs.getDeathY(), passiveMobs.getDeathZ());
-                if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) addFood(2);
+                if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) spawnDroppedFood(passiveMobs.getDeathX(), passiveMobs.getDeathY(), passiveMobs.getDeathZ());
             }
             return true;
         }
         return false;
+    }
+
+
+    private void spawnDroppedBlock(int type, float x, float y, float z) {
+        if (type < 0 || type >= blockIcons.length || type == TerrainGenerator.BLOCK_BEDROCK) return;
+        spawnDroppedItem(type, blockIcons[type], x, y, z);
+    }
+
+    private void spawnDroppedFood(float x, float y, float z) {
+        int[] pixels = new int[16 * 16];
+        for (int py = 0; py < 16; py++) {
+            for (int px = 0; px < 16; px++) {
+                boolean meat = (px > 2 && px < 13 && py > 3 && py < 13)
+                    || (px > 5 && px < 15 && py > 5 && py < 11);
+                pixels[py * 16 + px] = meat
+                    ? (((px + py) % 4 == 0) ? 0xFFB83C24 : 0xFFDD7540)
+                    : 0xFF7D4027;
+            }
+        }
+        spawnDroppedItem(-1, Image.createRGBImage(pixels, 16, 16, false), x, y, z);
+    }
+
+    private void spawnDroppedItem(int type, Image icon, float x, float y, float z) {
+        if (droppedItemGroup == null || icon == null) return;
+        int slot = -1;
+        for (int i = 0; i < MAX_DROPPED_ITEMS; i++) {
+            if (droppedMeshes[i] == null) { slot = i; break; }
+        }
+        if (slot < 0) {
+            slot = 0;
+            for (int i = 1; i < MAX_DROPPED_ITEMS; i++)
+                if (droppedAge[i] > droppedAge[slot]) slot = i;
+            droppedItemGroup.removeChild(droppedMeshes[slot]);
+            droppedMeshes[slot] = null;
+        }
+        try {
+            Mesh mesh = createDroppedItemMesh(icon);
+            droppedMeshes[slot] = mesh;
+            droppedTypes[slot] = type;
+            droppedX[slot] = x;
+            droppedY[slot] = y;
+            droppedZ[slot] = z;
+            droppedAge[slot] = 0;
+            mesh.setTranslation(x, y, z);
+            droppedItemGroup.addChild(mesh);
+        } catch (Exception ignored) { }
+    }
+
+    private Mesh createDroppedItemMesh(Image icon) {
+        Texture2D texture = new Texture2D(new Image2D(Image2D.RGBA, icon));
+        texture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
+        texture.setWrapping(Texture2D.WRAP_CLAMP, Texture2D.WRAP_CLAMP);
+        Appearance appearance = new Appearance();
+        appearance.setTexture(0, texture);
+        PolygonMode pm = new PolygonMode();
+        pm.setCulling(PolygonMode.CULL_NONE);
+        pm.setShading(PolygonMode.SHADE_FLAT);
+        appearance.setPolygonMode(pm);
+        short[] p = {
+            -3,-3,-3, -3,3,-3, 3,-3,-3, 3,3,-3,
+            3,-3,3, 3,3,3, -3,-3,3, -3,3,3,
+            -3,-3,3, -3,3,3, -3,-3,-3, -3,3,-3,
+            3,-3,-3, 3,3,-3, 3,-3,3, 3,3,3,
+            -3,3,-3, -3,3,3, 3,3,-3, 3,3,3,
+            -3,-3,3, -3,-3,-3, 3,-3,3, 3,-3,-3
+        };
+        short[] uv = new short[48];
+        int[] indices = new int[24];
+        int[] strips = {4,4,4,4,4,4};
+        for (int face = 0; face < 6; face++) {
+            int b = face * 8;
+            uv[b] = 0; uv[b+1] = 0;
+            uv[b+2] = 0; uv[b+3] = 1024;
+            uv[b+4] = 1024; uv[b+5] = 0;
+            uv[b+6] = 1024; uv[b+7] = 1024;
+            for (int c = 0; c < 4; c++) indices[face * 4 + c] = face * 4 + c;
+        }
+        VertexArray pa = new VertexArray(24, 3, 2);
+        pa.set(0, 24, p);
+        VertexArray ta = new VertexArray(24, 2, 2);
+        ta.set(0, 24, uv);
+        VertexBuffer vb = new VertexBuffer();
+        vb.setPositions(pa, 1.0f / 16.0f, null);
+        vb.setTexCoords(0, ta, 1.0f / 1024.0f, null);
+        return new Mesh(vb, new TriangleStripArray(indices, strips), appearance);
+    }
+
+    private void tickDroppedItems() {
+        if (droppedItemGroup == null) return;
+        for (int i = 0; i < MAX_DROPPED_ITEMS; i++) {
+            Mesh mesh = droppedMeshes[i];
+            if (mesh == null) continue;
+            droppedAge[i]++;
+            float bob = (float)Math.sin(droppedAge[i] * 0.18f) * 0.07f;
+            mesh.setOrientation(droppedAge[i] * 9.0f, 0.0f, 1.0f, 0.0f);
+            mesh.setTranslation(droppedX[i], droppedY[i] + bob, droppedZ[i]);
+            float dx = droppedX[i] - cameraX;
+            float dy = droppedY[i] - cameraY;
+            float dz = droppedZ[i] - cameraZ;
+            if (dx*dx + dy*dy + dz*dz < 1.75f * 1.75f) {
+                if (droppedTypes[i] < 0) addFood(1);
+                else if (droppedTypes[i] < inventory.length && inventory[droppedTypes[i]] < 64)
+                    inventory[droppedTypes[i]]++;
+                droppedItemGroup.removeChild(mesh);
+                droppedMeshes[i] = null;
+            } else if (droppedAge[i] > 250) {
+                droppedItemGroup.removeChild(mesh);
+                droppedMeshes[i] = null;
+            }
+        }
     }
 
     private void addFood(int amount) {
@@ -2546,6 +2667,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (placedType >= 0 && terrain.removePlacedBlockAt(placedHit[0], placedHit[2], placedHit[1])) {
                 lastMiningDelay = miningDelay(placedType);
                 if (worldMode == IndevViewerMIDlet.MODE_CREATIVE && placedType < inventory.length && inventory[placedType] < 64) inventory[placedType]++;
+                else if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) spawnDroppedBlock(placedType, placedHit[0] + 0.5f, placedHit[2] + 0.5f, placedHit[1] + 0.5f);
                 spawnBlockParticles(placedType, placedHit[0] + 0.5f, placedHit[2] + 0.5f, placedHit[1] + 0.5f);
                 invalidateEditedArea(placedHit[0], placedHit[0], placedHit[1], placedHit[1]);
                 return;
@@ -2571,6 +2693,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             return;
         }
         if (worldMode == IndevViewerMIDlet.MODE_CREATIVE && type >= 0 && type < inventory.length && type != TerrainGenerator.BLOCK_BEDROCK && inventory[type] < 64) inventory[type]++;
+        else if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) spawnDroppedBlock(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
         spawnBlockParticles(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
 
         if (blockY == h - 1) {
