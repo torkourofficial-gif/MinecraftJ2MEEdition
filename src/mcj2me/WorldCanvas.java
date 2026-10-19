@@ -789,22 +789,52 @@ final class WorldCanvas extends Canvas implements Runnable {
             return;
         }
         boolean targetBound = false;
+        boolean heldPassReady = false;
         try {
             camera.setPerspective(70.0f,
                 (float) getWidth() / (float) Math.max(1, getHeight()),
                 0.1f, 180.0f);
+            // The 2D night/underwater overlays are drawn after the 3D world.
+            // Exclude the first-person arm from that pass so it is not tinted
+            // nearly black together with the distant world geometry.
+            heldItemGroup.setRenderingEnable(false);
             graphics3D.bindTarget(g);
             targetBound = true;
             graphics3D.render(world);
+            heldPassReady = true;
         } catch (Exception e) {
             g.setColor(0x101820);
             g.fillRect(0, 0, getWidth(), getHeight());
             g.setColor(0xFFFFFF);
             g.drawString("M3G render error", 4, 4, Graphics.TOP | Graphics.LEFT);
             g.drawString(e.toString(), 4, 24, Graphics.TOP | Graphics.LEFT);
-        } finally { if (targetBound) graphics3D.releaseTarget(); }
+        } finally {
+            heldItemGroup.setRenderingEnable(true);
+            if (targetBound) graphics3D.releaseTarget();
+        }
         drawNightOverlay(g);
         drawUnderwaterOverlay(g);
+        if (heldPassReady && heldItemGroup.getChildCount() > 0) {
+            boolean handTargetBound = false;
+            try {
+                // Re-render only the held model after the full-screen overlays.
+                // Immediate-mode Group rendering ignores the node's own transform,
+                // so pass the group's current camera-relative transform explicitly.
+                graphics3D.bindTarget(g);
+                handTargetBound = true;
+                Transform cameraTransform = new Transform();
+                camera.getTransformTo(world, cameraTransform);
+                graphics3D.setCamera(camera, cameraTransform);
+                Transform handTransform = new Transform();
+                heldItemGroup.getTransform(handTransform);
+                graphics3D.render(heldItemGroup, handTransform);
+            } catch (Exception ignored) {
+                // Keep the already-rendered world and HUD visible if the optional
+                // first-person overlay pass is unsupported by a device's M3G.
+            } finally {
+                if (handTargetBound) graphics3D.releaseTarget();
+            }
+        }
         drawHud(g);
         if (pauseOverlayOpen) drawPauseOverlay(g);
         if (dead) drawDeathOverlay(g);
