@@ -1332,7 +1332,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         VertexBuffer buffer = new VertexBuffer();
         buffer.setPositions(positions,1.0f/16.0f,null);
         buffer.setTexCoords(0,texCoords,1.0f/1024.0f,null);
-        return new Mesh(buffer,new TriangleStripArray(indices,strips),heldArmAppearance);
+        Mesh arm = new Mesh(buffer,new TriangleStripArray(indices,strips),heldArmAppearance);
+        // The first-person arm should read smaller than a full block on the
+        // narrow portrait display; scale uniformly to avoid an oversized fist.
+        arm.setScale(0.78f,0.78f,0.78f);
+        return arm;
     }
 
     private Mesh createHeldItemMesh(int item) {
@@ -1503,8 +1507,9 @@ final class WorldCanvas extends Canvas implements Runnable {
             transform.postRotate(swingZ,0.0f,0.0f,1.0f);
         }
         if (arm) {
-            // Keep the textured forearm diagonal even while holding food.
-            transform.postRotate(-32.0f,0.0f,0.0f,1.0f);
+            // Shoulder stays toward the upper-left and the wrist toward the
+            // lower-right, matching the familiar Minecraft first-person arm.
+            transform.postRotate(32.0f,0.0f,0.0f,1.0f);
         }
         heldItemGroup.setTransform(transform);
     }
