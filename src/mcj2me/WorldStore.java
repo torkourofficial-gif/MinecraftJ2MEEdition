@@ -17,7 +17,8 @@ final class WorldStore {
         final String name;
         final int seed;
         final int id;
-        WorldInfo(String n, int s, int recordId) { name = n; seed = s; id = recordId; }
+        final int mode;
+        WorldInfo(String n, int s, int recordId, int gameMode) { name = n; seed = s; id = recordId; mode = gameMode; }
     }
 
     static synchronized WorldInfo[] list() throws Exception {
@@ -32,7 +33,9 @@ final class WorldStore {
                     DataInputStream in = new DataInputStream(new ByteArrayInputStream(rs.getRecord(id)));
                     String name = in.readUTF();
                     int seed = in.readInt();
-                    result[out++] = new WorldInfo(name, seed, id);
+                    int mode = in.available() >= 4 ? in.readInt() : IndevViewerMIDlet.MODE_CREATIVE;
+                    if (mode != IndevViewerMIDlet.MODE_SURVIVAL) mode = IndevViewerMIDlet.MODE_CREATIVE;
+                    result[out++] = new WorldInfo(name, seed, id, mode);
                     in.close();
                 } catch (Exception badRecord) { /* Ignore incomplete records. */ }
             }
@@ -46,6 +49,10 @@ final class WorldStore {
     }
 
     static synchronized WorldInfo create(String requestedName) throws Exception {
+        return create(requestedName, IndevViewerMIDlet.MODE_CREATIVE);
+    }
+
+    static synchronized WorldInfo create(String requestedName, int mode) throws Exception {
         String name = requestedName == null ? "" : requestedName.trim();
         if (name.length() == 0) name = "World";
         if (name.length() > 24) name = name.substring(0, 24);
@@ -67,13 +74,14 @@ final class WorldStore {
             DataOutputStream out = new DataOutputStream(bytes);
             out.writeUTF(name);
             out.writeInt(seed);
+            out.writeInt(mode == IndevViewerMIDlet.MODE_SURVIVAL ? IndevViewerMIDlet.MODE_SURVIVAL : IndevViewerMIDlet.MODE_CREATIVE);
             out.flush();
             byte[] data = bytes.toByteArray();
             id = rs.addRecord(data, 0, data.length);
         } finally {
             if (rs != null) try { rs.closeRecordStore(); } catch (RecordStoreException ignored) { }
         }
-        return new WorldInfo(name, seed, id);
+        return new WorldInfo(name, seed, id, mode == IndevViewerMIDlet.MODE_SURVIVAL ? IndevViewerMIDlet.MODE_SURVIVAL : IndevViewerMIDlet.MODE_CREATIVE);
     }
 
     static synchronized void saveState(int worldId, byte[] state) throws Exception {
