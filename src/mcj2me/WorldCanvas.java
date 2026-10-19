@@ -2712,8 +2712,11 @@ final class WorldCanvas extends Canvas implements Runnable {
                     int mobType = passiveMobs.getDeathType();
                     if (mobType == PassiveMob.MOB_PIG)
                         spawnDroppedItem(ITEM_RAW_PORKCHOP, blockIcons[ITEM_RAW_PORKCHOP], dx, dy, dz);
-                    else if (mobType == PassiveMob.MOB_COW)
-                        spawnDroppedItem(ITEM_RAW_BEEF, blockIcons[ITEM_RAW_BEEF], dx, dy, dz);
+                    else if (mobType == PassiveMob.MOB_COW) {
+                        spawnDroppedItem(ITEM_RAW_BEEF, blockIcons[ITEM_RAW_BEEF], dx - 0.08f, dy, dz);
+                        if (particleRandom.nextInt(2) == 0)
+                            spawnDroppedItem(crafts.LEATHER, blockIcons[crafts.LEATHER], dx + 0.08f, dy, dz);
+                    }
                     else if (mobType == PassiveMob.MOB_SHEEP) {
                         spawnDroppedBlock(TerrainGenerator.BLOCK_WOOL_WHITE, dx - 0.08f, dy, dz);
                         if (particleRandom.nextInt(2) == 0)
@@ -3755,7 +3758,14 @@ final class WorldCanvas extends Canvas implements Runnable {
             return;
         }
         if (worldMode == IndevViewerMIDlet.MODE_CREATIVE && type >= 0 && type < inventory.length && type != TerrainGenerator.BLOCK_BEDROCK && inventory[type] < 64) { inventory[type]++; addItemToSlots(type); }
-        else if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) spawnDroppedBlock(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
+        else if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
+            if (type == TerrainGenerator.BLOCK_COAL_ORE)
+                spawnDroppedItem(crafts.COAL, blockIcons[crafts.COAL], x + 0.5f, blockY + 0.5f, z + 0.5f);
+            else if (type == TerrainGenerator.BLOCK_DIAMOND_ORE)
+                spawnDroppedItem(crafts.DIAMOND, blockIcons[crafts.DIAMOND], x + 0.5f, blockY + 0.5f, z + 0.5f);
+            else
+                spawnDroppedBlock(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
+        }
         spawnBlockParticles(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
 
         if (blockY == h - 1) {
