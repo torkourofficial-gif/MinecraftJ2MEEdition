@@ -209,16 +209,31 @@ final class WorldCanvas extends Canvas implements Runnable {
     private final String worldName;
     private final int worldSeed;
     private final int worldId;
+    private final int worldMode;
+    private int health = 20;
+    private int foodCount = 0;
+    private int zombieDamageCooldown = 0;
+    private int lastMiningDelay = 4;
+    private int foodMessageTicks = 0;
 
     WorldCanvas(IndevViewerMIDlet owner, String name, int seed) {
-        this(owner, name, seed, 0, null);
+        this(owner, name, seed, 0, IndevViewerMIDlet.MODE_CREATIVE, null);
     }
 
     WorldCanvas(IndevViewerMIDlet owner, String name, int seed, int id, byte[] savedTerrain) {
+        this(owner, name, seed, id, IndevViewerMIDlet.MODE_CREATIVE, savedTerrain);
+    }
+
+    WorldCanvas(IndevViewerMIDlet owner, String name, int seed, int id, int mode, byte[] savedTerrain) {
         midlet = owner;
         worldName = name;
         worldSeed = seed;
         worldId = id;
+        worldMode = mode == IndevViewerMIDlet.MODE_SURVIVAL ? IndevViewerMIDlet.MODE_SURVIVAL : IndevViewerMIDlet.MODE_CREATIVE;
+        if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
+            for (int i = 0; i < inventory.length; i++) inventory[i] = 0;
+            selectedSlot = 0;
+        }
         terrain = new TerrainGenerator(seed);
         setFullScreenMode(true);
         try {
@@ -269,6 +284,8 @@ final class WorldCanvas extends Canvas implements Runnable {
             out.writeInt(waterFlowX[i]); out.writeInt(waterFlowZ[i]); out.writeInt(waterFlowLevel[i]);
             out.writeInt(waterFlowTicks[i]);
         }
+        out.writeInt(health);
+        out.writeInt(foodCount);
         out.flush();
         return bytes.toByteArray();
     }
@@ -319,6 +336,10 @@ final class WorldCanvas extends Canvas implements Runnable {
                 waterFlowLevel[i] = in.readInt(); waterFlowTicks[i] = in.readInt();
                 waterFlowActive[i] = true;
             }
+        }
+        if (in.available() >= 8) {
+            health = Math.max(1, Math.min(20, in.readInt()));
+            foodCount = Math.max(0, in.readInt());
         }
         yaw = savedPlayerYaw;
         in.close();
@@ -600,6 +621,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         while (running) {
             if (!paused) {
                 updateMovement();
+                tickSurvival();
                 tickWaterFlow();
                 // Stream at most one missing chunk pair per tick to avoid large
                 // mesh-allocation spikes on memory-constrained J2ME devices.
@@ -789,6 +811,17 @@ final class WorldCanvas extends Canvas implements Runnable {
         g.setColor(0xFFFFFF);
         g.drawString(daylightLevel > 0.42f ? "DAY" : "NIGHT", w - 5, 4,
             Graphics.TOP | Graphics.RIGHT);
+        if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
+            g.setColor(0x101820);
+            g.fillRect(3, 20, Math.min(w - 6, 128), 28);
+            g.setColor(health > 6 ? 0xFF5555 : 0xFF2222);
+            g.drawString("HP " + health + "/20", 7, 20, Graphics.TOP | Graphics.LEFT);
+            g.setColor(0xFFCC55);
+            g.drawString("Food " + foodCount + "  (0 eat)", 7, 34, Graphics.TOP | Graphics.LEFT);
+        } else {
+            g.setColor(0xDDDDDD);
+            g.drawString("CREATIVE", w - 5, 20, Graphics.TOP | Graphics.RIGHT);
+        }
         if (inventoryOpen) {
             drawInventory(g);
             return;
@@ -906,14 +939,19 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         if (IndevViewerMIDlet.controlPressed(CONTROL_BREAK,keyCode,action)
                 && actionCooldown == 0) {
-            if (!attackMobs()) breakBlock();
-            actionCooldown = 4;
+            if (!attackMobs()) {
+                lastMiningDelay = 4;
+                breakBlock();
+                actionCooldown = worldMode == IndevViewerMIDlet.MODE_SURVIVAL ? lastMiningDelay : 4;
+            } else actionCooldown = 4;
         } else if (IndevViewerMIDlet.controlPressed(CONTROL_PLACE,keyCode,action)
                 && actionCooldown == 0) {
             placeBlock();
             actionCooldown = 4;
         } else if (keyCode == '*' || keyCode == 42) {
             cycleSelectedBlock(1);
+        } else if (keyCode == '0' && worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
+            eatFood();
         } else if (keyCode == '7') {
             cycleSelectedBlock(-1);
         } else if (keyCode == '9') {
@@ -922,7 +960,10 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         if (IndevViewerMIDlet.controlPressed(CONTROL_JUMP,keyCode,action) && !jumpHeld) {
             jumpHeld = true;
-            if (flying) {
+            if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
+                verticalVelocity = JUMP_SPEED;
+                airborne = true;
+            } else if (flying) {
                 // Like Minecraft creative: tap jump twice quickly to stop flying.
                 if (flightTapWindowTicks > 0) {
                     flying = false;
@@ -1747,16 +1788,56 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (hostileMobs != null && hostileMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch)) {
             if (hostileMobs.consumeDeathEvent()) {
                 spawnMobDeathParticles(hostileMobs.getDeathX(), hostileMobs.getDeathY(), hostileMobs.getDeathZ());
+                if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) addFood(1);
             }
             return true;
         }
         if (passiveMobs != null && passiveMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch)) {
             if (passiveMobs.consumeDeathEvent()) {
                 spawnMobDeathParticles(passiveMobs.getDeathX(), passiveMobs.getDeathY(), passiveMobs.getDeathZ());
+                if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) addFood(2);
             }
             return true;
         }
         return false;
+    }
+
+    private void addFood(int amount) {
+        foodCount += amount;
+        if (foodCount > 64) foodCount = 64;
+        foodMessageTicks = 30;
+    }
+
+    private void eatFood() {
+        if (worldMode != IndevViewerMIDlet.MODE_SURVIVAL || foodCount <= 0 || health >= 20) return;
+        foodCount--;
+        health += 4;
+        if (health > 20) health = 20;
+        foodMessageTicks = 25;
+        repaint();
+    }
+
+    private void tickSurvival() {
+        if (worldMode != IndevViewerMIDlet.MODE_SURVIVAL) return;
+        if (foodMessageTicks > 0) foodMessageTicks--;
+        if (zombieDamageCooldown > 0) zombieDamageCooldown--;
+        if (hostileMobs != null && zombieDamageCooldown == 0
+                && hostileMobs.touchesPlayer(cameraX, cameraZ)) {
+            health -= 2;
+            if (health < 0) health = 0;
+            zombieDamageCooldown = 25;
+            foodMessageTicks = 25;
+            if (health == 0) {
+                health = 10;
+                foodCount = 0;
+                cameraX = 64.0f;
+                cameraZ = 105.0f;
+                cameraY = terrain.getHeight((int)cameraX, (int)cameraZ) + PLAYER_EYE_HEIGHT + 0.1f;
+                verticalVelocity = 0.0f;
+                airborne = false;
+                updateCamera();
+            }
+        }
     }
 
     private void animateWater() {
@@ -2417,6 +2498,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         int decorationHit = raycastDecoration();
         if (decorationHit >= 0) {
             int type = decorationTypes[decorationHit];
+            lastMiningDelay = miningDelay(type);
             int removedDecorationX = (int)decorationX[decorationHit];
             int removedDecorationZ = (int)decorationZ[decorationHit];
             if (inventory[type] < 64) inventory[type]++;
@@ -2450,6 +2532,7 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         int[] leafHit = raycastLeafBlock();
         if (leafHit != null && terrain.removeLeafBlock(leafHit[0], leafHit[1], leafHit[2])) {
+            lastMiningDelay = miningDelay(4);
             spawnBlockParticles(4, leafHit[0] + 0.5f, leafHit[1] + 0.5f,
                 leafHit[2] + 0.5f);
             invalidateEditedArea(leafHit[0], leafHit[0], leafHit[2], leafHit[2]);
@@ -2461,7 +2544,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (placedHit != null) {
             int placedType = terrain.getPlacedBlockTypeAt(placedHit[0], placedHit[2], placedHit[1]);
             if (placedType >= 0 && terrain.removePlacedBlockAt(placedHit[0], placedHit[2], placedHit[1])) {
-                if (placedType < inventory.length && inventory[placedType] < 64) inventory[placedType]++;
+                lastMiningDelay = miningDelay(placedType);
+                if (worldMode == IndevViewerMIDlet.MODE_CREATIVE && placedType < inventory.length && inventory[placedType] < 64) inventory[placedType]++;
                 spawnBlockParticles(placedType, placedHit[0] + 0.5f, placedHit[2] + 0.5f, placedHit[1] + 0.5f);
                 invalidateEditedArea(placedHit[0], placedHit[0], placedHit[1], placedHit[1]);
                 return;
@@ -2478,6 +2562,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         int type = sideHit ? terrain.getBlockTypeAt(x, blockY, z)
                            : terrain.getTopType(x, z);
         if (type == TerrainGenerator.BLOCK_BEDROCK) return;
+        lastMiningDelay = miningDelay(type);
         if (type == TerrainGenerator.BLOCK_TNT) {
             if (tntFuseTicks == 0) {
                 tntX=x; tntZ=z; tntFuseTicks=125; tntFlashCounter=0; tntFlashOn=true;
@@ -2485,7 +2570,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
             return;
         }
-        if (type >= 0 && type < inventory.length && type != TerrainGenerator.BLOCK_BEDROCK && inventory[type] < 64) inventory[type]++;
+        if (worldMode == IndevViewerMIDlet.MODE_CREATIVE && type >= 0 && type < inventory.length && type != TerrainGenerator.BLOCK_BEDROCK && inventory[type] < 64) inventory[type]++;
         spawnBlockParticles(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
 
         if (blockY == h - 1) {
@@ -2734,6 +2819,20 @@ final class WorldCanvas extends Canvas implements Runnable {
                 torchLights[i].setTranslation(0.0f, -1000.0f, 0.0f);
             }
         }
+    }
+
+    private int miningDelay(int type) {
+        if (worldMode == IndevViewerMIDlet.MODE_CREATIVE) return 4;
+        if (type == TerrainGenerator.BLOCK_OBSIDIAN) return 45;
+        if (type == TerrainGenerator.BLOCK_BEDROCK) return 999;
+        if (type == TerrainGenerator.BLOCK_STONE || type == TerrainGenerator.BLOCK_COAL_ORE
+                || type == TerrainGenerator.BLOCK_IRON_ORE || type == TerrainGenerator.BLOCK_GOLD_ORE
+                || type == TerrainGenerator.BLOCK_DIAMOND_ORE) return 18;
+        if (type == TerrainGenerator.BLOCK_WOOD || type == TerrainGenerator.BLOCK_PLANKS
+                || type == TerrainGenerator.BLOCK_BRICK) return 12;
+        if (type == TerrainGenerator.BLOCK_DIRT || type == TerrainGenerator.BLOCK_SAND
+                || type == TerrainGenerator.BLOCK_GRAVEL) return 7;
+        return 5;
     }
 
     private void placeBlock() {
