@@ -91,6 +91,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Camera camera;
 
     private Appearance groundAppearance;
+    private Appearance flowerAppearance;
     private Image terrainAtlasImage;
     private Appearance[] terrainTileAppearances = new Appearance[256];
     private Group[][] activeChunks = new Group[8][8];
@@ -452,14 +453,19 @@ final class WorldCanvas extends Canvas implements Runnable {
         terrainPolygonMode.setCulling(PolygonMode.CULL_NONE);
         terrainPolygonMode.setShading(PolygonMode.SHADE_FLAT);
         groundAppearance.setPolygonMode(terrainPolygonMode);
-        // The classic terrain atlas includes transparent pixels in flower,
-        // sapling and leaf tiles. Enable alpha compositing so their cutouts
-        // remain transparent instead of appearing as solid colored squares.
-        CompositingMode terrainBlend = new CompositingMode();
-        terrainBlend.setBlending(CompositingMode.ALPHA);
-        // Alpha-test atlas cut-outs so invisible flower pixels do not occlude geometry.
-        terrainBlend.setAlphaThreshold(0.5f);
-        groundAppearance.setCompositingMode(terrainBlend);
+        // Terrain cube faces are opaque. Plant cut-outs are rendered separately
+        // with alpha testing so transparent flower pixels never affect side faces.
+        flowerAppearance = new Appearance();
+        flowerAppearance.setTexture(0, texture);
+        flowerAppearance.setFog(distanceFog);
+        PolygonMode flowerPolygonMode = new PolygonMode();
+        flowerPolygonMode.setCulling(PolygonMode.CULL_NONE);
+        flowerPolygonMode.setShading(PolygonMode.SHADE_FLAT);
+        flowerAppearance.setPolygonMode(flowerPolygonMode);
+        CompositingMode flowerBlend = new CompositingMode();
+        flowerBlend.setBlending(CompositingMode.ALPHA);
+        flowerBlend.setAlphaThreshold(0.5f);
+        flowerAppearance.setCompositingMode(flowerBlend);
 
         PolygonMode transparentPolygonMode = new PolygonMode();
         transparentPolygonMode.setCulling(PolygonMode.CULL_NONE);
@@ -1424,6 +1430,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         if (quads == 0) return null;
         int vertexCount = quads * 4;
+        int flowerVertexCount = flowerQuads * 4;
+        short[] flowerPositions = new short[flowerVertexCount * 3];
+        short[] flowerTexCoords = new short[flowerVertexCount * 2];
+        byte[] flowerColors = new byte[flowerVertexCount * 3];
+        int[] flowerStripLengths = new int[flowerQuads];
         short[] positions = new short[vertexCount * 3];
         short[] texCoords = new short[vertexCount * 2];
         int[] stripLengths = new int[quads];
@@ -1718,6 +1729,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         int startX = chunkX * CHUNK;
         int startZ = chunkZ * CHUNK;
         int quads = 0;
+        int flowerQuads = 0;
         int x, z, h;
         for (x = startX; x < startX + CHUNK; x++) {
             for (z = startZ; z < startZ + CHUNK; z++) {
@@ -1736,7 +1748,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                     if (yy > 0 && terrain.isBlockRemoved(x, yy - 1, z)) quads++;
                 }
                 int flowerType = terrain.getFlowerType(x, z);
-                if (flowerType >= 0) quads += 2;
+                if (flowerType >= 0) flowerQuads += 2;
                 if (terrain.isTreeAt(x, z)) {
                     int treeBase = h;
                     int treeHeight = terrain.getTreeHeight(x, z);
@@ -1767,6 +1779,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         int[] stripLengths = new int[quads];
         int vertex = 0;
         int strip = 0;
+        int flowerStrip = 0;
 
         for (x = startX; x < startX + CHUNK; x++) {
             for (z = startZ; z < startZ + CHUNK; z++) {
@@ -1813,15 +1826,15 @@ final class WorldCanvas extends Canvas implements Runnable {
                 int flowerType = terrain.getFlowerType(x, z);
                 if (flowerType >= 0) {
                     int fx = BLOCK_TILE_X[flowerType], fy = BLOCK_TILE_Y[flowerType];
-                    // Classic crossed billboards: two vertical diagonal planes
-                    // through the block center. Keep both planes; they are plant
-                    // geometry, not cube faces eligible for hidden-face culling.
-                    vertex = addQuad(positions, texCoords, colors, stripLengths,
-                        vertex, strip++, x, h, z, x + 1, h, z + 1,
-                        x, h + 1, z, x + 1, h + 1, z + 1, fx, fy);
-                    vertex = addQuad(positions, texCoords, colors, stripLengths,
-                        vertex, strip++, x + 1, h, z, x, h, z + 1,
-                        x + 1, h + 1, z, x, h + 1, z + 1, fx, fy);
+                    // Keep crossed plant planes out of opaque terrain geometry:
+                    // alpha-tested pixels belong only to the flower itself.
+                    int flowerVertex = flowerStrip * 4;
+                    flowerVertex = addQuad(flowerPositions, flowerTexCoords, flowerColors,
+                        flowerStripLengths, flowerVertex, flowerStrip++, x, h, z,
+                        x + 1, h, z + 1, x, h + 1, z, x + 1, h + 1, z + 1, fx, fy);
+                    flowerVertex = addQuad(flowerPositions, flowerTexCoords, flowerColors,
+                        flowerStripLengths, flowerVertex, flowerStrip++, x + 1, h, z,
+                        x, h, z + 1, x + 1, h + 1, z, x, h + 1, z + 1, fx, fy);
                 }
                 if (terrain.isTreeAt(x, z)) {
                     int base = h, th = terrain.getTreeHeight(x, z), y;
@@ -1854,6 +1867,20 @@ final class WorldCanvas extends Canvas implements Runnable {
             buffer.setColors(colorArray);
             TriangleStripArray triangles = new TriangleStripArray(0, stripLengths);
             chunkGroup.addChild(new Mesh(buffer, triangles, groundAppearance));
+        }
+        if (flowerVertexCount > 0) {
+            VertexArray flowerPositionArray = new VertexArray(flowerVertexCount, 3, 2);
+            flowerPositionArray.set(0, flowerVertexCount, flowerPositions);
+            VertexArray flowerTexArray = new VertexArray(flowerVertexCount, 2, 2);
+            flowerTexArray.set(0, flowerVertexCount, flowerTexCoords);
+            VertexArray flowerColorArray = new VertexArray(flowerVertexCount, 3, 1);
+            flowerColorArray.set(0, flowerVertexCount, flowerColors);
+            VertexBuffer flowerBuffer = new VertexBuffer();
+            flowerBuffer.setPositions(flowerPositionArray, 1.0f, null);
+            flowerBuffer.setTexCoords(0, flowerTexArray, 1.0f / 256.0f, null);
+            flowerBuffer.setColors(flowerColorArray);
+            chunkGroup.addChild(new Mesh(flowerBuffer,
+                new TriangleStripArray(0, flowerStripLengths), flowerAppearance));
         }
         buildGreedyTopMeshes(chunkGroup, chunkX, chunkZ);
         return chunkGroup;
@@ -1943,6 +1970,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         if(terrainTileAppearances[key]!=null)return terrainTileAppearances[key];
         int tx=key&15, ty=key>>4; int[] pixels=new int[256];
         terrainAtlasImage.getRGB(pixels,0,16,tx*16,ty*16,16,16);
+        // Leaf cubes are opaque for simpler rendering and fewer alpha artifacts.
+        if (tx == 4 && ty == 3) {
+            for (int p = 0; p < pixels.length; p++) pixels[p] |= 0xFF000000;
+        }
         Image tile=Image.createRGBImage(pixels,16,16,true);
         Texture2D tex=new Texture2D(new Image2D(Image2D.RGBA,tile));
         tex.setFiltering(Texture2D.FILTER_BASE_LEVEL,Texture2D.FILTER_NEAREST);
