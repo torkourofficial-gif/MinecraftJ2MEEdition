@@ -49,7 +49,7 @@ final class HostileMob {
                 } else if (!mob.alive) {
                     // The existing nightly zombie respawn behavior is preserved.
                     mob.alive = true;
-                    mob.health = 3;
+                    mob.health = 20;
                     mob.hurtTicks = 0;
                     mob.x = mob.homeX;
                     mob.z = mob.homeZ;
@@ -137,7 +137,7 @@ final class HostileMob {
         final Appearance normal;
         float x, z, homeX, homeZ, dirX, dirZ;
         float jumpY = 0.0f, jumpVelocity = 0.0f;
-        int health = 3, hurtTicks, wanderTicks, hopCooldown;
+        int health = 20, hurtTicks, wanderTicks, hopCooldown;
         boolean alive = true;
         boolean rendered;
         final Random random;
