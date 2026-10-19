@@ -578,6 +578,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         setupStage = "loading /mcj2me/char.png";
         Image charImage = ResourceImages.load("/mcj2me/char.png");
         heldArmAppearance = createHeldTextureAppearance(charImage);
+        // The M3G texture owns its converted image data now; do not keep the
+        // decoded character sheet alive throughout terrain/chunk construction.
+        charImage = null;
         hudIconsImage = ResourceImages.load("/mcj2me/icons.png");
         setupStage = "creating inventory icon 0 (grass)";
         blockIcons[0] = createGuiBlockIcon(GUI_ICON_X[0], GUI_ICON_Y[0]);
@@ -661,6 +664,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         mapCraftItemIcon(itemsImage, crafts.LEATHER, 7, 6);
         for (int ci = 44; ci < blockIcons.length; ci++)
             if (blockIcons[ci] == null) blockIcons[ci] = createItemsIcon(itemsImage, ci % 16, ci / 16);
+        // Every inventory sprite needed from items.png has been cropped into
+        // blockIcons; release the full decoded sheet before creating the world.
+        itemsImage = null;
 
         setupStage = "loading /mcj2me/clouds.png";
         Image cloudsImage = ResourceImages.load("/mcj2me/clouds.png");
@@ -725,6 +731,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         waterAppearance.setCompositingMode(waterBlend);
         setupStage = "creating cloud texture";
         cloudTexture = new Texture2D(new Image2D(Image2D.RGBA, cloudsImage));
+        // The texture has its own M3G image; release the decoded PNG before
+        // the initial terrain chunks allocate their vertex/index data.
+        cloudsImage = null;
         cloudTexture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
         cloudTexture.setWrapping(Texture2D.WRAP_REPEAT, Texture2D.WRAP_REPEAT);
         Appearance cloudAppearance = new Appearance();
