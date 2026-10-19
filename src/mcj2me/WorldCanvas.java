@@ -4237,6 +4237,20 @@ final class WorldCanvas extends Canvas implements Runnable {
         int[] indices = {0, 1, 2, 3};
         int[] stripLengths = {4};
         decorationTriangles = new TriangleStripArray(indices, stripLengths);
+        // All crossed decorations use identical render state; share these
+        // components instead of allocating an Appearance/PolygonMode/blend
+        // state for every torch, plant, and door-panel variant.
+        Appearance sharedAppearance = new Appearance();
+        sharedAppearance.setTexture(0, terrainTexture);
+        sharedAppearance.setFog(distanceFog);
+        PolygonMode sharedPolygon = new PolygonMode();
+        sharedPolygon.setCulling(PolygonMode.CULL_NONE);
+        sharedPolygon.setShading(PolygonMode.SHADE_FLAT);
+        sharedAppearance.setPolygonMode(sharedPolygon);
+        CompositingMode sharedBlend = new CompositingMode();
+        sharedBlend.setBlending(CompositingMode.ALPHA);
+        sharedBlend.setDepthWriteEnable(false);
+        sharedAppearance.setCompositingMode(sharedBlend);
         for (int i = 0; i < 6; i++) {
             int tileIndex = i == 5 ? 11 : BLOCK_TORCH + i;
             short[] positions = {-1, 0, 0, -1, 2, 0, 1, 0, 0, 1, 2, 0};
@@ -4254,18 +4268,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             vb.setPositions(va, 0.5f, null);
             vb.setTexCoords(0, ta, 1.0f / 256.0f, null);
             decorationBuffers[i] = vb;
-            Appearance appearance = new Appearance();
-            appearance.setTexture(0, terrainTexture);
-            appearance.setFog(distanceFog);
-            PolygonMode pm = new PolygonMode();
-            pm.setCulling(PolygonMode.CULL_NONE);
-            pm.setShading(PolygonMode.SHADE_FLAT);
-            appearance.setPolygonMode(pm);
-            CompositingMode blend = new CompositingMode();
-            blend.setBlending(CompositingMode.ALPHA);
-            blend.setDepthWriteEnable(false);
-            appearance.setCompositingMode(blend);
-            decorationAppearances[i] = appearance;
+            decorationAppearances[i] = sharedAppearance;
         }
     }
 
