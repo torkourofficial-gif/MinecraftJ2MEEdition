@@ -247,6 +247,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Group droppedItemGroup;
     private Group heldItemGroup;
     private Mesh heldItemMesh;
+    private Mesh heldFoodMesh;
     private int heldItemType = -2;
     private boolean heldItemIsArm;
     private Appearance heldArmAppearance;
@@ -1360,10 +1361,20 @@ final class WorldCanvas extends Canvas implements Runnable {
             heldPass.setDepthTestEnable(false);
             heldPass.setDepthWriteEnable(false);
             for (int sub=0; sub<block.getSubmeshCount(); sub++) {
-                Appearance faceAppearance = block.getAppearance(sub);
-                if (faceAppearance != null) {
-                    faceAppearance.setLayer(7);
-                    faceAppearance.setCompositingMode(heldPass);
+                Appearance source = block.getAppearance(sub);
+                if (source != null) {
+                    // Never modify shared terrain appearances: those same instances
+                    // are used by placed world blocks, which must keep normal depth.
+                    Appearance heldAppearance = new Appearance();
+                    Texture2D sourceTexture = source.getTexture(0);
+                    if (sourceTexture != null) heldAppearance.setTexture(0, sourceTexture);
+                    PolygonMode heldPolygon = new PolygonMode();
+                    heldPolygon.setCulling(PolygonMode.CULL_NONE);
+                    heldPolygon.setShading(PolygonMode.SHADE_FLAT);
+                    heldAppearance.setPolygonMode(heldPolygon);
+                    heldAppearance.setLayer(7);
+                    heldAppearance.setCompositingMode(heldPass);
+                    block.setAppearance(sub, heldAppearance);
                 }
             }
             return block;
@@ -1407,17 +1418,30 @@ final class WorldCanvas extends Canvas implements Runnable {
         int item = eatingTicks > 0 ? eatingItem : selectedItemType();
         boolean hasItem = item >= 0 && item < inventory.length
             && (worldMode != IndevViewerMIDlet.MODE_SURVIVAL || inventory[item] > 0);
-        boolean arm = !hasItem;
+        boolean foodItem = hasItem && (item == ITEM_RAW_PORKCHOP || item == ITEM_RAW_BEEF);
+        // Food is held in front of the arm, not instead of the arm.
+        boolean arm = !hasItem || foodItem;
         int type = hasItem ? item : -1;
-        if (heldItemMesh == null || type != heldItemType || arm != heldItemIsArm) {
+        if (heldItemMesh == null || type != heldItemType || arm != heldItemIsArm
+                || (foodItem && heldFoodMesh == null) || (!foodItem && heldFoodMesh != null)) {
             if (heldItemMesh != null) heldItemGroup.removeChild(heldItemMesh);
+            if (heldFoodMesh != null) heldItemGroup.removeChild(heldFoodMesh);
+            heldFoodMesh = null;
             try {
                 heldItemMesh = arm ? createHeldArmMesh() : createHeldItemMesh(type);
                 heldItemGroup.addChild(heldItemMesh);
+                if (foodItem) {
+                    heldFoodMesh = createHeldItemMesh(type);
+                    heldItemGroup.addChild(heldFoodMesh);
+                    // Keep the food visibly in the hand, slightly inward and forward.
+                    heldFoodMesh.setTranslation(0.13f, 0.12f, -0.04f);
+                    heldFoodMesh.setOrientation(-18.0f, 0.0f, 0.0f, 1.0f);
+                }
                 heldItemType = type;
                 heldItemIsArm = arm;
             } catch (Exception e) {
                 heldItemMesh = null;
+                heldFoodMesh = null;
                 heldItemType = -2;
                 return;
             }
@@ -1435,6 +1459,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         // Match Minecraft's familiar first-person transform (about
         // x=+0.56, y=-0.52, z=-0.72 in camera space).
         float forward=0.48f, right=0.38f, down=0.28f;
+        // Tuck cube blocks slightly farther toward the lower-right screen edge.
+        if (hasItem && !foodItem) { right += 0.07f; down += 0.06f; }
         float swingX=0.0f, swingY=0.0f, swingZ=0.0f;
         if (eatingTicks > 0) {
             int elapsed=EATING_DURATION_TICKS-eatingTicks;
@@ -1473,9 +1499,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             transform.postRotate(swingZ,0.0f,0.0f,1.0f);
         }
         if (arm) {
-            // Vanilla's first-person arm is visibly canted, not a vertical column.
-            // Our arm mesh is centered, so a moderate screen-space roll reproduces
-            // the familiar diagonal without importing the full player-model offsets.
+            // Keep the textured forearm diagonal even while holding food.
             transform.postRotate(-32.0f,0.0f,0.0f,1.0f);
         }
         heldItemGroup.setTransform(transform);
