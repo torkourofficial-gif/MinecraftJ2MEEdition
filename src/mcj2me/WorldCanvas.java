@@ -73,7 +73,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Image hudIconsImage;
     private Image guiBlocksImage;
     private Image inventoryImage;
-    private final Image[] blockIcons = new Image[42];
+    private final Image[] blockIcons = new Image[44];
     private boolean inventoryOpen = false;
     private int inventoryCursor = 0;
     private int inventoryPageStart = 0;
@@ -161,6 +161,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final int[] GUI_ICON_Y = {0, 0, 0, 48, 0};
     private static final int BLOCK_TORCH = 16, BLOCK_YELLOW_FLOWER = 17, BLOCK_RED_FLOWER = 18, BLOCK_SAPLING = 19, BLOCK_DOOR = 20;
     private static final int ITEM_WATER_BUCKET = 40, ITEM_EMPTY_BUCKET = 41;
+    private static final int ITEM_RAW_PORKCHOP = 42, ITEM_RAW_BEEF = 43;
     private static final int MAX_WATER_SOURCES = 8;
     private static final int WATER_FLOW_INTERVAL = 10;
     private final int[] waterFlowX = new int[MAX_WATER_SOURCES];
@@ -176,14 +177,15 @@ final class WorldCanvas extends Canvas implements Runnable {
         "IRON BLOCK", "GOLD BLOCK", "DIAMOND BLOCK",
         "WHITE WOOL", "ORANGE WOOL", "MAGENTA WOOL", "LIGHT BLUE WOOL", "YELLOW WOOL", "LIME WOOL",
         "PINK WOOL", "GRAY WOOL", "LIGHT GRAY WOOL", "CYAN WOOL", "PURPLE WOOL", "BLUE WOOL",
-        "BROWN WOOL", "GREEN WOOL", "RED WOOL", "BLACK WOOL", "WATER BUCKET", "EMPTY BUCKET"
+        "BROWN WOOL", "GREEN WOOL", "RED WOOL", "BLACK WOOL", "WATER BUCKET", "EMPTY BUCKET",
+        "RAW PORKCHOP", "RAW BEEF"
     };
     // Creative-style starter inventory: every block stack starts at 64.
     // Buckets remain individual items; mining can never grow a stack past 64.
     private final int[] inventory = {
         64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
         64, 64, 64, 64, 64, 64, 64, 64,
-        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 1, 0
+        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 1, 0, 0, 0
     };
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
     private int tntFuseTicks = 0, tntX = -1, tntZ = -1, tntFlashCounter = 0;
@@ -525,6 +527,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         blockIcons[ITEM_WATER_BUCKET] = createItemsIcon(itemsImage, 11, 4);
         setupStage = "creating inventory icon 41 (empty bucket from items.png)";
         blockIcons[ITEM_EMPTY_BUCKET] = createItemsIcon(itemsImage, 10, 4);
+        setupStage = "creating inventory icon 42 (raw porkchop from items.png)";
+        blockIcons[ITEM_RAW_PORKCHOP] = createItemsIcon(itemsImage, 0, 7);
+        setupStage = "creating inventory icon 43 (raw beef from items.png)";
+        blockIcons[ITEM_RAW_BEEF] = createItemsIcon(itemsImage, 1, 7);
         setupStage = "loading /mcj2me/clouds.png";
         Image cloudsImage = ResourceImages.load("/mcj2me/clouds.png");
         setupStage = "creating terrain Image2D/Texture2D";
@@ -2012,7 +2018,20 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         if (passiveMobs != null && passiveMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch)) {
             if (passiveMobs.consumeDeathEvent()) {
-                spawnMobDeathParticles(passiveMobs.getDeathX(), passiveMobs.getDeathY(), passiveMobs.getDeathZ());
+                float dx = passiveMobs.getDeathX(), dy = passiveMobs.getDeathY(), dz = passiveMobs.getDeathZ();
+                spawnMobDeathParticles(dx, dy, dz);
+                if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
+                    int mobType = passiveMobs.getDeathType();
+                    if (mobType == PassiveMob.MOB_PIG)
+                        spawnDroppedItem(ITEM_RAW_PORKCHOP, blockIcons[ITEM_RAW_PORKCHOP], dx, dy, dz);
+                    else if (mobType == PassiveMob.MOB_COW)
+                        spawnDroppedItem(ITEM_RAW_BEEF, blockIcons[ITEM_RAW_BEEF], dx, dy, dz);
+                    else if (mobType == PassiveMob.MOB_SHEEP) {
+                        spawnDroppedBlock(TerrainGenerator.BLOCK_WOOL_WHITE, dx - 0.08f, dy, dz);
+                        if (particleRandom.nextInt(2) == 0)
+                            spawnDroppedBlock(TerrainGenerator.BLOCK_WOOL_WHITE, dx + 0.08f, dy, dz);
+                    }
+                }
             }
             return true;
         }
@@ -2041,7 +2060,8 @@ final class WorldCanvas extends Canvas implements Runnable {
             droppedMeshes[slot] = null;
         }
         try {
-            Mesh mesh = type >= 0 ? createDroppedBlockMesh(type) : createDroppedItemMesh(icon);
+            Mesh mesh = type >= 0 && type < ITEM_RAW_PORKCHOP
+                ? createDroppedBlockMesh(type) : createDroppedItemMesh(icon);
             droppedMeshes[slot] = mesh;
             droppedTypes[slot] = type;
             droppedX[slot] = x;
@@ -2156,29 +2176,16 @@ final class WorldCanvas extends Canvas implements Runnable {
         pm.setCulling(PolygonMode.CULL_NONE);
         pm.setShading(PolygonMode.SHADE_FLAT);
         appearance.setPolygonMode(pm);
-        short[] p = {
-            -3,-3,-3, -3,3,-3, 3,-3,-3, 3,3,-3,
-            3,-3,3, 3,3,3, -3,-3,3, -3,3,3,
-            -3,-3,3, -3,3,3, -3,-3,-3, -3,3,-3,
-            3,-3,-3, 3,3,-3, 3,-3,3, 3,3,3,
-            -3,3,-3, -3,3,3, 3,3,-3, 3,3,3,
-            -3,-3,3, -3,-3,-3, 3,-3,3, 3,-3,-3
-        };
-        short[] uv = new short[48];
-        int[] indices = new int[24];
-        int[] strips = {4,4,4,4,4,4};
-        for (int face = 0; face < 6; face++) {
-            int b = face * 8;
-            uv[b] = 0; uv[b+1] = 0;
-            uv[b+2] = 0; uv[b+3] = 1024;
-            uv[b+4] = 1024; uv[b+5] = 0;
-            uv[b+6] = 1024; uv[b+7] = 1024;
-            for (int c = 0; c < 4; c++) indices[face * 4 + c] = face * 4 + c;
-        }
-        VertexArray pa = new VertexArray(24, 3, 2);
-        pa.set(0, 24, p);
-        VertexArray ta = new VertexArray(24, 2, 2);
-        ta.set(0, 24, uv);
+        // Item entities use a thin, double-sided sprite plane rather than a cube.
+        // The Y-axis spin in tickDroppedItems reproduces the classic rotating drop.
+        short[] p = {-3,-3,0, -3,3,0, 3,-3,0, 3,3,0};
+        short[] uv = {0,0, 0,1024, 1024,0, 1024,1024};
+        int[] indices = {0,1,2,3};
+        int[] strips = {4};
+        VertexArray pa = new VertexArray(4, 3, 2);
+        pa.set(0, 4, p);
+        VertexArray ta = new VertexArray(4, 2, 2);
+        ta.set(0, 4, uv);
         VertexBuffer vb = new VertexBuffer();
         vb.setPositions(pa, 1.0f / 16.0f, null);
         vb.setTexCoords(0, ta, 1.0f / 1024.0f, null);
@@ -2213,7 +2220,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             float dz = droppedZ[i] - cameraZ;
             if (dx*dx + dy*dy + dz*dz < 1.75f * 1.75f) {
                 if (droppedTypes[i] < 0) { droppedItemGroup.removeChild(mesh); droppedMeshes[i]=null; droppedTypes[i]=0; continue; }
-                else if (droppedTypes[i] < inventory.length && inventory[droppedTypes[i]] < 64)
+                if (droppedTypes[i] < inventory.length && inventory[droppedTypes[i]] < 64)
                     inventory[droppedTypes[i]]++;
                 droppedItemGroup.removeChild(mesh);
                 droppedMeshes[i] = null;
