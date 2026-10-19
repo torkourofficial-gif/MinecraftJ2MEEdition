@@ -919,12 +919,15 @@ final class WorldCanvas extends Canvas implements Runnable {
             cycleSelectedBlock(1);
         }
 
+        if (keyCode == '0' && flying) {
+            flying = false;
+            verticalVelocity = 0.0f;
+            airborne = true;
+        }
         if (IndevViewerMIDlet.controlPressed(CONTROL_JUMP,keyCode,action) && !jumpHeld) {
             jumpHeld = true;
             if (flying) {
-                // A fresh jump press exits creative flight.
-                flying = false;
-                verticalVelocity = 0.0f;
+                // In flight, holding jump rises and releasing it hovers.
             } else if (isSwimming()) {
                 verticalVelocity = Math.max(verticalVelocity, 0.24f);
                 airborne = true;
