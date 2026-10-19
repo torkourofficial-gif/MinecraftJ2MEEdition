@@ -86,10 +86,6 @@ final class WorldCanvas extends Canvas implements Runnable {
     private final Image[] grayBlockIcons = new Image[123];
     // Reuse GPU textures for repeated dropped/held sprites; recreating one per drop wastes memory.
     private final Texture2D[] itemIconTextures = new Texture2D[123];
-    // Lazily cache immutable solid dropped-block geometry per block type. Mesh
-    // nodes keep their own transforms/appearances, while vertex/index data is shared.
-    private final VertexBuffer[] droppedCubeBuffers = new VertexBuffer[BLOCK_TILE_X.length];
-    private final IndexBuffer[] droppedCubeIndices = new IndexBuffer[BLOCK_TILE_X.length];
     private int craftingTablePage = 0;
     private boolean inventoryOpen = false;
     private int inventoryCursor = 0;
@@ -183,6 +179,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
         2 // 40: crafting-table top tile in terrain.png
     };
+    // Lazily cache immutable solid dropped-block geometry per block type. Mesh
+    // nodes keep their own transforms/appearances, while vertex/index data is shared.
+    private final VertexBuffer[] droppedCubeBuffers = new VertexBuffer[BLOCK_TILE_X.length];
+    private final IndexBuffer[] droppedCubeIndices = new IndexBuffer[BLOCK_TILE_X.length];
     // Coordinates are pixel offsets in the 512x512 gui_blocks atlas.
     // The first five entries are the actual grass, dirt, stone, oak-log and
     // leaves cube icons; the remaining blocks are mapped by their own atlas cells.
