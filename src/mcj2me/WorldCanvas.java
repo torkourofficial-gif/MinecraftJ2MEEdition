@@ -2206,7 +2206,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                     droppedVelocityY[i] = 0.0f;
                 }
             }
-            mesh.setOrientation(droppedAge[i] * 9.0f, 0.0f, 1.0f, 0.0f);
+            mesh.setOrientation(yaw + droppedAge[i] * 9.0f, 0.0f, 1.0f, 0.0f);
             mesh.setTranslation(droppedX[i], droppedY[i], droppedZ[i]);
             float dx = droppedX[i] - cameraX;
             float dy = droppedY[i] - cameraY;
