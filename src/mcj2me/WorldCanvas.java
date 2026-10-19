@@ -1144,8 +1144,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     // the configured jump key instead of Canvas.FIRE. Treat that binding as
     // confirm while a menu is open, without changing its in-world jump action.
     private boolean isConfirmKey(int keyCode, int action) {
-        return isConfirmKey(keyCode, action)
-            || keyCode == 13 || IndevViewerMIDlet.controlPressed(CONTROL_JUMP, keyCode, action);
+        return action == FIRE || keyCode == '5' || keyCode == ' '
+            || keyCode == 10 || keyCode == 13
+            || IndevViewerMIDlet.controlPressed(CONTROL_JUMP, keyCode, action);
     }
 
     protected synchronized void keyPressed(int keyCode) {
