@@ -24,6 +24,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final float PLAYER_EYE_HEIGHT = 1.62f;
     private static final float PLAYER_HEAD_OFFSET = PLAYER_HEIGHT - PLAYER_EYE_HEIGHT;
     private static final float BLOCK_REACH = 5.0f;
+    private static final float PLAYER_HEIGHT = 2.0f;
+    private static final float PLAYER_EYE_HEIGHT = 1.62f;
+    private static final float PLAYER_HEAD_OFFSET = PLAYER_HEIGHT - PLAYER_EYE_HEIGHT;
+    private static final float BLOCK_REACH = 5.0f;
     private static final float MOVE_SPEED = 0.20f;
     private static final float MOVE_ACCEL = 0.035f;
     private static final float FRICTION = 0.78f;
@@ -1031,7 +1035,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
         }
 
-        float groundY = terrain.getHeight((int) cameraX, (int) cameraZ) + PLAYER_EYE_HEIGHT;
+        float groundY = getGroundHeightBelow(cameraX, cameraZ, cameraY - PLAYER_EYE_HEIGHT) + PLAYER_EYE_HEIGHT;
         boolean inWater = isSwimming();
         if (inWater && !wasInWater) splashTicks = 10;
         wasInWater = inWater;
@@ -1101,35 +1105,46 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (x < 1.0f || z < 1.0f || x > 126.0f || z > 126.0f) return false;
 
         float feetY = cameraY - PLAYER_EYE_HEIGHT;
+        float headY = feetY + PLAYER_HEIGHT;
         int minX = (int) Math.floor(x - 0.20f);
         int maxX = (int) Math.floor(x + 0.20f);
         int minZ = (int) Math.floor(z - 0.20f);
         int maxZ = (int) Math.floor(z + 0.20f);
+        int firstBodyY = Math.max(0, (int) Math.floor(feetY + 0.02f));
+        int lastBodyY = Math.min(TerrainGenerator.HEIGHT - 1,
+            (int) Math.floor(headY - 0.02f));
 
         for (int bx = minX; bx <= maxX; bx++) {
             for (int bz = minZ; bz <= maxZ; bz++) {
-                int surface = terrain.getHeight(bx, bz);
-                if (surface > feetY + 1.01f) return false;
-
-                // Trunks occupy a full square block at the player's level.
-                if (terrain.isTreeAt(bx, bz)) {
-                    int treeBase = terrain.getHeight(bx, bz);
-                    if (feetY < treeBase + terrain.getTreeHeight(bx, bz)) {
-                        return false;
-                    }
+                // Test actual occupied voxels instead of the original column
+                // height. A mined tunnel must become empty for player collision.
+                for (int by = firstBodyY; by <= lastBodyY; by++) {
+                    if (terrain.getBlockTypeAt(bx, by, bz) >= 0) return false;
+                    if (terrain.isLeafBlockAt(bx, by, bz)) return false;
                 }
 
-                // Leaves are solid too: reject movement when the player's
-                // body overlaps any generated leaf cube at this X/Z column.
-                int firstBodyY = Math.max(0, (int) Math.floor(feetY));
-                int lastBodyY = Math.min(TerrainGenerator.HEIGHT - 1,
-                    (int) Math.floor(cameraY + PLAYER_HEAD_OFFSET));
-                for (int by = firstBodyY; by <= lastBodyY; by++) {
-                    if (terrain.isLeafBlockAt(bx, by, bz)) return false;
+                // Tree trunks are generated separately from terrain voxels.
+                if (terrain.isTreeAt(bx, bz)) {
+                    int treeBase = terrain.getHeight(bx, bz);
+                    int treeTop = treeBase + terrain.getTreeHeight(bx, bz);
+                    if (headY > treeBase && feetY < treeTop) return false;
                 }
             }
         }
         return true;
+    }
+
+    /** Finds the highest solid voxel directly below the player's feet. */
+    private float getGroundHeightBelow(float x, float z, float feetY) {
+        int bx = (int) x;
+        int bz = (int) z;
+        int h = terrain.getHeight(bx, bz);
+        int startY = Math.min(floorVoxel(feetY + 0.02f), h - 1);
+        if (startY >= TerrainGenerator.HEIGHT) startY = TerrainGenerator.HEIGHT - 1;
+        for (int by = startY; by >= 0; by--) {
+            if (terrain.getBlockTypeAt(bx, by, bz) >= 0) return by + 1.0f;
+        }
+        return 0.0f;
     }
 
     private void updateCamera() {
@@ -2811,11 +2826,32 @@ final class WorldCanvas extends Canvas implements Runnable {
         // Amanatides-Woo DDA: visit the voxel cells crossed by the view ray.
         // The height-map world only has editable column surfaces, so side hits
         // are accepted where the neighbouring column leaves a wall exposed.
-        while (distance <= 5.0f) {
+        while (distance <= BLOCK_REACH) {
             if (x >= 1 && z >= 1 && x < TerrainGenerator.SIZE - 1
                     && z < TerrainGenerator.SIZE - 1 && y >= 0
                     && y < TerrainGenerator.HEIGHT) {
                 int surface = terrain.getHeight(x, z);
+                float nextBoundary = Math.min(tx, Math.min(ty, tz));
+                // Intersect the actual top plane during this ray segment. This
+                // also catches shallow/diagonal views that enter the cell from a side.
+                if (dy < -0.0001f && surface > 0
+                        && terrain.getBlockTypeAt(x, surface - 1, z) >= 0) {
+                    float topDistance = (surface - cameraY) / dy;
+                    if (topDistance >= distance - 0.0001f
+                            && topDistance <= nextBoundary + 0.0001f
+                            && topDistance >= 0.0f) {
+                        float topX = cameraX + dx * topDistance;
+                        float topZ = cameraZ + dz * topDistance;
+                        if (floorVoxel(topX) == x && floorVoxel(topZ) == z) {
+                            surfaceHitResult[0] = x;
+                            surfaceHitResult[1] = z;
+                            surfaceHitResult[2] = surface - 1;
+                            surfaceHitResult[3] = 0;
+                            surfaceHitResult[4] = (int)(topDistance * 1000.0f);
+                            return surfaceHitResult;
+                        }
+                    }
+                }
                 boolean occupied = y < surface && terrain.getBlockTypeAt(x, y, z) >= 0;
                 boolean topFace = enteredAxis == 1 && dy < 0.0f
                     && y == surface - 1 && occupied;
