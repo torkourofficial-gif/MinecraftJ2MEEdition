@@ -601,7 +601,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         // These are blocks, not item sprites: Beta 1.6 stores their block
         // faces in terrain.png (loaded as "atlas"). Using items.png here
         // sampled unrelated item sprites and made the recipe icons incorrect.
-        blockIcons[crafts.CRAFTING_TABLE] = createTerrainBlockIcon(atlas, 10, 3);
+        blockIcons[crafts.CRAFTING_TABLE] = createTerrainBlockIcon(atlas, 11, 2);
         mapCraftItemIcon(itemsImage, crafts.COAL, 7, 0);
         mapCraftItemIcon(itemsImage, crafts.CHARCOAL, 7, 0);
         mapCraftItemIcon(itemsImage, crafts.IRON_INGOT, 7, 1);
@@ -612,9 +612,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         mapCraftItemIcon(itemsImage, crafts.FEATHER, 8, 1);
         mapCraftItemIcon(itemsImage, crafts.PAPER, 10, 3);
         mapCraftItemIcon(itemsImage, crafts.BOOK, 11, 3);
-        blockIcons[crafts.CHEST] = createTerrainBlockIcon(atlas, 6, 3);
-        blockIcons[crafts.FURNACE] = createTerrainBlockIcon(atlas, 13, 3);
-        mapCraftItemIcon(itemsImage, crafts.LADDER, 7, 0);
+        blockIcons[crafts.CHEST] = createTerrainBlockIcon(atlas, 11, 1);
+        blockIcons[crafts.FURNACE] = createTerrainBlockIcon(atlas, 12, 2);
+        blockIcons[crafts.LADDER] = createTerrainBlockIcon(atlas, 3, 5);
         mapCraftItemIcon(itemsImage, crafts.SIGN, 10, 2);
         mapCraftItemIcon(itemsImage, crafts.BOWL, 7, 4);
         mapCraftItemIcon(itemsImage, crafts.BREAD, 9, 2);
