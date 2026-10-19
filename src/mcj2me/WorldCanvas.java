@@ -1373,7 +1373,17 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         if (keyCode == '3') {
             int aimedDecoration = raycastDecoration();
-            if (aimedDecoration >= 0 && decorationTypes[aimedDecoration] == BLOCK_CRAFTING_TABLE) {
+            boolean aimedAtCraftingTable = aimedDecoration >= 0
+                && decorationTypes[aimedDecoration] == BLOCK_CRAFTING_TABLE;
+            // Crafting tables are now normal voxels, so check the same block
+            // raycast used for mining/placement as well as legacy saved decorations.
+            if (!aimedAtCraftingTable) {
+                int[] aimedBlock = raycastSurface();
+                aimedAtCraftingTable = aimedBlock != null
+                    && terrain.getBlockTypeAt(aimedBlock[0], aimedBlock[2], aimedBlock[1])
+                        == TerrainGenerator.BLOCK_CRAFTING_TABLE;
+            }
+            if (aimedAtCraftingTable) {
                 craftingMenuOpen = true;
                 craftingMenuTable = true;
                 craftingRecipeCursor = 0;
