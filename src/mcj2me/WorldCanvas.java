@@ -1902,6 +1902,11 @@ final class WorldCanvas extends Canvas implements Runnable {
             topX = 1; topY = 0;
             sideX = 1; sideY = 0;
             bottomX = 1; bottomY = 0;
+        } else if (type == TerrainGenerator.BLOCK_TNT) {
+            // Classic terrain atlas: TNT has a distinct top label tile.
+            topX = 9; topY = 0;
+            sideX = 8; sideY = 0;
+            bottomX = 9; bottomY = 0;
         }
         short[] p = {
             -3,-3,-3, -3,3,-3, 3,-3,-3, 3,3,-3,
@@ -2300,6 +2305,8 @@ final class WorldCanvas extends Canvas implements Runnable {
                 continue;
             }
             int tx=BLOCK_TILE_X[type], ty=BLOCK_TILE_Y[type];
+            // The top of a TNT block is not its side texture, even before ignition.
+            if(type==TerrainGenerator.BLOCK_TNT){tx=9;ty=0;}
             if(type==TerrainGenerator.BLOCK_TNT && tntFuseTicks>0 && wx==tntX && wz==tntZ && tntFlashOn){tx=9;ty=0;}
             keys[x][z]=ty*16+tx; hs[x][z]=h;
             bases[x][z]=IndevViewerMIDlet.humbleMode ? 255 : terrain.getShadowShade(wx,wz,h);
