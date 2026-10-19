@@ -1320,73 +1320,64 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private Mesh createHeldArmMesh() {
-        // Classic char.png is a 64x32 Steve skin. The right arm UVs are the
-        // standard 4x12x4 cuboid at atlas origin (40,16), including all six faces.
-        int x=40, y=16, w=4, h=12, d=4;
+        // Ported from Minecraft Indev 20100223 ModelBiped/ModelRenderer:
+        // right arm box starts at texture offset (40,16), with box origin
+        // (-3,-2,-2) and dimensions 4x12x4. The six atlas rectangles below
+        // follow ModelRenderer.addBox's original face order exactly.
+        int tx=40, ty=16, w=4, h=12, d=4;
         int[][] rects = {
-            {x+d, y+d, x+d+w, y+d+h},             // front: 4x12
-            {x+d+w+d, y+d, x+d+w+d+w, y+d+h},     // back: 4x12
-            {x, y+d, x+d, y+d+h},                 // outer side: 4x12
-            {x+d+w, y+d, x+d+w+d, y+d+h},         // inner side: 4x12
-            {x+d, y, x+d+w, y+d},                 // top: 4x4
-            {x+d+w, y, x+d+w+d, y+d}              // bottom: 4x4
+            {tx+d+w,   ty+d,   tx+d+w+d+w, ty+d+h}, // +Z/front: (x+d+w+d,y+d) .. +w,+h
+            {tx,       ty+d,   tx+d,       ty+d+h}, // -Z/back
+            {tx+d,     ty,     tx+d+w,     ty+d},   // top
+            {tx+d+w,   ty,     tx+d+w+d,   ty+d},   // bottom
+            {tx+d+w,   ty+d,   tx+d+w+d,   ty+d+h}, // side A
+            {tx+d,     ty+d,   tx+d+w,     ty+d+h}  // side B
         };
+        // Match the vertex ordering used by the source ModelRenderer's six
+        // TexturedQuad definitions. Each quad has four vertices in strip order.
         short[] p = {
-            -2,-6,-2, -2,6,-2, 2,-6,-2, 2,6,-2,
-            2,-6,2, 2,6,2, -2,-6,2, -2,6,2,
-            -2,-6,2, -2,6,2, -2,-6,-2, -2,6,-2,
-            2,-6,-2, 2,6,-2, 2,-6,2, 2,6,2,
-            -2,6,-2, -2,6,2, 2,6,-2, 2,6,2,
-            -2,-6,2, -2,-6,-2, 2,-6,2, 2,-6,-2
+            -2,-6, 2,  -2, 6, 2,   2,-6, 2,   2, 6, 2,   // front (+Z)
+             2,-6,-2,   2, 6,-2,  -2,-6,-2,  -2, 6,-2,   // back (-Z)
+            -2, 6,-2,  -2, 6, 2,   2, 6,-2,   2, 6, 2,   // top (+Y)
+            -2,-6, 2,  -2,-6,-2,   2,-6, 2,   2,-6,-2,   // bottom (-Y)
+            -2,-6,-2,  -2, 6,-2,  -2,-6, 2,  -2, 6, 2,   // left (-X)
+             2,-6, 2,   2, 6, 2,   2,-6,-2,   2, 6,-2    // right (+X)
+        };
+        // U/V corner order is explicitly mapped per face, based on the
+        // original TexturedQuad vertex arrays, instead of flipping U based
+        // on a guessed face index. V is converted from top-origin PNG space
+        // to M3G's texture coordinate convention.
+        int[][] cornerUV = {
+            {2,0, 2,1, 3,0, 3,1}, // front
+            {0,0, 0,1, 1,0, 1,1}, // back
+            {1,0, 1,1, 2,0, 2,1}, // top
+            {2,0, 2,1, 3,0, 3,1}, // bottom
+            {1,0, 1,1, 2,0, 2,1}, // left side
+            {3,0, 3,1, 4,0, 4,1}  // right side
         };
         short[] uv = new short[48];
-        // The camera sees the +Z face of the held arm. Map that face to
-        // the front rectangle in char.png; the opposite face gets the back.
-        int[] uvFace = {1,0,2,3,4,5};
         for (int face=0; face<6; face++) {
-            int[] r=rects[uvFace[face]];
-            for (int k=0;k<4;k++) {
-                int u, v;
-                if (face==4) {
-                    // Top: +Z is the front edge, which belongs to the
-                    // bottom edge of the top-face rectangle in the skin net.
-                    u=(k<2)?r[0]:r[2]; v=(k==0||k==2)?r[1]:r[3];
-                } else if (face==5) {
-                    // Bottom uses the same front-edge convention: vertices
-                    // on +Z map to the rectangle's bottom edge, not its top.
-                    u=(k<2)?r[0]:r[2]; v=(k==0||k==2)?r[3]:r[1];
-                } else {
-                    u=(k<2)?r[0]:r[2]; v=(k==0||k==2)?r[3]:r[1];
-                    // Match the skin's unfolded net to each face's vertex order.
-                    // Front (+Z), back (-Z), and both side faces have vertex
-                    // order opposite to the atlas U direction.
-                    if (face==0 || face==2 || face==3) u=(k<2)?r[2]:r[0];
-                }
+            int[] r=rects[face];
+            for (int k=0; k<4; k++) {
+                int corner=k*2;
+                int u=cornerUV[face][corner]==0 ? r[0] : r[2];
+                int v=cornerUV[face][corner+1]==0 ? r[1] : r[3];
                 uv[face*8+k*2]=(short)(u*1024/64);
-                // M3G texture V runs from the image's bottom edge. Flip the
-                // classic skin atlas V coordinate so the arm is not upside down.
                 uv[face*8+k*2+1]=(short)(1024-(v*1024/32));
             }
         }
-        int[] indices = new int[24];
-        int[] strips = new int[6];
-        for (int i=0;i<24;i++) indices[i]=i;
-        for (int i=0;i<6;i++) strips[i]=4;
-        VertexArray positions = new VertexArray(24,3,2);
+        int[] indices=new int[24], strips=new int[6];
+        for(int i=0;i<24;i++) indices[i]=i;
+        for(int i=0;i<6;i++) strips[i]=4;
+        VertexArray positions=new VertexArray(24,3,2);
         positions.set(0,24,p);
-        VertexArray texCoords = new VertexArray(24,2,2);
+        VertexArray texCoords=new VertexArray(24,2,2);
         texCoords.set(0,24,uv);
-        VertexBuffer buffer = new VertexBuffer();
+        VertexBuffer buffer=new VertexBuffer();
         buffer.setPositions(positions,1.0f/16.0f,null);
         buffer.setTexCoords(0,texCoords,1.0f/1024.0f,null);
-        // Explicitly keep the mesh's fallback vertex colour white. The skin
-        // texture is the colour source; no baked vertex tint should darken it.
         buffer.setDefaultColor(0xFFFFFFFF);
-        Mesh arm = new Mesh(buffer,new TriangleStripArray(indices,strips),heldArmAppearance);
-        // Match the proportions of the arm shown while eating: the previous
-        // 0.52 scale shrank the skin UVs to only a few screen pixels on 240x320.
-        // Keep the vanilla 4x12x4 arm proportions, but use a moderate portrait
-        // scale so the forearm is clearly visible without covering the crosshair.
+        Mesh arm=new Mesh(buffer,new TriangleStripArray(indices,strips),heldArmAppearance);
         arm.setScale(0.82f,0.82f,0.82f);
         return arm;
     }
