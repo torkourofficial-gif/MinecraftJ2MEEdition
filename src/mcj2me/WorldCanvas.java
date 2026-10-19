@@ -288,6 +288,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Group heldItemGroup;
     private Mesh heldItemMesh;
     private Mesh heldFoodMesh;
+    // All flat 3D item models share the same immutable box geometry.
+    private VertexBuffer heldSpriteBuffer;
+    private IndexBuffer heldSpriteIndices;
     private int heldItemType = -2;
     private boolean heldItemIsArm;
     private Appearance heldArmAppearance;
@@ -1766,6 +1769,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         // inventory icon. This keeps meat/buckets volumetric rather than HUD sprites.
         Image icon = blockIcons[item];
         Appearance appearance = createHeldTextureAppearance(icon);
+        if (heldSpriteBuffer != null && heldSpriteIndices != null) {
+            Mesh cachedSprite = new Mesh(heldSpriteBuffer, heldSpriteIndices, appearance);
+            cachedSprite.setScale(0.85f, 0.85f, 0.85f);
+            return cachedSprite;
+        }
         short[] p = {
             -4,-5,-1, -4,5,-1, 4,-5,-1, 4,5,-1,
             4,-5,1, 4,5,1, -4,-5,1, -4,5,1,
@@ -1791,8 +1799,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         VertexBuffer buffer=new VertexBuffer();
         buffer.setPositions(positions,1.0f/16.0f,null);
         buffer.setTexCoords(0,texCoords,1.0f/1024.0f,null);
-        Mesh result=new Mesh(buffer,new TriangleStripArray(indices,strips),appearance);
-        result.setScale(0.85f,0.85f,0.85f);
+        TriangleStripArray indexBuffer = new TriangleStripArray(indices, strips);
+        heldSpriteBuffer = buffer;
+        heldSpriteIndices = indexBuffer;
+        Mesh result = new Mesh(buffer, indexBuffer, appearance);
+        result.setScale(0.85f, 0.85f, 0.85f);
         return result;
     }
 
