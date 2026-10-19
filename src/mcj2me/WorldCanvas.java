@@ -1095,6 +1095,33 @@ final class WorldCanvas extends Canvas implements Runnable {
         g.drawRect(cursorX - 1, cursorY - 1, 17, 17);
         g.drawRect(cursorX - 2, cursorY - 2, 19, 19);
         drawRecipePreview(g, false, panelX, panelY);
+
+        // Minecraft keeps the nine-slot hotbar visible while the inventory
+        // is open. Redraw it over the cleared background, including the
+        // selected slot and stack counts, using the same positions as the HUD.
+        int barX = (getWidth() - 182) / 2;
+        int barY = getHeight() - 23;
+        g.drawRegion(guiImage, 0, 0, 182, 22, 0, barX, barY,
+            Graphics.TOP | Graphics.LEFT);
+        for (int i = 0; i < 9; i++) {
+            int item = hotbarItems[i];
+            int slotX = barX + 1 + i * 20;
+            if (i == selectedSlot) {
+                g.drawRegion(guiImage, 0, 22, 24, 22, 0, slotX, barY,
+                    Graphics.TOP | Graphics.LEFT);
+            }
+            boolean available = item >= 0 && item < blockIcons.length
+                && (worldMode != IndevViewerMIDlet.MODE_SURVIVAL || inventory[item] > 0);
+            if (available) {
+                g.drawImage(blockIcons[item], slotX + 4, barY + 3,
+                    Graphics.TOP | Graphics.LEFT);
+                if (inventory[item] > 1) {
+                    g.setColor(0xFFFFFF);
+                    g.drawString(Integer.toString(inventory[item]), slotX + 11,
+                        barY + 10, Graphics.TOP | Graphics.LEFT);
+                }
+            }
+        }
     }
 
     private boolean isSwimming() {
