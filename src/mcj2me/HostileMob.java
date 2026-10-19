@@ -81,6 +81,17 @@ final class HostileMob {
         }
     }
 
+    boolean touchesPlayer(float playerX, float playerZ) {
+        if (!nightActive) return false;
+        for (int i = 0; i < mobs.length; i++) {
+            Mob mob = mobs[i];
+            if (!mob.alive || !mob.rendered) continue;
+            float dx = mob.x - playerX, dz = mob.z - playerZ;
+            if (dx * dx + dz * dz < 1.65f * 1.65f) return true;
+        }
+        return false;
+    }
+
     boolean hit(float px, float py, float pz, float yaw, float pitch) {
         if (!nightActive) return false;
         Mob target = null;
