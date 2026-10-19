@@ -214,6 +214,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int foodCount = 0;
     private int zombieDamageCooldown = 0;
     private int lastMiningDelay = 4;
+    private boolean breakHeld;
+    private int miningProgress;
     private int foodMessageTicks = 0;
     private static final int MAX_DROPPED_ITEMS = 8;
     private final Mesh[] droppedMeshes = new Mesh[MAX_DROPPED_ITEMS];
@@ -631,6 +633,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         while (running) {
             if (!paused) {
                 updateMovement();
+                tickMining();
                 tickSurvival();
                 tickDroppedItems();
                 tickWaterFlow();
@@ -950,11 +953,16 @@ final class WorldCanvas extends Canvas implements Runnable {
 
         if (IndevViewerMIDlet.controlPressed(CONTROL_BREAK,keyCode,action)
                 && actionCooldown == 0) {
-            if (!attackMobs()) {
-                lastMiningDelay = 4;
+            if (attackMobs()) {
+                breakHeld = false;
+                actionCooldown = 4;
+            } else if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
+                breakHeld = true;
+                miningProgress = 0;
+            } else {
                 breakBlock();
-                actionCooldown = worldMode == IndevViewerMIDlet.MODE_SURVIVAL ? lastMiningDelay : 4;
-            } else actionCooldown = 4;
+                actionCooldown = 4;
+            }
         } else if (IndevViewerMIDlet.controlPressed(CONTROL_PLACE,keyCode,action)
                 && actionCooldown == 0) {
             placeBlock();
@@ -1023,6 +1031,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         int action = getGameAction(keyCode);
         if (IndevViewerMIDlet.controlPressed(CONTROL_JUMP,keyCode,action))
             jumpHeld = false;
+        if (IndevViewerMIDlet.controlPressed(CONTROL_BREAK,keyCode,action)) {
+            breakHeld = false;
+            miningProgress = 0;
+        }
         if (IndevViewerMIDlet.controlPressed(CONTROL_FORWARD,keyCode,action)) forward=false;
         if (IndevViewerMIDlet.controlPressed(CONTROL_BACKWARD,keyCode,action)) backward=false;
         if (IndevViewerMIDlet.controlPressed(CONTROL_STRAFE_LEFT,keyCode,action)) strafeLeft=false;
@@ -1037,6 +1049,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         forward = backward = strafeLeft = strafeRight = false;
         lookUp = lookDown = turnLeft = turnRight = false;
         jumpHeld = false;
+        breakHeld = false;
+        miningProgress = 0;
     }
 
     private void updateMovement() {
@@ -2953,6 +2967,35 @@ final class WorldCanvas extends Canvas implements Runnable {
                 torchLights[i].setTranslation(0.0f, -1000.0f, 0.0f);
             }
         }
+    }
+
+
+    private void tickMining() {
+        if (worldMode != IndevViewerMIDlet.MODE_SURVIVAL || !breakHeld || actionCooldown > 0) return;
+        int delay = getMiningDelayForTarget();
+        if (delay >= 999) {
+            miningProgress = 0;
+            return;
+        }
+        if (++miningProgress >= delay) {
+            breakBlock();
+            miningProgress = 0;
+            actionCooldown = 4;
+        }
+    }
+
+    private int getMiningDelayForTarget() {
+        int decoration = raycastDecoration();
+        if (decoration >= 0) return miningDelay(decorationTypes[decoration]);
+        int[] leaf = raycastLeafBlock();
+        if (leaf != null) return miningDelay(TerrainGenerator.BLOCK_LEAVES);
+        int[] hit = raycastSurface();
+        if (hit == null) return 5;
+        int placed = terrain.getPlacedBlockTypeAt(hit[0], hit[2], hit[1]);
+        if (placed >= 0) return miningDelay(placed);
+        int x = hit[0], z = hit[1], y = hit[2];
+        int type = hit[3] != 0 ? terrain.getBlockTypeAt(x, y, z) : terrain.getTopType(x, z);
+        return miningDelay(type);
     }
 
     private int miningDelay(int type) {
