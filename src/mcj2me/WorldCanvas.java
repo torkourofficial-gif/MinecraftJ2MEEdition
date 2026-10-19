@@ -1025,7 +1025,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 && inventory[selectedItem] <= 0) ? "EMPTY" : BLOCK_NAMES[selectedItem])
             : "EMPTY";
         g.setColor(0xFFFFFF);
-        g.drawString(selectedName + " (5 select, 1 craft, 7/9 recipe, * close)",
+        g.drawString(selectedName + " (5 select, 1-3 recipe, 0 craft, 7/9 page)",
             Math.max(2, panelX), Math.min(getHeight() - 16, panelY + panelH + 2),
             Graphics.TOP | Graphics.LEFT);
         drawRecipePreview(g, false, panelX, panelY);
@@ -1204,14 +1204,14 @@ final class WorldCanvas extends Canvas implements Runnable {
                 repaint();
                 return;
             }
-            if (keyCode == '7' || keyCode == '9') {
-                craftingRecipeCursor = keyCode == '7'
-                    ? (craftingRecipeCursor + crafts.inventoryRecipeCount() - 1) % crafts.inventoryRecipeCount()
-                    : (craftingRecipeCursor + 1) % crafts.inventoryRecipeCount();
+                if (keyCode == '1' || keyCode == '2' || keyCode == '3') {
+                craftingRecipeCursor = keyCode - '1';
+                if (craftingRecipeCursor >= crafts.inventoryRecipeCount())
+                    craftingRecipeCursor = crafts.inventoryRecipeCount() - 1;
                 repaint();
                 return;
             }
-            if (keyCode == '1') {
+            if (keyCode == '0') {
                 craftRecipe(crafts.inventoryRecipeAt(craftingRecipeCursor));
                 repaint();
                 return;
@@ -2370,15 +2370,18 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     private boolean hasIngredients(crafts.Recipe recipe) {
         if (recipe == null) return false;
-        int[] neededItems = new int[inventory.length];
         for (int i = 0; i < recipe.ingredients.length; i++) {
             int item = recipe.ingredients[i];
             if (item == crafts.EMPTY) continue;
             if (item < 0 || item >= inventory.length) return false;
-            neededItems[item]++;
+            boolean first = true;
+            for (int j = 0; j < i; j++) if (recipe.ingredients[j] == item) { first = false; break; }
+            if (!first) continue;
+            int needed = 0;
+            for (int j = i; j < recipe.ingredients.length; j++)
+                if (recipe.ingredients[j] == item) needed++;
+            if (inventory[item] < needed) return false;
         }
-        for (int i = 0; i < neededItems.length; i++)
-            if (neededItems[i] > inventory[i]) return false;
         return true;
     }
 
@@ -3664,10 +3667,12 @@ final class WorldCanvas extends Canvas implements Runnable {
             lastMiningDelay = miningDelay(type);
             int removedDecorationX = (int)decorationX[decorationHit];
             int removedDecorationZ = (int)decorationZ[decorationHit];
+            int droppedType = type == BLOCK_CRAFTING_TABLE ? crafts.CRAFTING_TABLE : type;
             if (worldMode == IndevViewerMIDlet.MODE_CREATIVE) {
-                collectInventoryItem(type);
-            } else {
-                spawnDroppedBlock(type, decorationX[decorationHit], decorationY[decorationHit] + 0.35f, decorationZ[decorationHit]);
+                collectInventoryItem(droppedType);
+            } else if (droppedType >= 0 && droppedType < blockIcons.length) {
+                spawnDroppedItem(droppedType, blockIcons[droppedType], decorationX[decorationHit],
+                    decorationY[decorationHit] + 0.35f, decorationZ[decorationHit]);
             }
             spawnBlockParticles(type, decorationX[decorationHit], decorationY[decorationHit] + 0.35f,
                 decorationZ[decorationHit]);
