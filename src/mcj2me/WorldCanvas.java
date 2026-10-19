@@ -729,6 +729,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         g.setColor(0x551111);
         g.drawString("You Died!", w / 2, h / 3,
             Graphics.TOP | Graphics.HCENTER);
+        g.setFont(Font.getDefaultFont());
 
         int bw = Math.min(w - 32, 200);
         if (bw < 1) bw = w;
