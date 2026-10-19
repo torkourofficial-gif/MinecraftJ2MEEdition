@@ -74,7 +74,7 @@ final class PassiveMob {
         }
     }
 
-    boolean hit(float px, float py, float pz, float yaw, float pitch) {
+    boolean hit(float px, float py, float pz, float yaw, float pitch, int damage) {
         Mob target = null;
         float best = 4.6f;
         for (int i = 0; i < mobs.length; i++) {
@@ -84,7 +84,7 @@ final class PassiveMob {
             if (score >= 0.0f && score < best) { best = score; target = mob; }
         }
         if (target == null) return false;
-        target.health--;
+        target.health -= Math.max(1, damage);
         target.hurtTicks = 5;
         target.mesh.setAppearance(0, getHurtAppearance());
         if (target.health <= 0) {
