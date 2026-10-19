@@ -2095,7 +2095,10 @@ final class WorldCanvas extends Canvas implements Runnable {
                     int treeHeight = terrain.getTreeHeight(x, z);
                     int treeY;
                     for (treeY = 0; treeY < treeHeight; treeY++) {
-                        quads += countExposedTreeFaces(x, treeBase + treeY, z);
+                        if (terrain.isTreeTrunkAt(x, treeBase + treeY, z)) {
+                            int exposed = countExposedTreeFaces(x, treeBase + treeY, z);
+                            if (exposed > 0) quads += exposed;
+                        }
                     }
                     int crown = treeBase + treeHeight - 1;
                     for (treeY = crown - 1; treeY <= crown + 1; treeY++) {
@@ -2105,7 +2108,8 @@ final class WorldCanvas extends Canvas implements Runnable {
                             for (lz = z - radius; lz <= z + radius; lz++) {
                                 if (lx == x && lz == z && treeY <= crown) continue;
                                 if (terrain.isLeafBlockAt(lx, treeY, lz)) {
-                                    quads += countExposedTreeFaces(lx, treeY, lz);
+                                    int exposed = countExposedTreeFaces(lx, treeY, lz);
+                                    if (exposed > 0) quads += exposed;
                                 }
                             }
                         }
@@ -2199,8 +2203,11 @@ final class WorldCanvas extends Canvas implements Runnable {
                     int base = h, th = terrain.getTreeHeight(x, z), y;
                     for (y = 0; y < th; y++) {
                         if (terrain.isTreeTrunkAt(x, base + y, z)) {
-                            vertex = addTreeCube(positions, texCoords, colors, stripLengths, vertex, strip, x, base + y, z, 4, 1);
-                            strip += countExposedTreeFaces(x, base + y, z);
+                            int exposed = countExposedTreeFaces(x, base + y, z);
+                            if (exposed > 0) {
+                                vertex = addTreeCube(positions, texCoords, colors, stripLengths, vertex, strip, x, base + y, z, 4, 1);
+                                strip += exposed;
+                            }
                         }
                     }
                     int crown = base + th - 1;
@@ -2208,8 +2215,11 @@ final class WorldCanvas extends Canvas implements Runnable {
                         for (lx = x - radius; lx <= x + radius; lx++) for (lz = z - radius; lz <= z + radius; lz++) {
                             if (lx == x && lz == z && y <= crown) continue;
                             if (terrain.isLeafBlockAt(lx, y, lz)) {
-                                vertex = addTreeCube(positions, texCoords, colors, stripLengths, vertex, strip, lx, y, lz, 4, 3);
-                                strip += countExposedTreeFaces(lx, y, lz);
+                                int exposed = countExposedTreeFaces(lx, y, lz);
+                                if (exposed > 0) {
+                                    vertex = addTreeCube(positions, texCoords, colors, stripLengths, vertex, strip, lx, y, lz, 4, 3);
+                                    strip += exposed;
+                                }
                             }
                         }
                     }
