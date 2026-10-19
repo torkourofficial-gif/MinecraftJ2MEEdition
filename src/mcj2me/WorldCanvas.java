@@ -1479,8 +1479,9 @@ final class WorldCanvas extends Canvas implements Runnable {
             heldItemIsArm = false;
             return;
         }
-        // Food is held in front of the arm, not instead of the arm.
-        boolean arm = foodItem;
+        // Food uses the classic flat 3D item sprite by itself, just like
+        // other held items; do not render the arm or a second food mesh.
+        boolean arm = false;
         int type = item;
         if (heldItemMesh == null || type != heldItemType || arm != heldItemIsArm
                 || (foodItem && heldFoodMesh == null) || (!foodItem && heldFoodMesh != null)) {
@@ -1490,13 +1491,6 @@ final class WorldCanvas extends Canvas implements Runnable {
             try {
                 heldItemMesh = arm ? createHeldArmMesh() : createHeldItemMesh(type);
                 heldItemGroup.addChild(heldItemMesh);
-                if (foodItem) {
-                    heldFoodMesh = createHeldItemMesh(type);
-                    heldItemGroup.addChild(heldFoodMesh);
-                    // Keep the food visibly in the hand, slightly inward and forward.
-                    heldFoodMesh.setTranslation(0.13f, 0.12f, -0.04f);
-                    heldFoodMesh.setOrientation(-18.0f, 0.0f, 0.0f, 1.0f);
-                }
                 heldItemType = type;
                 heldItemIsArm = arm;
             } catch (Exception e) {
@@ -1789,9 +1783,21 @@ final class WorldCanvas extends Canvas implements Runnable {
                 // ceiling/side collision must not accumulate phantom fall damage.
                 if (verticalVelocity < 0.0f) fallDistance -= verticalVelocity;
                 cameraY = nextCameraY;
-            } else {
+            } else if (verticalVelocity < 0.0f) {
+                // A downward voxel collision is a landing, not a cancelled fall.
+                // Snap to the resolved support height and apply damage once.
+                cameraY = groundY;
                 verticalVelocity = 0.0f;
+                airborne = false;
+                if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL && fallDistance > 3.0f) {
+                    int fallDamage = (int) Math.ceil(fallDistance - 3.0f);
+                    applyDamage(fallDamage);
+                }
                 fallDistance = 0.0f;
+            } else {
+                // Hit a ceiling while rising: stop upward motion, but don't
+                // erase any fall distance already accumulated.
+                verticalVelocity = 0.0f;
             }
             verticalVelocity -= GRAVITY;
             if (cameraY <= groundY) {
