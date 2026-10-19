@@ -662,7 +662,6 @@ final class WorldCanvas extends Canvas implements Runnable {
         world.addChild(waterGroup);
         world.addChild(decorationGroup);
         world.addChild(droppedItemGroup);
-        world.addChild(heldItemGroup);
         setupStage = "creating decorations and torch lights";
         setupDecorations();
         setupTorchLights();
@@ -677,6 +676,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         setupStage = "building block-particle meshes";
         setupBlockParticles(atlas);
         world.addChild(blockParticleGroup);
+        // First-person hand/item is the final 3D pass in the scene graph.
+        // Its appearance disables depth testing, so terrain, mobs, water and
+        // particles cannot cover it; the 2D HUD is drawn afterward in paint().
+        world.addChild(heldItemGroup);
         setupStage = "loading passive mob textures";
         passiveMobs = new PassiveMob(world, terrain, cameraX, cameraZ);
         setupStage = "loading hostile mob texture";
@@ -1264,6 +1267,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         mode.setCulling(PolygonMode.CULL_NONE);
         mode.setShading(PolygonMode.SHADE_FLAT);
         appearance.setPolygonMode(mode);
+        CompositingMode heldPass = new CompositingMode();
+        heldPass.setDepthTestEnable(false);
+        heldPass.setDepthWriteEnable(false);
+        appearance.setCompositingMode(heldPass);
         return appearance;
     }
 
@@ -1304,7 +1311,9 @@ final class WorldCanvas extends Canvas implements Runnable {
                     if (uvFace[face]==1 || uvFace[face]==2) u=(k<2)?r[2]:r[0];
                 }
                 uv[face*8+k*2]=(short)(u*1024/64);
-                uv[face*8+k*2+1]=(short)(v*1024/32);
+                // M3G texture V runs from the image's bottom edge. Flip the
+                // classic skin atlas V coordinate so the arm is not upside down.
+                uv[face*8+k*2+1]=(short)(1024-(v*1024/32));
             }
         }
         int[] indices = new int[24];
@@ -1324,7 +1333,16 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Mesh createHeldItemMesh(int item) {
         if (item < ITEM_WATER_BUCKET) {
             Mesh block = createDroppedBlockMesh(item);
-            block.setScale(2.15f,2.15f,2.15f);
+            // Dropped cube geometry is 0.25 blocks wide; 1.6x gives the
+            // classic first-person held-block size of roughly 0.4 blocks.
+            block.setScale(1.6f,1.6f,1.6f);
+            CompositingMode heldPass = new CompositingMode();
+            heldPass.setDepthTestEnable(false);
+            heldPass.setDepthWriteEnable(false);
+            for (int sub=0; sub<block.getSubmeshCount(); sub++) {
+                Appearance faceAppearance = block.getAppearance(sub);
+                if (faceAppearance != null) faceAppearance.setCompositingMode(heldPass);
+            }
             return block;
         }
         // Non-block items use a shallow, six-sided 3D model textured from their
@@ -1391,13 +1409,15 @@ final class WorldCanvas extends Canvas implements Runnable {
         float ux=-(float)Math.sin(yr)*(float)Math.sin(pr);
         float uy=cosPitch;
         float uz=(float)Math.cos(yr)*(float)Math.sin(pr);
-        float forward=0.95f, right=0.43f, down=0.48f;
+        // Match Minecraft's familiar first-person transform (about
+        // x=+0.56, y=-0.52, z=-0.72 in camera space).
+        float forward=0.72f, right=0.56f, down=0.52f;
         float swingX=0.0f, swingY=0.0f, swingZ=0.0f;
         if (eatingTicks > 0) {
             int elapsed=EATING_DURATION_TICKS-eatingTicks;
-            forward=0.62f;
-            down=0.18f-((elapsed%8<4)?0.06f:0.0f);
-            right=0.20f;
+            forward=0.52f;
+            down=0.20f-((elapsed%8<4)?0.06f:0.0f);
+            right=0.36f;
         } else if (handSwingTicks > 0) {
             float phase=(8-handSwingTicks)%8;
             float swing=(float)Math.sin(phase*Math.PI/4.0);
@@ -1412,8 +1432,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         Transform transform=new Transform();
         transform.setIdentity();
         transform.postTranslate(px,py,pz);
-        transform.postRotate(-yaw,0.0f,1.0f,0.0f);
+        // Minecraft's standard held-item yaw is 45 degrees. The right arm
+        // is additionally canted so it rises from the lower-right like vanilla.
+        transform.postRotate(45.0f-yaw,0.0f,1.0f,0.0f);
         transform.postRotate(pitch+swingX,1.0f,0.0f,0.0f);
+        if (arm) transform.postRotate(35.0f,0.0f,0.0f,1.0f);
         heldItemGroup.setTransform(transform);
     }
 
