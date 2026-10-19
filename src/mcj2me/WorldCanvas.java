@@ -70,6 +70,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Texture2D waterTexture;
     private Texture2D cloudTexture;
     private Image guiImage;
+    private Image hudIconsImage;
     private Image guiBlocksImage;
     private Image inventoryImage;
     private final Image[] blockIcons = new Image[42];
@@ -211,7 +212,6 @@ final class WorldCanvas extends Canvas implements Runnable {
     private final int worldId;
     private final int worldMode;
     private int health = 20;
-    private int foodCount = 0;
     private int zombieDamageCooldown = 0;
     private int lastMiningDelay = 4;
     private boolean breakHeld;
@@ -295,7 +295,6 @@ final class WorldCanvas extends Canvas implements Runnable {
             out.writeInt(waterFlowTicks[i]);
         }
         out.writeInt(health);
-        out.writeInt(foodCount);
         out.flush();
         return bytes.toByteArray();
     }
@@ -347,9 +346,9 @@ final class WorldCanvas extends Canvas implements Runnable {
                 waterFlowActive[i] = true;
             }
         }
-        if (in.available() >= 8) {
+        if (in.available() >= 4) {
             health = Math.max(1, Math.min(20, in.readInt()));
-            foodCount = Math.max(0, in.readInt());
+            if (in.available() >= 4) in.readInt(); // discard legacy food count
         }
         yaw = savedPlayerYaw;
         in.close();
@@ -448,6 +447,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         inventoryImage = ResourceImages.load("/mcj2me/inventory.png");
         setupStage = "loading /mcj2me/items.png";
         Image itemsImage = ResourceImages.load("/mcj2me/items.png");
+        hudIconsImage = ResourceImages.load("/mcj2me/icons.png");
         setupStage = "creating inventory icon 0 (grass)";
         blockIcons[0] = createGuiBlockIcon(GUI_ICON_X[0], GUI_ICON_Y[0]);
         setupStage = "creating inventory icon 1 (dirt)";
@@ -826,12 +826,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         g.drawString(daylightLevel > 0.42f ? "DAY" : "NIGHT", w - 5, 4,
             Graphics.TOP | Graphics.RIGHT);
         if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
-            g.setColor(0x101820);
-            g.fillRect(3, 20, Math.min(w - 6, 128), 28);
-            g.setColor(health > 6 ? 0xFF5555 : 0xFF2222);
-            g.drawString("HP " + health + "/20", 7, 20, Graphics.TOP | Graphics.LEFT);
-            g.setColor(0xFFCC55);
-            g.drawString("Food " + foodCount + "  (0 eat)", 7, 34, Graphics.TOP | Graphics.LEFT);
+            int heartY=h-36, heartX=(w-90)/2;
+            for(int heart=0;heart<10;heart++){
+                int value=health-heart*2, sx=value>=2?52:(value==1?61:16);
+                if(hudIconsImage!=null)g.drawRegion(hudIconsImage,sx,0,9,9,0,
+                    heartX+heart*9,heartY,Graphics.TOP|Graphics.LEFT);
+            }
         } else {
             g.setColor(0xDDDDDD);
             g.drawString("CREATIVE", w - 5, 20, Graphics.TOP | Graphics.RIGHT);
@@ -971,8 +971,6 @@ final class WorldCanvas extends Canvas implements Runnable {
             actionCooldown = 4;
         } else if (keyCode == '*' || keyCode == 42) {
             cycleSelectedBlock(1);
-        } else if (keyCode == '0' && worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
-            eatFood();
         } else if (keyCode == '7') {
             cycleSelectedBlock(-1);
         } else if (keyCode == '9') {
@@ -985,9 +983,8 @@ final class WorldCanvas extends Canvas implements Runnable {
                 if (isSwimming()) {
                     verticalVelocity = Math.max(verticalVelocity, 0.24f);
                     airborne = true;
-                } else if (!airborne) {
-                    verticalVelocity = JUMP_SPEED;
-                    airborne = true;
+                } else if (!airborne || cameraY <= getGroundHeightBelow(cameraX,cameraZ,cameraY-PLAYER_EYE_HEIGHT)+PLAYER_EYE_HEIGHT+0.12f) {
+                    verticalVelocity=JUMP_SPEED; airborne=true;
                 }
             } else if (flying) {
                 // Like Minecraft creative: tap jump twice quickly to stop flying.
@@ -1006,10 +1003,8 @@ final class WorldCanvas extends Canvas implements Runnable {
                 // Tap jump twice quickly: enable creative-style flight.
                 flying = true;
                 verticalVelocity = 0.0f;
-            } else if (!airborne) {
-                verticalVelocity = JUMP_SPEED;
-                airborne = true;
-                jumpTapWindowTicks = 12;
+            } else if (!airborne || cameraY <= getGroundHeightBelow(cameraX,cameraZ,cameraY-PLAYER_EYE_HEIGHT)+PLAYER_EYE_HEIGHT+0.12f) {
+                verticalVelocity=JUMP_SPEED; airborne=true; jumpTapWindowTicks=12;
             }
         }
     }
@@ -1820,14 +1815,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (hostileMobs != null && hostileMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch)) {
             if (hostileMobs.consumeDeathEvent()) {
                 spawnMobDeathParticles(hostileMobs.getDeathX(), hostileMobs.getDeathY(), hostileMobs.getDeathZ());
-                if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) spawnDroppedFood(hostileMobs.getDeathX(), hostileMobs.getDeathY(), hostileMobs.getDeathZ());
             }
             return true;
         }
         if (passiveMobs != null && passiveMobs.hit(cameraX, cameraY, cameraZ, yaw, pitch)) {
             if (passiveMobs.consumeDeathEvent()) {
                 spawnMobDeathParticles(passiveMobs.getDeathX(), passiveMobs.getDeathY(), passiveMobs.getDeathZ());
-                if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) spawnDroppedFood(passiveMobs.getDeathX(), passiveMobs.getDeathY(), passiveMobs.getDeathZ());
             }
             return true;
         }
@@ -2000,7 +1993,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             float dy = droppedY[i] - cameraY;
             float dz = droppedZ[i] - cameraZ;
             if (dx*dx + dy*dy + dz*dz < 1.75f * 1.75f) {
-                if (droppedTypes[i] < 0) addFood(1);
+                if (droppedTypes[i] < 0) { droppedItemGroup.removeChild(mesh); droppedMeshes[i]=null; droppedTypes[i]=0; continue; }
                 else if (droppedTypes[i] < inventory.length && inventory[droppedTypes[i]] < 64)
                     inventory[droppedTypes[i]]++;
                 droppedItemGroup.removeChild(mesh);
@@ -2010,21 +2003,6 @@ final class WorldCanvas extends Canvas implements Runnable {
                 droppedMeshes[i] = null;
             }
         }
-    }
-
-    private void addFood(int amount) {
-        foodCount += amount;
-        if (foodCount > 64) foodCount = 64;
-        foodMessageTicks = 30;
-    }
-
-    private void eatFood() {
-        if (worldMode != IndevViewerMIDlet.MODE_SURVIVAL || foodCount <= 0 || health >= 20) return;
-        foodCount--;
-        health += 4;
-        if (health > 20) health = 20;
-        foodMessageTicks = 25;
-        repaint();
     }
 
     private void tickSurvival() {
@@ -2039,7 +2017,6 @@ final class WorldCanvas extends Canvas implements Runnable {
             foodMessageTicks = 25;
             if (health == 0) {
                 health = 10;
-                foodCount = 0;
                 cameraX = 64.0f;
                 cameraZ = 105.0f;
                 cameraY = terrain.getHeight((int)cameraX, (int)cameraZ) + PLAYER_EYE_HEIGHT + 0.1f;
@@ -3445,15 +3422,15 @@ final class WorldCanvas extends Canvas implements Runnable {
         int glow = IndevViewerMIDlet.humbleMode ? 0 : torchGlowAt(centerX, centerY, centerZ);
         int shade = baseShade + glow;
         if (shade > 255) shade = 255;
-        int firstVertex = vertex;
-        vertex = addVertex(positions, texCoords, colors, vertex, x0, y0, z0,
-                           tileX, tileY, 0, shade);
-        vertex = addVertex(positions, texCoords, colors, vertex, x1, y1, z1,
-                           tileX, tileY, 1, shade);
-        vertex = addVertex(positions, texCoords, colors, vertex, x2, y2, z2,
-                           tileX, tileY, 2, shade);
-        vertex = addVertex(positions, texCoords, colors, vertex, x3, y3, z3,
-                           tileX, tileY, 3, shade);
+        int firstVertex=vertex;
+        boolean horizontal=y0==y1&&y0==y2&&y0==y3, xFace=x0==x1&&x0==x2&&x0==x3;
+        int minX=Math.min(Math.min(x0,x1),Math.min(x2,x3)),maxX=Math.max(Math.max(x0,x1),Math.max(x2,x3));
+        int minY=Math.min(Math.min(y0,y1),Math.min(y2,y3)),maxY=Math.max(Math.max(y0,y1),Math.max(y2,y3));
+        int minZ=Math.min(Math.min(z0,z1),Math.min(z2,z3)),maxZ=Math.max(Math.max(z0,z1),Math.max(z2,z3));
+        vertex=addVertex(positions,texCoords,colors,vertex,x0,y0,z0,tileX,tileY,uvU(x0,z0,horizontal,xFace,minX,maxX,minZ,maxZ),uvV(y0,z0,horizontal,minY,maxY,minZ,maxZ),shade);
+        vertex=addVertex(positions,texCoords,colors,vertex,x1,y1,z1,tileX,tileY,uvU(x1,z1,horizontal,xFace,minX,maxX,minZ,maxZ),uvV(y1,z1,horizontal,minY,maxY,minZ,maxZ),shade);
+        vertex=addVertex(positions,texCoords,colors,vertex,x2,y2,z2,tileX,tileY,uvU(x2,z2,horizontal,xFace,minX,maxX,minZ,maxZ),uvV(y2,z2,horizontal,minY,maxY,minZ,maxZ),shade);
+        vertex=addVertex(positions,texCoords,colors,vertex,x3,y3,z3,tileX,tileY,uvU(x3,z3,horizontal,xFace,minX,maxX,minZ,maxZ),uvV(y3,z3,horizontal,minY,maxY,minZ,maxZ),shade);
         if (glow > 0) {
             int green = shade - glow / 5;
             int blue = shade - glow / 2;
@@ -3492,9 +3469,17 @@ final class WorldCanvas extends Canvas implements Runnable {
         return glow;
     }
 
+    private int uvU(int x,int z,boolean horizontal,boolean xFace,int minX,int maxX,int minZ,int maxZ) {
+        int value=(horizontal||!xFace)?x:z,min=(horizontal||!xFace)?minX:minZ,max=(horizontal||!xFace)?maxX:maxZ;
+        return value==max&&max!=min?1:0;
+    }
+    private int uvV(int y,int z,boolean horizontal,int minY,int maxY,int minZ,int maxZ) {
+        int value=horizontal?z:y,min=horizontal?minZ:minY,max=horizontal?maxZ:maxY;
+        return value==max&&max!=min?1:0;
+    }
     private int addVertex(short[] positions, short[] texCoords, byte[] colors,
                           int vertex, int x, int y, int z,
-                          int tileX, int tileY, int corner, int shade) {
+                          int tileX, int tileY, int uFraction, int vFraction, int shade) {
         int p = vertex * 3;
         positions[p] = (short) x;
         positions[p + 1] = (short) y;
@@ -3509,15 +3494,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         int right = (tileX + 1) * 16 - 1;
         int top = tileY * 16 + 1;
         int bottom = (tileY + 1) * 16 - 1;
-        int u, v;
-        // Restore the previous UV orientation for plants and ordinary blocks.
-        // Ore tiles alone are mirrored horizontally to correct their artwork.
-        boolean oreTile = (tileX == 2 && (tileY == 1 || tileY == 2 || tileY == 3))
-            || (tileX == 1 && tileY == 2);
-        boolean grassSideTile = tileX == 3 && tileY == 0;
-        u = (corner == 0 || corner == 2) ? left : right;
-        v = (corner == 0 || corner == 1) ? bottom : top;
-        if (oreTile || grassSideTile) u = (corner == 0 || corner == 2) ? right : left;
+        boolean oreTile=(tileX==2&&(tileY==1||tileY==2||tileY==3))||(tileX==1&&tileY==2);
+        boolean grassSideTile=tileX==3&&tileY==0;
+        if(oreTile||grassSideTile)uFraction=1-uFraction;
+        int u=uFraction==0?left:right, v=vFraction==0?bottom:top;
         int t = vertex * 2;
         texCoords[t] = (short) u;
         texCoords[t + 1] = (short) v;
