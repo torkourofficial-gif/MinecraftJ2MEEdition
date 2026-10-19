@@ -1284,12 +1284,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         // standard 4x12x4 cuboid at atlas origin (40,16), including all six faces.
         int x=40, y=16, w=4, h=12, d=4;
         int[][] rects = {
-            {x+d, y+d, x+d+w, y+d+h},             // front
-            {x+d+w+d, y+d, x+d+w+d+w, y+d+h},     // back
-            {x, y+d, x+d, y+d+h},                 // outer side
-            {x+d+w, y+d, x+d+w+d, y+d+h},         // inner side
-            {x+d, y, x+d+w, y+d},                 // top
-            {x+d+w, y, x+d+w+w, y+d}              // bottom
+            {x+d, y+d, x+d+w, y+d+h},             // front: 4x12
+            {x+d+w+d, y+d, x+d+w+d+w, y+d+h},     // back: 4x12
+            {x, y+d, x+d, y+d+h},                 // outer side: 4x12
+            {x+d+w, y+d, x+d+w+d, y+d+h},         // inner side: 4x12
+            {x+d, y, x+d+w, y+d},                 // top: 4x4
+            {x+d+w, y, x+d+w+d, y+d}              // bottom: 4x4
         };
         short[] p = {
             -2,-6,-2, -2,6,-2, 2,-6,-2, 2,6,-2,
@@ -1460,9 +1460,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         // inside the view instead of letting it drift off the lower-right edge.
         // Move it toward the center and slightly upward compared with landscape Minecraft.
         float forward=0.46f, right=0.24f, down=0.20f;
-        // Blocks sit just a little farther right/down than the empty hand,
-        // while remaining comfortably inside the portrait viewport.
-        if (hasItem && !foodItem) { right += 0.025f; down += 0.02f; }
+        // The empty arm needs its own portrait placement: keep it lower-right
+        // like Minecraft, but pull it inward/up so the forearm stays visible.
+        if (arm && !foodItem) { right=0.16f; down=0.13f; }
+        // Held blocks sit only slightly farther right/down than the hand.
+        if (hasItem && !foodItem && !arm) { right += 0.025f; down += 0.02f; }
         float swingX=0.0f, swingY=0.0f, swingZ=0.0f;
         if (eatingTicks > 0) {
             int elapsed=EATING_DURATION_TICKS-eatingTicks;
