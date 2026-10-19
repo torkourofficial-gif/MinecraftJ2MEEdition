@@ -1207,15 +1207,10 @@ final class WorldCanvas extends Canvas implements Runnable {
                 repaint();
                 return;
             }
-                if (keyCode == '1' || keyCode == '2' || keyCode == '3') {
+            if (keyCode == '1' || keyCode == '2' || keyCode == '3') {
                 craftingRecipeCursor = keyCode - '1';
                 if (craftingRecipeCursor >= crafts.inventoryRecipeCount())
                     craftingRecipeCursor = crafts.inventoryRecipeCount() - 1;
-                repaint();
-                return;
-            }
-            if (keyCode == '0') {
-                craftRecipe(crafts.inventoryRecipeAt(craftingRecipeCursor));
                 repaint();
                 return;
             }
