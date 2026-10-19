@@ -676,14 +676,14 @@ final class WorldCanvas extends Canvas implements Runnable {
         setupStage = "building block-particle meshes";
         setupBlockParticles(atlas);
         world.addChild(blockParticleGroup);
-        // First-person hand/item is the final 3D pass in the scene graph.
-        // Its appearance disables depth testing, so terrain, mobs, water and
-        // particles cannot cover it; the 2D HUD is drawn afterward in paint().
-        world.addChild(heldItemGroup);
         setupStage = "loading passive mob textures";
         passiveMobs = new PassiveMob(world, terrain, cameraX, cameraZ);
         setupStage = "loading hostile mob texture";
         hostileMobs = new HostileMob(world, terrain, cameraX, cameraZ);
+        // Add the first-person model last: depth testing is disabled for its
+        // appearances, so it overlays the entire 3D scene. paint() draws HUD/UI
+        // only after the M3G pass, keeping those elements in front of the hand.
+        world.addChild(heldItemGroup);
         setupStage = "updating camera and building initial terrain chunks";
         updateCamera();
         updateChunks();
