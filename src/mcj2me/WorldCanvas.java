@@ -239,8 +239,11 @@ final class WorldCanvas extends Canvas implements Runnable {
     private final float[] blockParticleSize = new float[BLOCK_PARTICLE_COUNT];
     private final Mesh[] blockParticleMeshes = new Mesh[BLOCK_PARTICLE_COUNT];
     private Group blockParticleGroup;
-    private VertexBuffer blockParticleBuffer;
+    private final VertexBuffer[] blockParticleBuffers = new VertexBuffer[BLOCK_PARTICLE_COUNT];
+    private final VertexArray[] blockParticleTexArrays = new VertexArray[BLOCK_PARTICLE_COUNT];
+    private final short[][] blockParticleUvByType = new short[BLOCK_TILE_X.length][];
     private TriangleStripArray blockParticleTriangles;
+    // Every debris fragment shares one atlas-backed appearance; only its UVs vary.
     private Appearance[] blockParticleAppearances = new Appearance[BLOCK_TILE_X.length];
     private Appearance mobDeathParticleAppearance;
     private float cameraX = 64.0f;
@@ -3802,45 +3805,43 @@ final class WorldCanvas extends Canvas implements Runnable {
      * patch from its block's atlas tile, like classic Minecraft block debris.
      */
     private void setupBlockParticles(Image atlas) {
-        // Minecraft-style debris uses a single flat, camera-facing sprite.
-        // It falls and slides, but never spins like a miniature cube.
+        // All debris fragments share one quad's positions and one atlas-backed
+        // appearance. Per-particle UV VertexArrays select the correct 8x8
+        // patch, avoiding dozens of tiny Image2D/Texture2D objects.
         short[] positions = {
             -1, -1, 0,
             -1,  1, 0,
              1, -1, 0,
              1,  1, 0
         };
-        short[] texCoords = {0, 0, 0, 1, 1, 0, 1, 1};
         int[] indices = {0, 1, 2, 3};
         int[] stripLengths = {4};
-        VertexArray vertexArray = new VertexArray(4, 3, 2);
-        vertexArray.set(0, 4, positions);
-        VertexArray texArray = new VertexArray(4, 2, 2);
-        texArray.set(0, 4, texCoords);
-        blockParticleBuffer = new VertexBuffer();
-        blockParticleBuffer.setPositions(vertexArray, 0.5f, null);
-        blockParticleBuffer.setTexCoords(0, texArray, 1.0f, null);
+        VertexArray positionArray = new VertexArray(4, 3, 2);
+        positionArray.set(0, 4, positions);
         blockParticleTriangles = new TriangleStripArray(indices, stripLengths);
 
-        int[] patchPixels = new int[8 * 8];
+        Appearance particleAppearance = new Appearance();
+        particleAppearance.setTexture(0, terrainTexture);
+        particleAppearance.setFog(distanceFog);
+        PolygonMode particleMode = new PolygonMode();
+        particleMode.setCulling(PolygonMode.CULL_NONE);
+        particleMode.setShading(PolygonMode.SHADE_FLAT);
+        particleAppearance.setPolygonMode(particleMode);
+
         for (int t = 0; t < blockParticleAppearances.length; t++) {
             int tileX = BLOCK_TILE_X[t] * 16 + 4;
             int tileY = BLOCK_TILE_Y[t] * 16 + 4;
-            atlas.getRGB(patchPixels, 0, 8, tileX, tileY, 8, 8);
-            Image patch = Image.createRGBImage(patchPixels, 8, 8, true);
-            Texture2D texture = new Texture2D(new Image2D(Image2D.RGBA, patch));
-            texture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
-            texture.setWrapping(Texture2D.WRAP_CLAMP, Texture2D.WRAP_CLAMP);
-
-            Appearance appearance = new Appearance();
-            appearance.setTexture(0, texture);
-            appearance.setFog(distanceFog);
-            PolygonMode pm = new PolygonMode();
-            pm.setCulling(PolygonMode.CULL_NONE);
-            pm.setShading(PolygonMode.SHADE_FLAT);
-            appearance.setPolygonMode(pm);
-            blockParticleAppearances[t] = appearance;
+            blockParticleUvByType[t] = new short[] {
+                (short)tileX, (short)tileY,
+                (short)tileX, (short)(tileY + 8),
+                (short)(tileX + 8), (short)tileY,
+                (short)(tileX + 8), (short)(tileY + 8)
+            };
+            // Keep the existing type-indexed lookup API while sharing the
+            // exact same M3G Appearance object for every block particle.
+            blockParticleAppearances[t] = particleAppearance;
         }
+
         int[] grayPixel = {0xFF858585};
         Image grayImage = Image.createRGBImage(grayPixel, 1, 1, true);
         Texture2D grayTexture = new Texture2D(new Image2D(Image2D.RGBA, grayImage));
@@ -3855,8 +3856,15 @@ final class WorldCanvas extends Canvas implements Runnable {
         mobDeathParticleAppearance.setPolygonMode(grayMode);
 
         for (int i = 0; i < BLOCK_PARTICLE_COUNT; i++) {
-            blockParticleMeshes[i] = new Mesh(blockParticleBuffer,
-                blockParticleTriangles, blockParticleAppearances[0]);
+            VertexArray texArray = new VertexArray(4, 2, 2);
+            texArray.set(0, 4, blockParticleUvByType[0]);
+            blockParticleTexArrays[i] = texArray;
+            VertexBuffer buffer = new VertexBuffer();
+            buffer.setPositions(positionArray, 0.5f, null);
+            buffer.setTexCoords(0, texArray, 1.0f / 256.0f, null);
+            blockParticleBuffers[i] = buffer;
+            blockParticleMeshes[i] = new Mesh(buffer,
+                blockParticleTriangles, particleAppearance);
             blockParticleMeshes[i].setRenderingEnable(false);
             blockParticleGroup.addChild(blockParticleMeshes[i]);
         }
@@ -3885,6 +3893,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             blockParticleVZ[i] = (dz / directionLength) * horizontalSpeed;
             blockParticleVY[i] = 0.015f + particleRandom.nextFloat() * 0.085f;
             blockParticleSize[i] = 0.045f + particleRandom.nextFloat() * 0.035f;
+            blockParticleTexArrays[i].set(0, 4, blockParticleUvByType[type]);
             blockParticleMeshes[i].setAppearance(0, blockParticleAppearances[type]);
             blockParticleMeshes[i].setScale(blockParticleSize[i], blockParticleSize[i],
                                              blockParticleSize[i]);
