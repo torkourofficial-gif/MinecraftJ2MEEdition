@@ -20,9 +20,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     private static final int CONTROL_JUMP = 8, CONTROL_BREAK = 9, CONTROL_PLACE = 10;
     private static final int CHUNK = 16;
     private static final int RADIUS = 1;
-    private static final float PLAYER_HEIGHT = 2.0f;
+    private static final float PLAYER_HEIGHT = 1.8f; // Minecraft player AABB: 0.6 x 1.8 blocks.
     private static final float PLAYER_EYE_HEIGHT = 1.62f;
     private static final float PLAYER_HEAD_OFFSET = PLAYER_HEIGHT - PLAYER_EYE_HEIGHT;
+    private static final float PLAYER_HALF_WIDTH = 0.30f;
     private static final float BLOCK_REACH = 5.0f;
 
     private static final float MOVE_SPEED = 0.20f;
@@ -1055,7 +1056,9 @@ final class WorldCanvas extends Canvas implements Runnable {
             verticalVelocity -= 0.006f;
             if (verticalVelocity < -0.035f) verticalVelocity = -0.035f;
             if (verticalVelocity > 0.20f) verticalVelocity = 0.20f;
-            cameraY += verticalVelocity;
+            float nextCameraY = cameraY + verticalVelocity;
+            if (canOccupyAt(cameraX, nextCameraY - PLAYER_EYE_HEIGHT, cameraZ)) cameraY = nextCameraY;
+            else { verticalVelocity = 0.0f; }
 
             // Water never disables solid-ground collision. Keep the player's
             // feet above the terrain even while buoyancy/gravity is active.
@@ -1065,7 +1068,9 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
             changed = true;
         } else if (airborne) {
-            cameraY += verticalVelocity;
+            float nextCameraY = cameraY + verticalVelocity;
+            if (canOccupyAt(cameraX, nextCameraY - PLAYER_EYE_HEIGHT, cameraZ)) cameraY = nextCameraY;
+            else { verticalVelocity = 0.0f; }
             verticalVelocity -= GRAVITY;
             if (cameraY <= groundY) {
                 cameraY = groundY;
@@ -1105,14 +1110,18 @@ final class WorldCanvas extends Canvas implements Runnable {
      * movement and prevents diagonal corner clipping.
      */
     private boolean canOccupy(float x, float z) {
+        return canOccupyAt(x, cameraY - PLAYER_EYE_HEIGHT, z);
+    }
+
+    /** Minecraft-sized player AABB tested against every voxel it overlaps. */
+    private boolean canOccupyAt(float x, float feetY, float z) {
         if (x < 1.0f || z < 1.0f || x > 126.0f || z > 126.0f) return false;
 
-        float feetY = cameraY - PLAYER_EYE_HEIGHT;
         float headY = feetY + PLAYER_HEIGHT;
-        int minX = (int) Math.floor(x - 0.30f);
-        int maxX = (int) Math.floor(x + 0.30f);
-        int minZ = (int) Math.floor(z - 0.30f);
-        int maxZ = (int) Math.floor(z + 0.30f);
+        int minX = floorVoxel(x - PLAYER_HALF_WIDTH + 0.001f);
+        int maxX = floorVoxel(x + PLAYER_HALF_WIDTH - 0.001f);
+        int minZ = floorVoxel(z - PLAYER_HALF_WIDTH + 0.001f);
+        int maxZ = floorVoxel(z + PLAYER_HALF_WIDTH - 0.001f);
         int firstBodyY = Math.max(0, (int) Math.floor(feetY + 0.02f));
         int lastBodyY = Math.min(TerrainGenerator.HEIGHT - 1,
             (int) Math.floor(headY - 0.02f));
@@ -2648,12 +2657,11 @@ final class WorldCanvas extends Canvas implements Runnable {
             return;
         }
         if (h >= TerrainGenerator.HEIGHT - 3) return;
-        if (!isPlacementSpaceClear(x, h, z, 1)) return;
-        terrain.setHeight(x, z, h + 1);
-        terrain.setTopType(x, z, selectedSlot);
-        inventory[selectedSlot]--;
-        invalidateEditedArea(x, x, z, z);
-        resolvePlayerAfterTerrainEdit();
+        // The current terrain model stores a single top block per X/Z column.
+        // Raising that column here overwrote the true subsurface material and
+        // created phantom faces. Refuse solid-block placement rather than corrupting terrain.
+        // Decorations and water buckets remain placeable until sparse placed voxels
+        // have their own persistent storage and independent mesh generation.
     }
 
     /**
