@@ -593,52 +593,55 @@ final class WorldCanvas extends Canvas implements Runnable {
         // Leather is the item directly below the raw porkchop in items.png.
         // Use the real 16x16 atlas sprite rather than a generated text/icon placeholder.
         blockIcons[crafts.LEATHER] = createFoodItemsIcon(itemsImage, 7, 6);
+        // Beta-era items.png is a 16x16 grid. Coordinates passed below are
+        // (column, row), while atlas references often document (row, column);
+        // keeping the axes straight is essential or the icon becomes another item.
         // Crafting ingredients/results use original items.png sprites wherever available.
-        mapCraftItemIcon(itemsImage, crafts.STICK, 8, 2);
+        mapCraftItemIcon(itemsImage, crafts.STICK, 5, 3);
         // These are blocks, not item sprites: Beta 1.6 stores their block
         // faces in terrain.png (loaded as "atlas"). Using items.png here
         // sampled unrelated item sprites and made the recipe icons incorrect.
         blockIcons[crafts.CRAFTING_TABLE] = createTerrainBlockIcon(atlas, 10, 3);
         mapCraftItemIcon(itemsImage, crafts.COAL, 7, 0);
         mapCraftItemIcon(itemsImage, crafts.CHARCOAL, 7, 0);
-        mapCraftItemIcon(itemsImage, crafts.IRON_INGOT, 9, 0);
-        mapCraftItemIcon(itemsImage, crafts.GOLD_INGOT, 10, 0);
-        mapCraftItemIcon(itemsImage, crafts.DIAMOND, 8, 0);
-        mapCraftItemIcon(itemsImage, crafts.FLINT, 6, 2);
-        mapCraftItemIcon(itemsImage, crafts.STRING, 8, 3);
-        mapCraftItemIcon(itemsImage, crafts.FEATHER, 8, 4);
-        mapCraftItemIcon(itemsImage, crafts.PAPER, 9, 3);
-        mapCraftItemIcon(itemsImage, crafts.BOOK, 10, 3);
+        mapCraftItemIcon(itemsImage, crafts.IRON_INGOT, 7, 1);
+        mapCraftItemIcon(itemsImage, crafts.GOLD_INGOT, 7, 2);
+        mapCraftItemIcon(itemsImage, crafts.DIAMOND, 7, 3);
+        mapCraftItemIcon(itemsImage, crafts.FLINT, 6, 0);
+        mapCraftItemIcon(itemsImage, crafts.STRING, 8, 0);
+        mapCraftItemIcon(itemsImage, crafts.FEATHER, 8, 1);
+        mapCraftItemIcon(itemsImage, crafts.PAPER, 10, 3);
+        mapCraftItemIcon(itemsImage, crafts.BOOK, 11, 3);
         blockIcons[crafts.CHEST] = createTerrainBlockIcon(atlas, 6, 3);
         blockIcons[crafts.FURNACE] = createTerrainBlockIcon(atlas, 13, 3);
-        mapCraftItemIcon(itemsImage, crafts.LADDER, 7, 3);
-        mapCraftItemIcon(itemsImage, crafts.SIGN, 6, 3);
-        mapCraftItemIcon(itemsImage, crafts.BOWL, 8, 5);
-        mapCraftItemIcon(itemsImage, crafts.BREAD, 6, 4);
-        mapCraftItemIcon(itemsImage, crafts.WOODEN_PICKAXE, 14, 0);
-        mapCraftItemIcon(itemsImage, crafts.STONE_PICKAXE, 2, 1);
-        mapCraftItemIcon(itemsImage, crafts.IRON_PICKAXE, 1, 0);
-        mapCraftItemIcon(itemsImage, crafts.DIAMOND_PICKAXE, 6, 1);
-        mapCraftItemIcon(itemsImage, crafts.WOODEN_AXE, 15, 0);
-        mapCraftItemIcon(itemsImage, crafts.STONE_AXE, 3, 1);
-        mapCraftItemIcon(itemsImage, crafts.IRON_AXE, 2, 0);
-        mapCraftItemIcon(itemsImage, crafts.DIAMOND_AXE, 7, 1);
-        mapCraftItemIcon(itemsImage, crafts.WOODEN_SHOVEL, 13, 0);
-        mapCraftItemIcon(itemsImage, crafts.STONE_SHOVEL, 1, 1);
-        mapCraftItemIcon(itemsImage, crafts.IRON_SHOVEL, 0, 0);
-        mapCraftItemIcon(itemsImage, crafts.DIAMOND_SHOVEL, 5, 1);
-        mapCraftItemIcon(itemsImage, crafts.WOODEN_SWORD, 12, 0);
-        mapCraftItemIcon(itemsImage, crafts.STONE_SWORD, 0, 1);
-        mapCraftItemIcon(itemsImage, crafts.IRON_SWORD, 11, 0);
-        mapCraftItemIcon(itemsImage, crafts.DIAMOND_SWORD, 4, 1);
-        mapCraftItemIcon(itemsImage, crafts.WOODEN_HOE, 15, 1);
-        mapCraftItemIcon(itemsImage, crafts.STONE_HOE, 3, 2);
-        mapCraftItemIcon(itemsImage, crafts.IRON_HOE, 2, 2);
-        mapCraftItemIcon(itemsImage, crafts.DIAMOND_HOE, 7, 2);
-        mapCraftItemIcon(itemsImage, crafts.BOW, 5, 0);
-        mapCraftItemIcon(itemsImage, crafts.ARROW, 6, 0);
+        mapCraftItemIcon(itemsImage, crafts.LADDER, 7, 0);
+        mapCraftItemIcon(itemsImage, crafts.SIGN, 10, 2);
+        mapCraftItemIcon(itemsImage, crafts.BOWL, 7, 4);
+        mapCraftItemIcon(itemsImage, crafts.BREAD, 9, 2);
+        mapCraftItemIcon(itemsImage, crafts.WOODEN_PICKAXE, 0, 6);
+        mapCraftItemIcon(itemsImage, crafts.STONE_PICKAXE, 1, 6);
+        mapCraftItemIcon(itemsImage, crafts.IRON_PICKAXE, 2, 6);
+        mapCraftItemIcon(itemsImage, crafts.DIAMOND_PICKAXE, 3, 6);
+        mapCraftItemIcon(itemsImage, crafts.WOODEN_AXE, 0, 7);
+        mapCraftItemIcon(itemsImage, crafts.STONE_AXE, 1, 7);
+        mapCraftItemIcon(itemsImage, crafts.IRON_AXE, 2, 7);
+        mapCraftItemIcon(itemsImage, crafts.DIAMOND_AXE, 3, 7);
+        mapCraftItemIcon(itemsImage, crafts.WOODEN_SHOVEL, 0, 5);
+        mapCraftItemIcon(itemsImage, crafts.STONE_SHOVEL, 1, 5);
+        mapCraftItemIcon(itemsImage, crafts.IRON_SHOVEL, 2, 5);
+        mapCraftItemIcon(itemsImage, crafts.DIAMOND_SHOVEL, 3, 5);
+        mapCraftItemIcon(itemsImage, crafts.WOODEN_SWORD, 0, 4);
+        mapCraftItemIcon(itemsImage, crafts.STONE_SWORD, 1, 4);
+        mapCraftItemIcon(itemsImage, crafts.IRON_SWORD, 2, 4);
+        mapCraftItemIcon(itemsImage, crafts.DIAMOND_SWORD, 3, 4);
+        mapCraftItemIcon(itemsImage, crafts.WOODEN_HOE, 0, 8);
+        mapCraftItemIcon(itemsImage, crafts.STONE_HOE, 1, 8);
+        mapCraftItemIcon(itemsImage, crafts.IRON_HOE, 2, 8);
+        mapCraftItemIcon(itemsImage, crafts.DIAMOND_HOE, 3, 8);
+        mapCraftItemIcon(itemsImage, crafts.BOW, 5, 1);
+        mapCraftItemIcon(itemsImage, crafts.ARROW, 5, 2);
         mapCraftItemIcon(itemsImage, crafts.BUCKET, 10, 4);
-        mapCraftItemIcon(itemsImage, crafts.FLINT_AND_STEEL, 3, 0);
+        mapCraftItemIcon(itemsImage, crafts.FLINT_AND_STEEL, 5, 0);
         mapCraftItemIcon(itemsImage, crafts.LEATHER, 7, 6);
         for (int ci = 44; ci < blockIcons.length; ci++)
             if (blockIcons[ci] == null) blockIcons[ci] = createItemsIcon(itemsImage, ci % 16, ci / 16);
