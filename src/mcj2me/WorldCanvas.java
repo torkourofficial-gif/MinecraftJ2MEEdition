@@ -2377,16 +2377,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                     && Math.abs(z - centerZ) <= RADIUS;
                 // Retain nearby chunks behind the camera; unload only outside range.
                 if (!inRange) {
-                    Group old = activeChunks[x][z];
-                    if (old != null) {
-                        terrainGroup.removeChild(old);
-                        activeChunks[x][z] = null;
-                    }
-                    Mesh oldWater = activeWaterChunks[x][z];
-                    if (oldWater != null) {
-                        waterGroup.removeChild(oldWater);
-                        activeWaterChunks[x][z] = null;
-                    }
+                    removeChunkMeshes(x, z);
                     builtChunks[x][z] = false;
                 }
             }
@@ -2423,6 +2414,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
 
         if (bestX >= 0) {
+            // An edited chunk keeps its old mesh visible until its replacement
+            // is ready. Detach it only now, immediately before rebuilding, so
+            // repeated edits in the same tick cannot cause visible holes or
+            // repeatedly discard meshes that have not yet been rebuilt.
+            removeChunkMeshes(bestX, bestZ);
+            if (Runtime.getRuntime().freeMemory() < 1024 * 1024) System.gc();
             Group mesh = buildChunk(bestX, bestZ);
             if (mesh != null) {
                 activeChunks[bestX][bestZ] = mesh;
@@ -2455,6 +2452,9 @@ final class WorldCanvas extends Canvas implements Runnable {
      * player remains inside the same chunk. Synchronization prevents the game
      * loop from racing the key handler while meshes are removed and recreated. */
     private synchronized void invalidateEditedArea(int minX, int maxX, int minZ, int maxZ) {
+        // A voxel can change the exposed faces of its horizontal neighbors.
+        // Expand by one cell, which naturally includes the adjacent chunk only
+        // when the edit is on a chunk boundary.
         minX = Math.max(1, minX - 1);
         maxX = Math.min(TerrainGenerator.SIZE - 2, maxX + 1);
         minZ = Math.max(1, minZ - 1);
@@ -2463,21 +2463,28 @@ final class WorldCanvas extends Canvas implements Runnable {
         int minChunkZ = minZ / CHUNK, maxChunkZ = maxZ / CHUNK;
         for (int x = minChunkX; x <= maxChunkX; x++) {
             for (int z = minChunkZ; z <= maxChunkZ; z++) {
-                Group old = activeChunks[x][z];
-                if (old != null) {
-                    terrainGroup.removeChild(old);
-                    activeChunks[x][z] = null;
-                }
-                Mesh oldWater = activeWaterChunks[x][z];
-                if (oldWater != null) {
-                    waterGroup.removeChild(oldWater);
-                    activeWaterChunks[x][z] = null;
-                }
+                // Mark for rebuilding but keep the previous mesh attached.
+                // This coalesces rapid edits (especially spreading water) and
+                // avoids a blank chunk while its replacement waits in the queue.
                 builtChunks[x][z] = false;
             }
         }
-        // Let the normal game loop rebuild at most one chunk per tick.
+        // The regular game loop rebuilds at most one dirty chunk per tick.
         chunksDirty = true;
+    }
+
+    /** Detach both scene-graph meshes for one chunk without rebuilding it. */
+    private void removeChunkMeshes(int x, int z) {
+        Group old = activeChunks[x][z];
+        if (old != null) {
+            terrainGroup.removeChild(old);
+            activeChunks[x][z] = null;
+        }
+        Mesh oldWater = activeWaterChunks[x][z];
+        if (oldWater != null) {
+            waterGroup.removeChild(oldWater);
+            activeWaterChunks[x][z] = null;
+        }
     }
 
     private synchronized void reloadEditedChunks() {
