@@ -4507,7 +4507,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (terrain.getBlockTypeAt(x, by, z) >= 0 ||
                 terrain.isLeafBlockAt(x, by, z)) return false;
             if (terrain.isTreeAt(x, z)) {
-                int treeBase = terrain.getHeight(x, z);
+                int treeBase = terrain.getTreeBaseHeight(x, z);
                 int treeTop = treeBase + terrain.getTreeHeight(x, z);
                 if (by >= treeBase && by < treeTop) return false;
             }
