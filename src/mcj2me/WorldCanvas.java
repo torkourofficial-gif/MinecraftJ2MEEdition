@@ -1943,6 +1943,8 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     private void spawnDroppedBlock(int type, float x, float y, float z) {
         if (type < 0 || type >= blockIcons.length || type == TerrainGenerator.BLOCK_BEDROCK) return;
+        // In classic Minecraft, mining grass without Silk Touch drops dirt.
+        if (type == TerrainGenerator.BLOCK_GRASS) type = TerrainGenerator.BLOCK_DIRT;
         spawnDroppedItem(type, blockIcons[type], x, y, z);
     }
 
@@ -2032,8 +2034,6 @@ final class WorldCanvas extends Canvas implements Runnable {
                     || (tileX[face]==1 && tileY[face]==2);
                 // Grass-side UVs are already oriented for the dropped cube.
                 if(ore)uf=1-uf;
-                // Dirt's dropped cube uses vertically flipped terrain UVs.
-                if(type==TerrainGenerator.BLOCK_DIRT)vf=1-vf;
                 uv[b+k*2]=(short)(uf*1024); uv[b+k*2+1]=(short)(vf*1024);
             }
             int[] faceVertexIndices={base,base+1,base+2,base+3};
@@ -3537,7 +3537,11 @@ final class WorldCanvas extends Canvas implements Runnable {
                 // Intersect the actual top plane during this ray segment. This
                 // also catches shallow/diagonal views that enter the cell from a side.
                 if (dy < -0.0001f && surface > 0
-                        && terrain.getBlockTypeAt(x, surface - 1, z) >= 0) {
+                        && terrain.getBlockTypeAt(x, surface - 1, z) >= 0
+                        // Only use the height-map top plane when its target cell
+                        // is air. If a placed block sits here, let voxel DDA hit
+                        // that block so another block can be placed on top.
+                        && terrain.getBlockTypeAt(x, surface, z) < 0) {
                     float topDistance = (surface - cameraY) / dy;
                     if (topDistance >= distance - 0.0001f
                             && topDistance <= nextBoundary + 0.0001f
