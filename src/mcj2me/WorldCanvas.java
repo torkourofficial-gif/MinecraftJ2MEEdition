@@ -183,6 +183,11 @@ final class WorldCanvas extends Canvas implements Runnable {
     // nodes keep their own transforms/appearances, while vertex/index data is shared.
     private final VertexBuffer[] droppedCubeBuffers = new VertexBuffer[BLOCK_TILE_X.length];
     private final IndexBuffer[] droppedCubeIndices = new IndexBuffer[BLOCK_TILE_X.length];
+    // Cache one immutable prototype Mesh per dropped block type. Each entity
+    // receives a duplicate node (so transforms stay independent) while its
+    // vertex/index data and atlas textures can be reused across drops and the
+    // first-person held block. This also avoids rebuilding special-block meshes.
+    private final Mesh[] droppedBlockPrototypes = new Mesh[BLOCK_TILE_X.length];
     // Coordinates are pixel offsets in the 512x512 gui_blocks atlas.
     // The first five entries are the actual grass, dirt, stone, oak-log and
     // leaves cube icons; the remaining blocks are mapped by their own atlas cells.
@@ -3115,6 +3120,9 @@ final class WorldCanvas extends Canvas implements Runnable {
             droppedZ[slot] = z;
             droppedVelocityY[slot] = 0.0f;
             droppedAge[slot] = 0;
+            // Keep world drops visibly smaller than the first-person held item.
+            // Scaling the node does not alter the shared prototype geometry.
+            mesh.setScale(0.80f, 0.80f, 0.80f);
             mesh.setTranslation(x, y, z);
             droppedItemGroup.addChild(mesh);
         } catch (Exception ignored) { }
@@ -3128,6 +3136,18 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Mesh createDroppedBlockMesh(int type) {
         if (type < 0 || type >= BLOCK_TILE_X.length || type >= BLOCK_TILE_Y.length
                 || type >= blockIcons.length) return createDroppedItemMesh(blockIcons[0]);
+        Mesh prototype = droppedBlockPrototypes[type];
+        if (prototype == null) {
+            prototype = buildDroppedBlockMesh(type);
+            droppedBlockPrototypes[type] = prototype;
+        }
+        // M3G nodes cannot be shared between entities with different transforms.
+        // duplicate() preserves independent transforms while reusing the cached
+        // immutable geometry; held-item code replaces appearances on its own node.
+        return (Mesh) prototype.duplicate();
+    }
+
+    private Mesh buildDroppedBlockMesh(int type) {
         // Resolve each face explicitly. Do not infer dropped-block face textures
         // from GUI icon coordinates: those are a different atlas.
         int topX = BLOCK_TILE_X[type], topY = BLOCK_TILE_Y[type];
@@ -3333,8 +3353,13 @@ final class WorldCanvas extends Canvas implements Runnable {
                     droppedVelocityY[i] = 0.0f;
                 }
             }
-            mesh.setOrientation(yaw + droppedAge[i] * 9.0f, 0.0f, 1.0f, 0.0f);
-            mesh.setTranslation(droppedX[i], droppedY[i], droppedZ[i]);
+            // A gentler spin reads as a rotating pickup instead of a blur on
+            // the S730's low frame rate. Once settled, add a tiny visual bob;
+            // physics, collision and pickup distances continue using droppedY.
+            mesh.setOrientation(yaw + droppedAge[i] * 4.0f, 0.0f, 1.0f, 0.0f);
+            float bob = droppedVelocityY[i] == 0.0f
+                ? (float) Math.sin(droppedAge[i] * 0.12f) * 0.025f : 0.0f;
+            mesh.setTranslation(droppedX[i], droppedY[i] + bob, droppedZ[i]);
             float dx = droppedX[i] - cameraX;
             float dy = droppedY[i] - cameraY;
             float dz = droppedZ[i] - cameraZ;
