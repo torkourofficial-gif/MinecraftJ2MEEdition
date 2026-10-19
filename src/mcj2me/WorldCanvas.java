@@ -1262,8 +1262,9 @@ final class WorldCanvas extends Canvas implements Runnable {
                 craftingRecipeCursor = 0;
                 clearKeys();
                 repaint();
+                return;
             }
-            return;
+            // Otherwise preserve the normal "place block" binding for key 3.
         }
 
         if (IndevViewerMIDlet.controlPressed(CONTROL_FORWARD,keyCode,action)) forward=true;
