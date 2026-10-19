@@ -301,6 +301,8 @@ final class TerrainGenerator {
     static final int BLOCK_WOOL_GREEN = 37;
     static final int BLOCK_WOOL_RED = 38;
     static final int BLOCK_WOOL_BLACK = 39;
+    // Stored-world voxel ID; separate from crafts.CRAFTING_TABLE (inventory item ID).
+    static final int BLOCK_CRAFTING_TABLE = 40;
 
     int getTopType(int x, int z) {
         if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) return BLOCK_BEDROCK;
