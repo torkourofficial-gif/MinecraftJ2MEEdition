@@ -2346,25 +2346,42 @@ final class WorldCanvas extends Canvas implements Runnable {
             int pz = rem / TerrainGenerator.SIZE, px = rem - pz * TerrainGenerator.SIZE;
             if (px < startX || px >= startX + CHUNK || pz < startZ || pz >= startZ + CHUNK) continue;
             int type = terrain.getPlacedBlockTypeAtIndex(p);
-            int tx = BLOCK_TILE_X[type], ty = BLOCK_TILE_Y[type];
+            int sideTx = BLOCK_TILE_X[type], sideTy = BLOCK_TILE_Y[type];
+            int topTx = sideTx, topTy = sideTy, bottomTx = sideTx, bottomTy = sideTy;
+            // Placed voxels need the same per-face atlas mapping as natural
+            // blocks and dropped-block meshes. A single tile on all six faces
+            // makes oak logs show their end grain on every side.
+            if (type == TerrainGenerator.BLOCK_GRASS) {
+                sideTx = 3; sideTy = 0;
+                topTx = 0; topTy = 0;
+                bottomTx = 2; bottomTy = 0;
+            } else if (type == TerrainGenerator.BLOCK_WOOD) {
+                sideTx = 4; sideTy = 1;
+                topTx = 5; topTy = 1;
+                bottomTx = 5; bottomTy = 1;
+            } else if (type == TerrainGenerator.BLOCK_TNT) {
+                sideTx = 8; sideTy = 0;
+                topTx = 9; topTy = 0;
+                bottomTx = 9; bottomTy = 0;
+            }
             if (terrain.getBlockTypeAt(px - 1, py, pz) < 0)
                 vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
-                    px,py,pz+1, px,py+1,pz+1, px,py,pz, px,py+1,pz, tx,ty);
+                    px,py,pz+1, px,py+1,pz+1, px,py,pz, px,py+1,pz, sideTx,sideTy);
             if (terrain.getBlockTypeAt(px + 1, py, pz) < 0)
                 vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
-                    px+1,py,pz, px+1,py+1,pz, px+1,py,pz+1, px+1,py+1,pz+1, tx,ty);
+                    px+1,py,pz, px+1,py+1,pz, px+1,py,pz+1, px+1,py+1,pz+1, sideTx,sideTy);
             if (terrain.getBlockTypeAt(px, py - 1, pz) < 0)
                 vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
-                    px,py,pz, px+1,py,pz, px,py,pz+1, px+1,py,pz+1, tx,ty);
+                    px,py,pz, px+1,py,pz, px,py,pz+1, px+1,py,pz+1, bottomTx,bottomTy);
             if (terrain.getBlockTypeAt(px, py + 1, pz) < 0)
                 vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
-                    px,py+1,pz, px,py+1,pz+1, px+1,py+1,pz, px+1,py+1,pz+1, tx,ty);
+                    px,py+1,pz, px,py+1,pz+1, px+1,py+1,pz, px+1,py+1,pz+1, topTx,topTy);
             if (terrain.getBlockTypeAt(px, py, pz - 1) < 0)
                 vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
-                    px,py,pz, px,py+1,pz, px+1,py,pz, px+1,py+1,pz, tx,ty);
+                    px,py,pz, px,py+1,pz, px+1,py,pz, px+1,py+1,pz, sideTx,sideTy);
             if (terrain.getBlockTypeAt(px, py, pz + 1) < 0)
                 vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
-                    px+1,py,pz+1, px+1,py+1,pz+1, px,py,pz+1, px,py+1,pz+1, tx,ty);
+                    px+1,py,pz+1, px+1,py+1,pz+1, px,py,pz+1, px,py+1,pz+1, sideTx,sideTy);
         }
 
         Group chunkGroup = new Group();
