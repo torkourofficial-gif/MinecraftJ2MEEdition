@@ -603,7 +603,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         // These are blocks, not item sprites: Beta 1.6 stores their block
         // faces in terrain.png (loaded as "atlas"). Using items.png here
         // sampled unrelated item sprites and made the recipe icons incorrect.
-        blockIcons[crafts.CRAFTING_TABLE] = createGuiBlockIcon(192, 144); // crafting table item is shown as a block cube in inventory
+        blockIcons[crafts.CRAFTING_TABLE] = createTerrainBlockIcon(atlas, 11, 2); // actual crafting-table top texture
         mapCraftItemIcon(itemsImage, crafts.COAL, 7, 0);
         mapCraftItemIcon(itemsImage, crafts.CHARCOAL, 7, 0);
         mapCraftItemIcon(itemsImage, crafts.IRON_INGOT, 7, 1);
