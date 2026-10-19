@@ -1783,10 +1783,16 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
             changed = true;
         } else if (airborne) {
-            if (verticalVelocity < 0.0f) fallDistance -= verticalVelocity;
             float nextCameraY = cameraY + verticalVelocity;
-            if (canOccupyAt(cameraX, nextCameraY - PLAYER_EYE_HEIGHT, cameraZ)) cameraY = nextCameraY;
-            else { verticalVelocity = 0.0f; }
+            if (canOccupyAt(cameraX, nextCameraY - PLAYER_EYE_HEIGHT, cameraZ)) {
+                // Count only downward movement that actually happened. A
+                // ceiling/side collision must not accumulate phantom fall damage.
+                if (verticalVelocity < 0.0f) fallDistance -= verticalVelocity;
+                cameraY = nextCameraY;
+            } else {
+                verticalVelocity = 0.0f;
+                fallDistance = 0.0f;
+            }
             verticalVelocity -= GRAVITY;
             if (cameraY <= groundY) {
                 cameraY = groundY;
@@ -1897,7 +1903,13 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (x < 0 || z < 0 || x >= TerrainGenerator.SIZE || z >= TerrainGenerator.SIZE) return 0.0f;
         int startY = Math.min(floorVoxel(feetY + 0.02f), TerrainGenerator.HEIGHT - 1);
         for (int y = startY; y >= 0; y--) {
-            if (terrain.getBlockTypeAt(x, y, z) >= 0) return y + 1.0f;
+            // Leaves and tree logs are physical blocks too. Include them in
+            // support detection so the player can land and jump on canopies.
+            if (terrain.getBlockTypeAt(x, y, z) >= 0
+                    || terrain.isLeafBlockAt(x, y, z)
+                    || terrain.isTreeTrunkAt(x, y, z)) {
+                return y + 1.0f;
+            }
         }
         return 0.0f;
     }
