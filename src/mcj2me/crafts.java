@@ -8,9 +8,9 @@ package mcj2me;
  * -1 means empty. Recipe matching supports moving a shaped recipe anywhere in
  * the grid and horizontal mirroring.
  *
- * IDs 0..43 are the existing WorldCanvas IDs. IDs 44+ are reserved for
- * craftable items that still need to be added to the game's item/inventory
- * registry before their recipes can be used in-game.
+ * IDs 0..43 are the original WorldCanvas items. IDs 44+ are the extended
+ * crafting-item registry; several outputs still need their later gameplay
+ * behavior (such as smelting or equipping) implemented separately.
  */
 public final class crafts {
     private crafts() { }
