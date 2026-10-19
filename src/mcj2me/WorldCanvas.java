@@ -81,6 +81,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int craftingRecipeCursor = 0;
     private final Image[] blockIcons = new Image[123];
     private final Image[] grayBlockIcons = new Image[123];
+    // Reuse GPU textures for repeated dropped/held sprites; recreating one per drop wastes memory.
+    private final Texture2D[] itemIconTextures = new Texture2D[123];
     private int craftingTablePage = 0;
     private boolean inventoryOpen = false;
     private int inventoryCursor = 0;
@@ -102,6 +104,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int splashTicks = 0;
     private boolean wasInWater = false;
     private Camera camera;
+    // Reuse transforms during paint instead of allocating two objects every rendered frame.
+    private final Transform paintCameraTransform = new Transform();
+    private final Transform paintHeldTransform = new Transform();
 
     private Appearance groundAppearance;
     private Appearance flowerAppearance;
@@ -902,12 +907,10 @@ final class WorldCanvas extends Canvas implements Runnable {
                 // so pass the group's current camera-relative transform explicitly.
                 graphics3D.bindTarget(g);
                 handTargetBound = true;
-                Transform cameraTransform = new Transform();
-                camera.getTransformTo(world, cameraTransform);
-                graphics3D.setCamera(camera, cameraTransform);
-                Transform handTransform = new Transform();
-                heldItemGroup.getTransform(handTransform);
-                graphics3D.render(heldItemGroup, handTransform);
+                camera.getTransformTo(world, paintCameraTransform);
+                graphics3D.setCamera(camera, paintCameraTransform);
+                heldItemGroup.getTransform(paintHeldTransform);
+                graphics3D.render(heldItemGroup, paintHeldTransform);
             } catch (Exception ignored) {
                 // Keep the already-rendered world and HUD visible if the optional
                 // first-person overlay pass is unsupported by a device's M3G.
@@ -1632,14 +1635,22 @@ final class WorldCanvas extends Canvas implements Runnable {
         return arm;
     }
 
+    private boolean isItemsAtlasIconItem(int item) {
+        if (item >= ITEM_WATER_BUCKET && item <= ITEM_RAW_BEEF) return true;
+        // These three IDs use terrain.png block-face icons, not items.png.
+        if (item == crafts.CRAFTING_TABLE || item == crafts.CHEST || item == crafts.LADDER)
+            return false;
+        // Remaining extended item IDs fall back to their corresponding items.png tile.
+        return item >= crafts.STICK && item < blockIcons.length;
+    }
+
     private Mesh createHeldItemMesh(int item) {
         // Food is a thin, double-sided textured plane, not a cube. Keep buckets
         // as solid 3D models, while pork/beef use the same flat item geometry
         // as classic Minecraft's dropped food sprites.
-        if (item == crafts.STICK || (item >= crafts.WOODEN_PICKAXE && item <= crafts.DIAMOND_PICKAXE)) {
-            // Classic tools and sticks are textured, double-sided 3D planes,
-            // not cubes. Keep the PNG alpha so the transparent icon background
-            // does not become a solid rectangle in first person.
+        if (isItemsAtlasIconItem(item)) {
+            // Every icon sourced from items.png is a cut-out sprite, not a cube.
+            // Keep the atlas alpha for buckets, food, materials, tools, and armor alike.
             Mesh sprite = createDroppedItemMesh(blockIcons[item], true);
             Appearance spriteAppearance = sprite.getAppearance(0);
             if (spriteAppearance != null) {
@@ -1650,24 +1661,10 @@ final class WorldCanvas extends Canvas implements Runnable {
                 spritePass.setDepthWriteEnable(false);
                 spriteAppearance.setCompositingMode(spritePass);
             }
-            sprite.setScale(item == crafts.STICK ? 0.78f : 1.18f,
-                item == crafts.STICK ? 1.25f : 1.18f, 1.0f);
+            float spriteScale = item == crafts.STICK ? 0.78f : 1.18f;
+            sprite.setScale(spriteScale,
+                item == crafts.STICK ? 1.25f : spriteScale, 1.0f);
             return sprite;
-        }
-        if (item == ITEM_RAW_PORKCHOP || item == ITEM_RAW_BEEF) {
-            Mesh food = createDroppedItemMesh(blockIcons[item]);
-            Appearance foodAppearance = food.getAppearance(0);
-            if (foodAppearance != null) {
-                foodAppearance.setLayer(7);
-                CompositingMode heldPass = new CompositingMode();
-                // Respect the PNG alpha channel on the thin food sprite.
-                heldPass.setBlending(CompositingMode.ALPHA);
-                heldPass.setDepthTestEnable(false);
-                heldPass.setDepthWriteEnable(false);
-                foodAppearance.setCompositingMode(heldPass);
-            }
-            food.setScale(1.15f, 1.15f, 1.0f);
-            return food;
         }
         if (item < ITEM_WATER_BUCKET) {
             Mesh block = createDroppedBlockMesh(item);
@@ -3119,14 +3116,26 @@ final class WorldCanvas extends Canvas implements Runnable {
         return new Mesh(vb, faceIndices, faceAppearances);
     }
 
+    private Texture2D getCachedItemIconTexture(Image icon) {
+        int cacheIndex = -1;
+        for (int i = 0; i < blockIcons.length; i++) {
+            if (blockIcons[i] == icon) { cacheIndex = i; break; }
+        }
+        if (cacheIndex >= 0 && itemIconTextures[cacheIndex] != null)
+            return itemIconTextures[cacheIndex];
+        Texture2D texture = new Texture2D(new Image2D(Image2D.RGBA, icon));
+        texture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
+        texture.setWrapping(Texture2D.WRAP_CLAMP, Texture2D.WRAP_CLAMP);
+        if (cacheIndex >= 0) itemIconTextures[cacheIndex] = texture;
+        return texture;
+    }
+
     private Mesh createDroppedItemMesh(Image icon) {
         return createDroppedItemMesh(icon, false);
     }
 
     private Mesh createDroppedItemMesh(Image icon, boolean flipVertical) {
-        Texture2D texture = new Texture2D(new Image2D(Image2D.RGBA, icon));
-        texture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
-        texture.setWrapping(Texture2D.WRAP_CLAMP, Texture2D.WRAP_CLAMP);
+        Texture2D texture = getCachedItemIconTexture(icon);
         Appearance appearance = new Appearance();
         appearance.setTexture(0, texture);
         PolygonMode pm = new PolygonMode();
