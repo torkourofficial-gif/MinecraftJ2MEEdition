@@ -1314,7 +1314,10 @@ final class WorldCanvas extends Canvas implements Runnable {
                     u=(k==0||k==2)?r[2]:r[0]; v=(k<2)?r[1]:r[3];
                 } else {
                     u=(k<2)?r[0]:r[2]; v=(k==0||k==2)?r[3]:r[1];
-                    if (uvFace[face]==1 || uvFace[face]==2) u=(k<2)?r[2]:r[0];
+                    // Face 1 is the camera-facing (+Z) front, whose vertex
+                    // order runs right-to-left; face 2 is the outer side,
+                    // whose vertex order also runs opposite to atlas U.
+                    if (face==1 || face==2) u=(k<2)?r[2]:r[0];
                 }
                 uv[face*8+k*2]=(short)(u*1024/64);
                 // M3G texture V runs from the image's bottom edge. Flip the
@@ -1350,6 +1353,8 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (foodAppearance != null) {
                 foodAppearance.setLayer(7);
                 CompositingMode heldPass = new CompositingMode();
+                // Respect the PNG alpha channel on the thin food sprite.
+                heldPass.setBlending(CompositingMode.ALPHA);
                 heldPass.setDepthTestEnable(false);
                 heldPass.setDepthWriteEnable(false);
                 foodAppearance.setCompositingMode(heldPass);
@@ -2263,13 +2268,16 @@ final class WorldCanvas extends Canvas implements Runnable {
         int head = 0, tail = 0;
         int corner = pixels[0];
         int br = (corner >> 16) & 255, bg = (corner >> 8) & 255, bb = corner & 255;
-        for (int i = 0; i < pixels.length; i++) {
-            int a = (pixels[i] >>> 24) & 255;
-            int r = (pixels[i] >> 16) & 255, g = (pixels[i] >> 8) & 255, b = pixels[i] & 255;
-            if (a == 0 || (Math.abs(r-br) <= 20 && Math.abs(g-bg) <= 20 && Math.abs(b-bb) <= 20)) {
-                visited[i] = true;
-                queue[tail++] = i;
-            }
+        // Seed only from the tile border. The previous version marked every
+        // matching pixel as visited before flooding, which defeated the
+        // connected-background test and could leave a solid matte behind.
+        for (int x = 0; x < size; x++) {
+            tail = seedFoodMatte(pixels, visited, queue, tail, x, br, bg, bb, size);
+            tail = seedFoodMatte(pixels, visited, queue, tail, (size - 1) * size + x, br, bg, bb, size);
+        }
+        for (int y = 1; y < size - 1; y++) {
+            tail = seedFoodMatte(pixels, visited, queue, tail, y * size, br, bg, bb, size);
+            tail = seedFoodMatte(pixels, visited, queue, tail, y * size + size - 1, br, bg, bb, size);
         }
         while (head < tail) {
             int p = queue[head++];
@@ -2281,6 +2289,15 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         for (int i = 0; i < pixels.length; i++) if (visited[i]) pixels[i] = 0;
         return Image.createRGBImage(pixels, size, size, true);
+    }
+
+    private int seedFoodMatte(int[] pixels, boolean[] visited, int[] queue, int tail,
+                               int index, int r, int g, int b, int size) {
+        if (!visited[index] && sameFoodMatte(pixels[index], r, g, b)) {
+            visited[index] = true;
+            queue[tail++] = index;
+        }
+        return tail;
     }
 
     private boolean sameFoodMatte(int pixel, int r, int g, int b) {
