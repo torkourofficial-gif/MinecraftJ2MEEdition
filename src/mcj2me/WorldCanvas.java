@@ -1456,11 +1456,13 @@ final class WorldCanvas extends Canvas implements Runnable {
         float ux=-(float)Math.sin(yr)*(float)Math.sin(pr);
         float uy=cosPitch;
         float uz=(float)Math.cos(yr)*(float)Math.sin(pr);
-        // Match Minecraft's familiar first-person transform (about
-        // x=+0.56, y=-0.52, z=-0.72 in camera space).
-        float forward=0.48f, right=0.38f, down=0.28f;
-        // Tuck cube blocks slightly farther toward the lower-right screen edge.
-        if (hasItem && !foodItem) { right += 0.07f; down += 0.06f; }
+        // Portrait adaptation for the 240x320 screen: keep the hand/item
+        // inside the view instead of letting it drift off the lower-right edge.
+        // Move it toward the center and slightly upward compared with landscape Minecraft.
+        float forward=0.46f, right=0.24f, down=0.20f;
+        // Blocks sit just a little farther right/down than the empty hand,
+        // while remaining comfortably inside the portrait viewport.
+        if (hasItem && !foodItem) { right += 0.025f; down += 0.02f; }
         float swingX=0.0f, swingY=0.0f, swingZ=0.0f;
         if (eatingTicks > 0) {
             int elapsed=EATING_DURATION_TICKS-eatingTicks;
