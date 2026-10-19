@@ -74,6 +74,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Image guiBlocksImage;
     private Image inventoryImage;
     private Image containerImage;
+    private Image menuBlueOverlay;
+    private int menuOverlayWidth = -1, menuOverlayHeight = -1;
     private boolean craftingMenuOpen = false;
     private boolean craftingMenuTable = false;
     private int craftingRecipeCursor = 0;
@@ -1049,10 +1051,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void drawInventory(Graphics g) {
-        // Clear the previous gameplay frame first. Otherwise the hotbar/HUD
-        // from the last frame can remain visible behind the inventory panel.
-        g.setColor(0x101010);
-        g.fillRect(0, 0, getWidth(), getHeight());
+        // Indev used a translucent dark-blue tint, allowing the world to remain
+        // visible behind the inventory instead of replacing it with solid black.
+        drawMenuBlueOverlay(g);
         int panelW = Math.min(176, inventoryImage.getWidth());
         int panelH = Math.min(166, inventoryImage.getHeight());
         int panelX = (getWidth() - panelW) / 2;
@@ -1096,9 +1097,24 @@ final class WorldCanvas extends Canvas implements Runnable {
         g.drawRect(cursorX - 2, cursorY - 2, 19, 19);
         drawRecipePreview(g, false, panelX, panelY);
 
-        // Minecraft keeps the nine-slot hotbar visible while the inventory
-        // is open. Redraw it over the cleared background, including the
-        // selected slot and stack counts, using the same positions as the HUD.
+        // Keep the hotbar visible in both inventory screens, like classic Minecraft.
+        drawMenuHotbar(g);
+    }
+
+    private void drawMenuBlueOverlay(Graphics g) {
+        int w = getWidth(), h = getHeight();
+        if (menuBlueOverlay == null || menuOverlayWidth != w || menuOverlayHeight != h) {
+            int[] pixels = new int[w * h];
+            // ARGB: translucent deep blue, matching the old Indev inventory tint.
+            for (int i = 0; i < pixels.length; i++) pixels[i] = 0xA0202A55;
+            menuBlueOverlay = Image.createRGBImage(pixels, w, h, true);
+            menuOverlayWidth = w;
+            menuOverlayHeight = h;
+        }
+        g.drawImage(menuBlueOverlay, 0, 0, Graphics.TOP | Graphics.LEFT);
+    }
+
+    private void drawMenuHotbar(Graphics g) {
         int barX = (getWidth() - 182) / 2;
         int barY = getHeight() - 23;
         g.drawRegion(guiImage, 0, 0, 182, 22, 0, barX, barY,
@@ -2694,10 +2710,13 @@ final class WorldCanvas extends Canvas implements Runnable {
         int panelW = Math.min(176, containerImage.getWidth());
         int panelH = Math.min(166, containerImage.getHeight());
         int panelX = (getWidth() - panelW) / 2, panelY = (getHeight() - panelH) / 2;
-        g.setColor(0x101010); g.fillRect(0, 0, getWidth(), getHeight());
+        // Keep the world visible through the same dark-blue translucent tint
+        // used by the inventory, then draw the table UI and persistent hotbar.
+        drawMenuBlueOverlay(g);
         g.drawRegion(containerImage, 0, 0, panelW, panelH, 0, panelX, panelY,
             Graphics.TOP | Graphics.LEFT);
         drawCraftingRecipeList(g, panelX, panelY);
+        drawMenuHotbar(g);
     }
 
     /**
