@@ -78,6 +78,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     private boolean craftingMenuTable = false;
     private int craftingRecipeCursor = 0;
     private final Image[] blockIcons = new Image[123];
+    private final Image[] grayBlockIcons = new Image[123];
+    private int craftingTablePage = 0;
     private boolean inventoryOpen = false;
     private int inventoryCursor = 0;
     private int inventoryPageStart = 0;
@@ -591,7 +593,53 @@ final class WorldCanvas extends Canvas implements Runnable {
         // Leather is the item directly below the raw porkchop in items.png.
         // Use the real 16x16 atlas sprite rather than a generated text/icon placeholder.
         blockIcons[crafts.LEATHER] = createFoodItemsIcon(itemsImage, 7, 6);
-        for (int ci = 44; ci < blockIcons.length; ci++) blockIcons[ci] = createCraftIcon(ci);
+        // Crafting ingredients/results use original items.png sprites wherever available.
+        mapCraftItemIcon(itemsImage, crafts.STICK, 8, 2);
+        mapCraftItemIcon(itemsImage, crafts.CRAFTING_TABLE, 4, 3);
+        mapCraftItemIcon(itemsImage, crafts.COAL, 7, 0);
+        mapCraftItemIcon(itemsImage, crafts.CHARCOAL, 7, 0);
+        mapCraftItemIcon(itemsImage, crafts.IRON_INGOT, 9, 0);
+        mapCraftItemIcon(itemsImage, crafts.GOLD_INGOT, 10, 0);
+        mapCraftItemIcon(itemsImage, crafts.DIAMOND, 8, 0);
+        mapCraftItemIcon(itemsImage, crafts.FLINT, 6, 2);
+        mapCraftItemIcon(itemsImage, crafts.STRING, 8, 3);
+        mapCraftItemIcon(itemsImage, crafts.FEATHER, 8, 4);
+        mapCraftItemIcon(itemsImage, crafts.PAPER, 9, 3);
+        mapCraftItemIcon(itemsImage, crafts.BOOK, 10, 3);
+        mapCraftItemIcon(itemsImage, crafts.CHEST, 9, 2);
+        mapCraftItemIcon(itemsImage, crafts.FURNACE, 1, 3);
+        mapCraftItemIcon(itemsImage, crafts.LADDER, 7, 3);
+        mapCraftItemIcon(itemsImage, crafts.SIGN, 6, 3);
+        mapCraftItemIcon(itemsImage, crafts.BOWL, 8, 5);
+        mapCraftItemIcon(itemsImage, crafts.BREAD, 6, 4);
+        mapCraftItemIcon(itemsImage, crafts.WOODEN_PICKAXE, 14, 0);
+        mapCraftItemIcon(itemsImage, crafts.STONE_PICKAXE, 2, 1);
+        mapCraftItemIcon(itemsImage, crafts.IRON_PICKAXE, 1, 0);
+        mapCraftItemIcon(itemsImage, crafts.DIAMOND_PICKAXE, 6, 1);
+        mapCraftItemIcon(itemsImage, crafts.WOODEN_AXE, 15, 0);
+        mapCraftItemIcon(itemsImage, crafts.STONE_AXE, 3, 1);
+        mapCraftItemIcon(itemsImage, crafts.IRON_AXE, 2, 0);
+        mapCraftItemIcon(itemsImage, crafts.DIAMOND_AXE, 7, 1);
+        mapCraftItemIcon(itemsImage, crafts.WOODEN_SHOVEL, 13, 0);
+        mapCraftItemIcon(itemsImage, crafts.STONE_SHOVEL, 1, 1);
+        mapCraftItemIcon(itemsImage, crafts.IRON_SHOVEL, 0, 0);
+        mapCraftItemIcon(itemsImage, crafts.DIAMOND_SHOVEL, 5, 1);
+        mapCraftItemIcon(itemsImage, crafts.WOODEN_SWORD, 12, 0);
+        mapCraftItemIcon(itemsImage, crafts.STONE_SWORD, 0, 1);
+        mapCraftItemIcon(itemsImage, crafts.IRON_SWORD, 11, 0);
+        mapCraftItemIcon(itemsImage, crafts.DIAMOND_SWORD, 4, 1);
+        mapCraftItemIcon(itemsImage, crafts.WOODEN_HOE, 15, 1);
+        mapCraftItemIcon(itemsImage, crafts.STONE_HOE, 3, 2);
+        mapCraftItemIcon(itemsImage, crafts.IRON_HOE, 2, 2);
+        mapCraftItemIcon(itemsImage, crafts.DIAMOND_HOE, 7, 2);
+        mapCraftItemIcon(itemsImage, crafts.BOW, 5, 0);
+        mapCraftItemIcon(itemsImage, crafts.ARROW, 6, 0);
+        mapCraftItemIcon(itemsImage, crafts.BUCKET, 10, 4);
+        mapCraftItemIcon(itemsImage, crafts.FLINT_AND_STEEL, 3, 0);
+        mapCraftItemIcon(itemsImage, crafts.LEATHER, 7, 6);
+        for (int ci = 44; ci < blockIcons.length; ci++)
+            if (blockIcons[ci] == null) blockIcons[ci] = createItemsIcon(itemsImage, ci % 16, ci / 16);
+
         setupStage = "loading /mcj2me/clouds.png";
         Image cloudsImage = ResourceImages.load("/mcj2me/clouds.png");
         setupStage = "creating terrain Image2D/Texture2D";
@@ -1197,10 +1245,18 @@ final class WorldCanvas extends Canvas implements Runnable {
             } else if (keyCode == '2' || action == UP) {
                 craftingRecipeCursor--;
                 if (craftingRecipeCursor < 0) craftingRecipeCursor = crafts.tableRecipeCount() - 1;
+                craftingTablePage = craftingRecipeCursor / 27;
             } else if (keyCode == '8' || action == DOWN) {
                 craftingRecipeCursor++;
                 if (craftingRecipeCursor >= crafts.tableRecipeCount()) craftingRecipeCursor = 0;
-            } else if (keyCode == '5' || action == FIRE || keyCode == ' ') {
+                craftingTablePage = craftingRecipeCursor / 27;
+            } else if (keyCode == '4' || action == LEFT) {
+                craftingRecipeCursor = Math.max(0, craftingRecipeCursor - 1);
+                craftingTablePage = craftingRecipeCursor / 27;
+            } else if (keyCode == '6' || action == RIGHT) {
+                craftingRecipeCursor = Math.min(crafts.tableRecipeCount() - 1, craftingRecipeCursor + 1);
+                craftingTablePage = craftingRecipeCursor / 27;
+            } else if (keyCode == '5') {
                 craftRecipe(crafts.tableRecipeAt(craftingRecipeCursor));
             }
             repaint();
@@ -1216,6 +1272,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (inventoryOpen) {
             if (keyCode == '*' || keyCode == 42) {
                 inventoryOpen = false;
+                repaint();
+                return;
+            }
+            if (keyCode == '5') {
+                craftRecipe(crafts.inventoryRecipeAt(craftingRecipeCursor));
                 repaint();
                 return;
             }
@@ -2402,6 +2463,32 @@ final class WorldCanvas extends Canvas implements Runnable {
         return vertex + 1;
     }
 
+    private void mapCraftItemIcon(Image items, int item, int tileX, int tileY) {
+        if (item >= 0 && item < blockIcons.length) blockIcons[item] = createItemsIcon(items, tileX, tileY);
+    }
+
+    private Image createGrayIcon(Image source) {
+        int w = source.getWidth(), h = source.getHeight();
+        int[] pixels = new int[w * h];
+        source.getRGB(pixels, 0, w, 0, 0, w, h);
+        for (int i = 0; i < pixels.length; i++) {
+            int a = pixels[i] >>> 24, r = (pixels[i] >> 16) & 255;
+            int gr = (pixels[i] >> 8) & 255, b = pixels[i] & 255;
+            int lum = ((r * 30 + gr * 59 + b * 11) / 100) * 2 / 3;
+            pixels[i] = (a << 24) | (lum << 16) | (lum << 8) | lum;
+        }
+        return Image.createRGBImage(pixels, w, h, true);
+    }
+
+    private void drawGrayableIcon(Graphics g, int item, int x, int y, boolean enabled) {
+        if (item < 0 || item >= blockIcons.length || blockIcons[item] == null) return;
+        if (enabled) g.drawImage(blockIcons[item], x, y, Graphics.TOP | Graphics.LEFT);
+        else {
+            if (grayBlockIcons[item] == null) grayBlockIcons[item] = createGrayIcon(blockIcons[item]);
+            g.drawImage(grayBlockIcons[item], x, y, Graphics.TOP | Graphics.LEFT);
+        }
+    }
+
     private Image createCraftIcon(int item) {
         Image icon = Image.createImage(16, 16);
         Graphics g = icon.getGraphics();
@@ -2473,60 +2560,62 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void drawRecipePreview(Graphics g, boolean table, int panelX, int panelY) {
-        int count = table ? crafts.tableRecipeCount() : crafts.inventoryRecipeCount();
+        if (table) { drawCraftingRecipeList(g, panelX, panelY); return; }
+        int count = crafts.inventoryRecipeCount();
         if (count <= 0) return;
         if (craftingRecipeCursor < 0 || craftingRecipeCursor >= count) craftingRecipeCursor = 0;
-        crafts.Recipe recipe = table ? crafts.tableRecipeAt(craftingRecipeCursor)
-                                     : crafts.inventoryRecipeAt(craftingRecipeCursor);
-        int cell = 18;
-        int gridSize = table ? 3 : 2;
-        int gridX = panelX + (table ? 25 : 92);
-        int gridY = panelY + 18;
-        for (int y = 0; y < gridSize; y++) for (int x = 0; x < gridSize; x++) {
+        crafts.Recipe recipe = crafts.inventoryRecipeAt(craftingRecipeCursor);
+        int cell = 18, gridX = panelX + 91, gridY = panelY + 17;
+        for (int y = 0; y < 2; y++) for (int x = 0; x < 2; x++) {
             int sx = gridX + x * cell, sy = gridY + y * cell;
             g.setColor(0x383838); g.fillRect(sx, sy, 16, 16);
             g.setColor(0xA0A0A0); g.drawRect(sx, sy, 16, 16);
         }
-        int ox = panelX + (table ? 124 : 140);
-        int oy = panelY + 35;
+        int ox = panelX + 139, oy = panelY + 34;
         g.setColor(0x383838); g.fillRect(ox, oy, 18, 18);
         g.setColor(0xDDDDDD); g.drawRect(ox, oy, 18, 18);
-        int offsetX = (gridSize - recipe.width) / 2;
-        int offsetY = (gridSize - recipe.height) / 2;
+        int dx = (2 - recipe.width) / 2, dy = (2 - recipe.height) / 2;
         for (int ry = 0; ry < recipe.height; ry++) for (int rx = 0; rx < recipe.width; rx++) {
             int item = recipe.ingredients[ry * recipe.width + rx];
-            if (item < 0 || item >= blockIcons.length || blockIcons[item] == null) continue;
-            int sx = gridX + (offsetX + rx) * cell + 1;
-            int sy = gridY + (offsetY + ry) * cell + 1;
-            g.drawImage(blockIcons[item], sx, sy, Graphics.TOP | Graphics.LEFT);
+            if (item >= 0 && item < blockIcons.length)
+                drawGrayableIcon(g, item, gridX + (dx + rx) * cell + 1,
+                    gridY + (dy + ry) * cell + 1, inventory[item] > 0);
         }
-        if (recipe.output >= 0 && recipe.output < blockIcons.length && blockIcons[recipe.output] != null)
-            g.drawImage(blockIcons[recipe.output], ox + 1, oy + 1, Graphics.TOP | Graphics.LEFT);
-        boolean hasItems = hasIngredients(recipe);
-        boolean hasRoom = hasItems && canReceiveCraftOutput(recipe);
-        g.setColor(hasRoom ? 0x66FF66 : 0xFF7777);
-        String resultName = recipe.output >= 0 && recipe.output < BLOCK_NAMES.length ? BLOCK_NAMES[recipe.output] : "ITEM";
-        g.drawString(resultName, panelX + 7, panelY + (table ? 96 : 55), Graphics.TOP | Graphics.LEFT);
-        String status = !hasItems ? "NEED MATERIALS" : (hasRoom ? "READY x" + recipe.outputCount : "INVENTORY FULL");
-        g.drawString(status, panelX + 7, panelY + (table ? 110 : 67), Graphics.TOP | Graphics.LEFT);
+        boolean ready = hasIngredients(recipe) && canReceiveCraftOutput(recipe);
+        drawGrayableIcon(g, recipe.output, ox + 1, oy + 1, ready);
+    }
+
+    /** Container-style recipe browser: every recipe is one icon filling a slot. */
+    private void drawCraftingRecipeList(Graphics g, int panelX, int panelY) {
+        int count = crafts.tableRecipeCount(), pageSize = 27;
+        int pages = (count + pageSize - 1) / pageSize;
+        if (craftingTablePage < 0) craftingTablePage = 0;
+        if (craftingTablePage >= pages) craftingTablePage = pages - 1;
+        int start = craftingTablePage * pageSize;
+        int gridX = panelX + 8, gridY = panelY + 18;
+        for (int slot = 0; slot < pageSize; slot++) {
+            int x = gridX + (slot % 9) * 18, y = gridY + (slot / 9) * 18;
+            g.setColor(0x373737); g.fillRect(x, y, 16, 16);
+            int index = start + slot;
+            if (index >= count) continue;
+            crafts.Recipe recipe = crafts.tableRecipeAt(index);
+            boolean ready = hasIngredients(recipe) && canReceiveCraftOutput(recipe);
+            drawGrayableIcon(g, recipe.output, x, y, ready);
+            if (index == craftingRecipeCursor) { g.setColor(0xFFFFFF); g.drawRect(x - 1, y - 1, 17, 17); }
+        }
         g.setColor(0xFFFFFF);
-        g.drawString((craftingRecipeCursor + 1) + "/" + count,
-            panelX + 7, panelY + (table ? 124 : 77), Graphics.TOP | Graphics.LEFT);
+        g.drawString((craftingTablePage + 1) + "/" + pages + "  5:CRAFT",
+            panelX + 8, panelY + 76, Graphics.TOP | Graphics.LEFT);
     }
 
     private void drawCraftingTableMenu(Graphics g) {
         int panelW = Math.min(176, containerImage.getWidth());
         int panelH = Math.min(166, containerImage.getHeight());
-        int panelX = (getWidth() - panelW) / 2;
-        int panelY = (getHeight() - panelH) / 2;
+        int panelX = (getWidth() - panelW) / 2, panelY = (getHeight() - panelH) / 2;
         g.setColor(0x101010); g.fillRect(0, 0, getWidth(), getHeight());
         g.drawRegion(containerImage, 0, 0, panelW, panelH, 0, panelX, panelY,
             Graphics.TOP | Graphics.LEFT);
-        g.setColor(0x404040); g.fillRect(panelX + 20, panelY + 15, 58, 58);
-        drawRecipePreview(g, true, panelX, panelY);
-        g.setColor(0xFFFFFF);
-        g.drawString("CRAFTING TABLE", panelX + 7, panelY + 3, Graphics.TOP | Graphics.LEFT);
-        g.drawString(" * close", panelX + 7, panelY + panelH - 15, Graphics.TOP | Graphics.LEFT);
+        drawCraftingRecipeList(g, panelX, panelY);
     }
 
     /**
