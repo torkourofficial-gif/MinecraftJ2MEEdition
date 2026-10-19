@@ -1468,9 +1468,20 @@ final class WorldCanvas extends Canvas implements Runnable {
         boolean hasItem = item >= 0 && item < inventory.length
             && (worldMode != IndevViewerMIDlet.MODE_SURVIVAL || inventory[item] > 0);
         boolean foodItem = hasItem && (item == ITEM_RAW_PORKCHOP || item == ITEM_RAW_BEEF);
+        // No selected item means an empty first-person view: remove the arm
+        // completely instead of rendering the skin/empty hand.
+        if (!hasItem) {
+            if (heldItemMesh != null) heldItemGroup.removeChild(heldItemMesh);
+            if (heldFoodMesh != null) heldItemGroup.removeChild(heldFoodMesh);
+            heldItemMesh = null;
+            heldFoodMesh = null;
+            heldItemType = -1;
+            heldItemIsArm = false;
+            return;
+        }
         // Food is held in front of the arm, not instead of the arm.
-        boolean arm = !hasItem || foodItem;
-        int type = hasItem ? item : -1;
+        boolean arm = foodItem;
+        int type = item;
         if (heldItemMesh == null || type != heldItemType || arm != heldItemIsArm
                 || (foodItem && heldFoodMesh == null) || (!foodItem && heldFoodMesh != null)) {
             if (heldItemMesh != null) heldItemGroup.removeChild(heldItemMesh);
