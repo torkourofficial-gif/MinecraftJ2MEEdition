@@ -3942,6 +3942,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             blockParticleVZ[i] = (float) Math.sin(angle) * horizontalSpeed;
             blockParticleVY[i] = 0.075f + (i % 4) * 0.018f;
             blockParticleSize[i] = 0.08f + (i % 3) * 0.025f;
+            blockParticleTexArrays[i].set(0, 4, blockParticleUvByType[type]);
             blockParticleMeshes[i].setAppearance(0, blockParticleAppearances[type]);
             blockParticleMeshes[i].setScale(blockParticleSize[i], blockParticleSize[i],
                                              blockParticleSize[i]);
