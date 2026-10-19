@@ -1309,6 +1309,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         // geometry on a dedicated top layer, then disable depth occlusion too.
         appearance.setLayer(7);
         CompositingMode heldPass = new CompositingMode();
+        // char.png and inventory icons may contain transparent pixels.
+        // Without alpha blending, some older M3G renderers show those texels
+        // as black instead of letting the scene show through.
+        heldPass.setBlending(CompositingMode.ALPHA);
         heldPass.setDepthTestEnable(false);
         heldPass.setDepthWriteEnable(false);
         appearance.setCompositingMode(heldPass);
@@ -1380,9 +1384,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         // texture is the colour source; no baked vertex tint should darken it.
         buffer.setDefaultColor(0xFFFFFFFF);
         Mesh arm = new Mesh(buffer,new TriangleStripArray(indices,strips),heldArmAppearance);
-        // The first-person arm should read smaller than a full block on the
-        // narrow portrait display; scale uniformly to avoid an oversized fist.
-        arm.setScale(0.52f,0.52f,0.52f);
+        // Match the proportions of the arm shown while eating: the previous
+        // 0.52 scale shrank the skin UVs to only a few screen pixels on 240x320.
+        // Keep the vanilla 4x12x4 arm proportions, but use a moderate portrait
+        // scale so the forearm is clearly visible without covering the crosshair.
+        arm.setScale(0.82f,0.82f,0.82f);
         return arm;
     }
 
