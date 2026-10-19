@@ -3133,6 +3133,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         pm.setCulling(PolygonMode.CULL_NONE);
         pm.setShading(PolygonMode.SHADE_FLAT);
         appearance.setPolygonMode(pm);
+        // Item icons (including flowers) contain transparent atlas pixels.
+        // Enable alpha blending/cutout so sprites render as plants, not rectangles.
+        CompositingMode itemBlend = new CompositingMode();
+        itemBlend.setBlending(CompositingMode.ALPHA);
+        itemBlend.setAlphaThreshold(0.5f);
+        appearance.setCompositingMode(itemBlend);
         // Item entities use a thin, double-sided sprite plane rather than a cube.
         // The Y-axis spin in tickDroppedItems reproduces the classic rotating drop.
         short[] p = {-3,-3,0, -3,3,0, 3,-3,0, 3,3,0};
