@@ -1587,6 +1587,24 @@ final class WorldCanvas extends Canvas implements Runnable {
         // Food is a thin, double-sided textured plane, not a cube. Keep buckets
         // as solid 3D models, while pork/beef use the same flat item geometry
         // as classic Minecraft's dropped food sprites.
+        if (item == crafts.STICK || (item >= crafts.WOODEN_PICKAXE && item <= crafts.DIAMOND_PICKAXE)) {
+            // Classic tools and sticks are textured, double-sided 3D planes,
+            // not cubes. Keep the PNG alpha so the transparent icon background
+            // does not become a solid rectangle in first person.
+            Mesh sprite = createDroppedItemMesh(blockIcons[item]);
+            Appearance spriteAppearance = sprite.getAppearance(0);
+            if (spriteAppearance != null) {
+                spriteAppearance.setLayer(7);
+                CompositingMode spritePass = new CompositingMode();
+                spritePass.setBlending(CompositingMode.ALPHA);
+                spritePass.setDepthTestEnable(false);
+                spritePass.setDepthWriteEnable(false);
+                spriteAppearance.setCompositingMode(spritePass);
+            }
+            sprite.setScale(item == crafts.STICK ? 0.78f : 1.18f,
+                item == crafts.STICK ? 1.25f : 1.18f, 1.0f);
+            return sprite;
+        }
         if (item == ITEM_RAW_PORKCHOP || item == ITEM_RAW_BEEF) {
             Mesh food = createDroppedItemMesh(blockIcons[item]);
             Appearance foodAppearance = food.getAppearance(0);
@@ -3926,7 +3944,9 @@ final class WorldCanvas extends Canvas implements Runnable {
                 lastMiningDelay = miningDelay(placedType);
                 int dropType = placedType == TerrainGenerator.BLOCK_CRAFTING_TABLE ? crafts.CRAFTING_TABLE : placedType;
                 if (worldMode == IndevViewerMIDlet.MODE_CREATIVE && dropType < inventory.length && inventory[dropType] < 64) { inventory[dropType]++; addItemToSlots(dropType); }
-                else if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) spawnDroppedItem(dropType, blockIcons[dropType], placedHit[0] + 0.5f, placedHit[2] + 0.5f, placedHit[1] + 0.5f);
+                else if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL
+                        && canHarvestWithSelectedTool(placedType))
+                    spawnDroppedItem(dropType, blockIcons[dropType], placedHit[0] + 0.5f, placedHit[2] + 0.5f, placedHit[1] + 0.5f);
                 spawnBlockParticles(placedType, placedHit[0] + 0.5f, placedHit[2] + 0.5f, placedHit[1] + 0.5f);
                 invalidateEditedArea(placedHit[0], placedHit[0], placedHit[1], placedHit[1]);
                 return;
@@ -3956,7 +3976,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             return;
         }
         if (worldMode == IndevViewerMIDlet.MODE_CREATIVE && type >= 0 && type < inventory.length && type != TerrainGenerator.BLOCK_BEDROCK && inventory[type] < 64) { inventory[type]++; addItemToSlots(type); }
-        else if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
+        else if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL && canHarvestWithSelectedTool(type)) {
             if (type == TerrainGenerator.BLOCK_COAL_ORE)
                 spawnDroppedItem(crafts.COAL, blockIcons[crafts.COAL], x + 0.5f, blockY + 0.5f, z + 0.5f);
             else if (type == TerrainGenerator.BLOCK_DIAMOND_ORE)
@@ -4299,20 +4319,61 @@ final class WorldCanvas extends Canvas implements Runnable {
         return miningDelay(type);
     }
 
+    /** Classic pickaxe speed multipliers: wood 2, stone 4, iron 6, diamond 8. */
+    private int selectedPickaxeTier() {
+        int item = selectedItemType();
+        if (item == crafts.WOODEN_PICKAXE) return 0;
+        if (item == crafts.STONE_PICKAXE) return 1;
+        if (item == crafts.IRON_PICKAXE) return 2;
+        if (item == crafts.DIAMOND_PICKAXE) return 3;
+        return -1;
+    }
+
+    private boolean isPickaxeEffectiveBlock(int type) {
+        return type == TerrainGenerator.BLOCK_STONE
+            || type == TerrainGenerator.BLOCK_COAL_ORE
+            || type == TerrainGenerator.BLOCK_IRON_ORE
+            || type == TerrainGenerator.BLOCK_GOLD_ORE
+            || type == TerrainGenerator.BLOCK_DIAMOND_ORE
+            || type == TerrainGenerator.BLOCK_OBSIDIAN
+            || type == TerrainGenerator.BLOCK_BRICK;
+    }
+
+    /** Beta/Indev-style harvest levels: coal needs wood; iron needs stone;
+     * gold and diamond need iron. A wrong tool still breaks the block slowly,
+     * but does not yield the mineral drop. */
+    private boolean canHarvestWithSelectedTool(int type) {
+        int tier = selectedPickaxeTier();
+        if (type == TerrainGenerator.BLOCK_COAL_ORE) return tier >= 0;
+        if (type == TerrainGenerator.BLOCK_IRON_ORE) return tier >= 1;
+        if (type == TerrainGenerator.BLOCK_GOLD_ORE
+                || type == TerrainGenerator.BLOCK_DIAMOND_ORE) return tier >= 2;
+        if (type == TerrainGenerator.BLOCK_OBSIDIAN) return tier == 3;
+        return true;
+    }
+
     /**
-     * Approximate classic Minecraft Indev bare-hand mining time.
-     * The game loop runs much faster than a Minecraft game tick on some
-     * Java ME devices, so use deliberate frame counts rather than tiny
-     * single-digit delays. There are no mining tools yet, so stone and ores
-     * take substantially longer than wood, dirt, sand or gravel.
+     * Frame-count approximation of classic mining. The no-tool delay is the
+     * baseline; the appropriate pickaxe divides it by its material speed.
      */
     private int miningDelay(int type) {
         if (worldMode == IndevViewerMIDlet.MODE_CREATIVE) return 1;
         if (type == TerrainGenerator.BLOCK_BEDROCK) return 999;
-        if (type == TerrainGenerator.BLOCK_OBSIDIAN) return 240;
+        if (type == TerrainGenerator.BLOCK_OBSIDIAN) {
+            int tier = selectedPickaxeTier();
+            return tier == 3 ? 30 : 240;
+        }
         if (type == TerrainGenerator.BLOCK_STONE || type == TerrainGenerator.BLOCK_COAL_ORE
                 || type == TerrainGenerator.BLOCK_IRON_ORE || type == TerrainGenerator.BLOCK_GOLD_ORE
-                || type == TerrainGenerator.BLOCK_DIAMOND_ORE) return 150;
+                || type == TerrainGenerator.BLOCK_DIAMOND_ORE) {
+            int delay = 150;
+            int tier = selectedPickaxeTier();
+            if (isPickaxeEffectiveBlock(type) && tier >= 0) {
+                int speed = tier == 0 ? 2 : tier == 1 ? 4 : tier == 2 ? 6 : 8;
+                delay = Math.max(1, delay / speed);
+            }
+            return delay;
+        }
         if (type == TerrainGenerator.BLOCK_WOOD) return 60;
         if (type == TerrainGenerator.BLOCK_PLANKS) return 45;
         if (type == TerrainGenerator.BLOCK_BRICK) return 90;
