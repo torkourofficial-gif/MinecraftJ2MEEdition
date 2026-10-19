@@ -565,7 +565,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         setupStage = "creating inventory icon 42 (raw porkchop from items.png)";
         blockIcons[ITEM_RAW_PORKCHOP] = createItemsIcon(itemsImage, 7, 5);
         setupStage = "creating inventory icon 43 (raw beef from items.png)";
-        blockIcons[ITEM_RAW_BEEF] = createItemsIcon(itemsImage, 7, 6);
+        // Reuse the cooked-beef (steak) sprite for cow meat, as requested.
+        blockIcons[ITEM_RAW_BEEF] = createItemsIcon(itemsImage, 8, 6);
         setupStage = "loading /mcj2me/clouds.png";
         Image cloudsImage = ResourceImages.load("/mcj2me/clouds.png");
         setupStage = "creating terrain Image2D/Texture2D";
@@ -1334,6 +1335,22 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private Mesh createHeldItemMesh(int item) {
+        // Food is a thin, double-sided textured plane, not a cube. Keep buckets
+        // as solid 3D models, while pork/beef use the same flat item geometry
+        // as classic Minecraft's dropped food sprites.
+        if (item == ITEM_RAW_PORKCHOP || item == ITEM_RAW_BEEF) {
+            Mesh food = createDroppedItemMesh(blockIcons[item]);
+            Appearance foodAppearance = food.getAppearance(0);
+            if (foodAppearance != null) {
+                foodAppearance.setLayer(7);
+                CompositingMode heldPass = new CompositingMode();
+                heldPass.setDepthTestEnable(false);
+                heldPass.setDepthWriteEnable(false);
+                foodAppearance.setCompositingMode(heldPass);
+            }
+            food.setScale(1.15f, 1.15f, 1.0f);
+            return food;
+        }
         if (item < ITEM_WATER_BUCKET) {
             Mesh block = createDroppedBlockMesh(item);
             // Dropped cube geometry is 0.25 blocks wide; 1.6x gives the
@@ -1421,9 +1438,15 @@ final class WorldCanvas extends Canvas implements Runnable {
         float swingX=0.0f, swingY=0.0f, swingZ=0.0f;
         if (eatingTicks > 0) {
             int elapsed=EATING_DURATION_TICKS-eatingTicks;
-            forward=0.40f;
-            down=0.08f-((elapsed%8<4)?0.04f:0.0f);
-            right=0.28f;
+            float eatPhase=(float)elapsed/(float)EATING_DURATION_TICKS;
+            // Lift the food toward the face, bob it in short bites, and tilt it
+            // inward. The same transform works on the compact 240x320 view.
+            float bite=(float)Math.abs(Math.sin(elapsed*Math.PI/5.0));
+            forward=0.34f;
+            down=0.02f-bite*0.10f;
+            right=0.25f-(float)Math.sin(eatPhase*Math.PI)*0.04f;
+            swingX=-18.0f-bite*12.0f;
+            swingZ=-12.0f-bite*8.0f;
         } else if (handSwingTicks > 0) {
             float phase=(8-handSwingTicks)%8;
             float swing=(float)Math.sin(phase*Math.PI/4.0);
@@ -1446,6 +1469,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         transform.postRotate(-yaw,0.0f,1.0f,0.0f);
         transform.postRotate(pitch+swingX,1.0f,0.0f,0.0f);
         transform.postRotate(45.0f,0.0f,1.0f,0.0f);
+        if (eatingTicks > 0) {
+            transform.postRotate(swingZ,0.0f,0.0f,1.0f);
+        }
         if (arm) {
             // Vanilla's first-person arm is visibly canted, not a vertical column.
             // Our arm mesh is centered, so a moderate screen-space roll reproduces
