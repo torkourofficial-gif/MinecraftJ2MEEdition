@@ -1148,13 +1148,27 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     /** Finds the highest solid voxel directly below the player's feet. */
     private float getGroundHeightBelow(float x, float z, float feetY) {
-        int bx = (int) x;
-        int bz = (int) z;
-        int h = terrain.getHeight(bx, bz);
-        int startY = Math.min(floorVoxel(feetY + 0.02f), h - 1);
+        // Resolve support across the player's full 0.6 x 0.6 footprint, not
+        // just the center column. This prevents edge sinking and stair clipping.
+        float ground = 0.0f;
+        ground = Math.max(ground, groundAtColumn(floorVoxel(x - PLAYER_HALF_WIDTH + 0.001f),
+            floorVoxel(z - PLAYER_HALF_WIDTH + 0.001f), feetY));
+        ground = Math.max(ground, groundAtColumn(floorVoxel(x + PLAYER_HALF_WIDTH - 0.001f),
+            floorVoxel(z - PLAYER_HALF_WIDTH + 0.001f), feetY));
+        ground = Math.max(ground, groundAtColumn(floorVoxel(x - PLAYER_HALF_WIDTH + 0.001f),
+            floorVoxel(z + PLAYER_HALF_WIDTH - 0.001f), feetY));
+        ground = Math.max(ground, groundAtColumn(floorVoxel(x + PLAYER_HALF_WIDTH - 0.001f),
+            floorVoxel(z + PLAYER_HALF_WIDTH - 0.001f), feetY));
+        ground = Math.max(ground, groundAtColumn(floorVoxel(x), floorVoxel(z), feetY));
+        return ground;
+    }
+
+    private float groundAtColumn(int x, int z, float feetY) {
+        if (x < 0 || z < 0 || x >= TerrainGenerator.SIZE || z >= TerrainGenerator.SIZE) return 0.0f;
+        int startY = Math.min(floorVoxel(feetY + 0.02f), terrain.getHeight(x, z) - 1);
         if (startY >= TerrainGenerator.HEIGHT) startY = TerrainGenerator.HEIGHT - 1;
-        for (int by = startY; by >= 0; by--) {
-            if (terrain.getBlockTypeAt(bx, by, bz) >= 0) return by + 1.0f;
+        for (int y = startY; y >= 0; y--) {
+            if (terrain.getBlockTypeAt(x, y, z) >= 0) return y + 1.0f;
         }
         return 0.0f;
     }
@@ -1919,14 +1933,23 @@ final class WorldCanvas extends Canvas implements Runnable {
         for (x=0;x<256;x++) perTile[x]=0;
         for (x=0;x<CHUNK;x++) for(z=0;z<CHUNK;z++) {
             int wx=startX+x, wz=startZ+z, h=terrain.getHeight(wx,wz);
-            int type=terrain.getTopType(wx,wz), tx=BLOCK_TILE_X[type], ty=BLOCK_TILE_Y[type];
+            int type=terrain.getTopType(wx,wz);
+            // Never emit a greedy surface quad for a voxel recorded as removed.
+            // This is the source of the lingering "ghost top" after side mining
+            // or loading older edited-world data.
+            if (h <= 0 || terrain.isBlockRemoved(wx, h - 1, wz)) {
+                keys[x][z] = -1; hs[x][z] = h;
+                bases[x][z] = 0; glows[x][z] = 0;
+                continue;
+            }
+            int tx=BLOCK_TILE_X[type], ty=BLOCK_TILE_Y[type];
             if(type==TerrainGenerator.BLOCK_TNT && tntFuseTicks>0 && wx==tntX && wz==tntZ && tntFlashOn){tx=9;ty=0;}
             keys[x][z]=ty*16+tx; hs[x][z]=h;
             bases[x][z]=IndevViewerMIDlet.humbleMode ? 255 : terrain.getShadowShade(wx,wz,h);
             glows[x][z]=IndevViewerMIDlet.humbleMode ? 0 : torchGlowAt(wx,h,wz);
         }
         for(x=0;x<CHUNK;x++) for(z=0;z<CHUNK;z++) {
-            if(used[x][z]) continue;
+            if(used[x][z] || keys[x][z] < 0) continue;
             int key=keys[x][z], h=hs[x][z], base=bases[x][z], glow=glows[x][z];
             int depth=1;
             while(z+depth<CHUNK && !used[x][z+depth] && keys[x][z+depth]==key
