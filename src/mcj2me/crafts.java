@@ -16,7 +16,7 @@ public final class crafts {
     private crafts() { }
 
     public static final int EMPTY = -1;
-    public static final int WHEAT = 104, REDSTONE = 105;
+    public static final int WHEAT = 104, REDSTONE = 105, LEATHER = 106;
 
     // Existing WorldCanvas IDs.
     public static final int GRASS = 0, DIRT = 1, STONE = 2, WOOD = 3, LEAVES = 4;
@@ -52,6 +52,10 @@ public final class crafts {
     public static final int REDSTONE_TORCH = 96, WOODEN_FENCE = 97, FENCE_GATE = 98;
     public static final int WOODEN_STAIRS = 99, STONE_STAIRS = 100, SLAB = 101;
     public static final int BUCKET = 102, FLINT_AND_STEEL = 103;
+    public static final int LEATHER_HELMET = 107, LEATHER_CHESTPLATE = 108, LEATHER_LEGGINGS = 109, LEATHER_BOOTS = 110;
+    public static final int IRON_HELMET = 111, IRON_CHESTPLATE = 112, IRON_LEGGINGS = 113, IRON_BOOTS = 114;
+    public static final int GOLD_HELMET = 115, GOLD_CHESTPLATE = 116, GOLD_LEGGINGS = 117, GOLD_BOOTS = 118;
+    public static final int DIAMOND_HELMET = 119, DIAMOND_CHESTPLATE = 120, DIAMOND_LEGGINGS = 121, DIAMOND_BOOTS = 122;
 
     public static final class Recipe {
         public final int width;
@@ -104,161 +108,54 @@ public final class crafts {
     }
 
     private static final Recipe[] INVENTORY_RECIPES = {
-        // One log -> four planks; four planks -> a crafting table.
         r(1, 1, new int[] { WOOD }, OAK_PLANKS, 4, false),
-        r(2, 2, new int[] { OAK_PLANKS, OAK_PLANKS, OAK_PLANKS, OAK_PLANKS },
-                CRAFTING_TABLE, 1, false),
-        // Planks are interchangeable for basic wooden components.
         r(1, 2, new int[] { OAK_PLANKS, OAK_PLANKS }, STICK, 4, false),
-        r(1, 2, new int[] { COAL, STICK }, TORCH, 4, false),
-        r(1, 2, new int[] { CHARCOAL, STICK }, TORCH, 4, false)
+        r(2, 2, new int[] { OAK_PLANKS, OAK_PLANKS, OAK_PLANKS, OAK_PLANKS }, CRAFTING_TABLE, 1, false)
     };
 
     private static final Recipe[] TABLE_RECIPES = {
-        // Building and utility blocks.
-        r(2, 3, new int[] { OAK_PLANKS, OAK_PLANKS,
-                            OAK_PLANKS, OAK_PLANKS,
-                            OAK_PLANKS, OAK_PLANKS }, DOOR, 3, false),
         r(3, 3, new int[] { OAK_PLANKS, OAK_PLANKS, OAK_PLANKS,
                             OAK_PLANKS, EMPTY, OAK_PLANKS,
                             OAK_PLANKS, OAK_PLANKS, OAK_PLANKS }, CHEST, 1, false),
         r(3, 3, new int[] { STONE, STONE, STONE,
                             STONE, EMPTY, STONE,
                             STONE, STONE, STONE }, FURNACE, 1, false),
-        r(3, 3, new int[] { OAK_PLANKS, OAK_PLANKS, OAK_PLANKS,
-                            EMPTY, OAK_PLANKS, EMPTY,
-                            EMPTY, OAK_PLANKS, EMPTY }, LADDER, 3, false),
-        r(3, 3, new int[] { OAK_PLANKS, OAK_PLANKS, OAK_PLANKS,
-                            OAK_PLANKS, OAK_PLANKS, OAK_PLANKS,
-                            EMPTY, STICK, EMPTY }, SIGN, 3, false),
-        r(3, 3, new int[] { OAK_PLANKS, EMPTY, OAK_PLANKS,
-                            OAK_PLANKS, EMPTY, OAK_PLANKS,
-                            OAK_PLANKS, EMPTY, OAK_PLANKS }, WOODEN_FENCE, 2, false),
-        r(3, 3, new int[] { OAK_PLANKS, STICK, OAK_PLANKS,
-                            OAK_PLANKS, STICK, OAK_PLANKS,
-                            EMPTY, EMPTY, EMPTY }, FENCE_GATE, 1, true),
-        r(3, 3, new int[] { OAK_PLANKS, EMPTY, EMPTY,
-                            OAK_PLANKS, OAK_PLANKS, EMPTY,
-                            OAK_PLANKS, OAK_PLANKS, OAK_PLANKS }, WOODEN_STAIRS, 4, true),
-        r(3, 3, new int[] { STONE, EMPTY, EMPTY,
-                            STONE, STONE, EMPTY,
-                            STONE, STONE, STONE }, STONE_STAIRS, 4, true),
-        r(3, 3, new int[] { STONE, STONE, STONE,
-                            EMPTY, EMPTY, EMPTY,
-                            EMPTY, EMPTY, EMPTY }, SLAB, 6, false),
-        r(2, 2, new int[] { OAK_PLANKS, OAK_PLANKS,
-                            OAK_PLANKS, OAK_PLANKS }, WOODEN_PRESSURE_PLATE, 1, false),
-        r(2, 1, new int[] { STONE, STONE }, STONE_BUTTON, 1, false),
-        r(2, 1, new int[] { OAK_PLANKS, OAK_PLANKS }, WOODEN_BUTTON, 1, false),
-        r(2, 2, new int[] { STICK, EMPTY,
-                            STONE, STONE }, LEVER, 1, false),
-        r(1, 2, new int[] { STICK, REDSTONE }, REDSTONE_TORCH, 1, false),
-
-        // Storage, transport and paper.
-        r(3, 3, new int[] { OAK_PLANKS, EMPTY, OAK_PLANKS,
-                            OAK_PLANKS, EMPTY, OAK_PLANKS,
-                            OAK_PLANKS, OAK_PLANKS, OAK_PLANKS }, BOAT, 1, false),
-        r(3, 3, new int[] { EMPTY, EMPTY, EMPTY,
-                            IRON_INGOT, EMPTY, IRON_INGOT,
-                            IRON_INGOT, IRON_INGOT, IRON_INGOT }, MINECART, 1, false),
-        r(3, 2, new int[] { IRON_INGOT, EMPTY, IRON_INGOT,
-                            EMPTY, IRON_INGOT, EMPTY }, BUCKET, 1, false),
-        r(3, 3, new int[] { IRON_INGOT, IRON_INGOT, IRON_INGOT,
-                            IRON_INGOT, EMPTY, IRON_INGOT,
-                            IRON_INGOT, IRON_INGOT, IRON_INGOT }, IRON_BLOCK, 1, false),
-        r(3, 3, new int[] { GOLD_INGOT, GOLD_INGOT, GOLD_INGOT,
-                            GOLD_INGOT, EMPTY, GOLD_INGOT,
-                            GOLD_INGOT, GOLD_INGOT, GOLD_INGOT }, GOLD_BLOCK, 1, false),
-        r(3, 3, new int[] { DIAMOND, DIAMOND, DIAMOND,
-                            DIAMOND, EMPTY, DIAMOND,
-                            DIAMOND, DIAMOND, DIAMOND }, DIAMOND_BLOCK, 1, false),
-        r(3, 3, new int[] { EMPTY, EMPTY, EMPTY,
-                            PAPER, PAPER, PAPER,
-                            EMPTY, EMPTY, EMPTY }, PAPER_ITEM, 3, false),
-        r(3, 3, new int[] { PAPER, PAPER, EMPTY,
-                            PAPER, PAPER, EMPTY,
-                            EMPTY, EMPTY, EMPTY }, BOOK, 1, false),
-        r(3, 3, new int[] { GLASS, GLASS, GLASS,
-                            GLASS, GLASS, GLASS,
-                            EMPTY, EMPTY, EMPTY }, GLASS_PANE, 16, false),
-        r(3, 3, new int[] { STONE, STONE, STONE,
-                            STONE, STONE, STONE,
-                            STONE, STONE, STONE }, STONE_BRICKS, 1, false),
-
-        // Tools. Each recipe uses the classic shaped layout.
-        r(3, 3, new int[] { OAK_PLANKS, OAK_PLANKS, OAK_PLANKS,
-                            EMPTY, STICK, EMPTY,
-                            EMPTY, STICK, EMPTY }, WOODEN_PICKAXE, 1, false),
-        r(3, 3, new int[] { STONE, STONE, STONE,
-                            EMPTY, STICK, EMPTY,
-                            EMPTY, STICK, EMPTY }, STONE_PICKAXE, 1, false),
-        r(3, 3, new int[] { IRON_INGOT, IRON_INGOT, IRON_INGOT,
-                            EMPTY, STICK, EMPTY,
-                            EMPTY, STICK, EMPTY }, IRON_PICKAXE, 1, false),
-        r(3, 3, new int[] { DIAMOND, DIAMOND, DIAMOND,
-                            EMPTY, STICK, EMPTY,
-                            EMPTY, STICK, EMPTY }, DIAMOND_PICKAXE, 1, false),
-        r(3, 3, new int[] { OAK_PLANKS, OAK_PLANKS, EMPTY,
-                            OAK_PLANKS, STICK, EMPTY,
-                            EMPTY, STICK, EMPTY }, WOODEN_AXE, 1, true),
-        r(3, 3, new int[] { STONE, STONE, EMPTY,
-                            STONE, STICK, EMPTY,
-                            EMPTY, STICK, EMPTY }, STONE_AXE, 1, true),
-        r(3, 3, new int[] { IRON_INGOT, IRON_INGOT, EMPTY,
-                            IRON_INGOT, STICK, EMPTY,
-                            EMPTY, STICK, EMPTY }, IRON_AXE, 1, true),
-        r(3, 3, new int[] { DIAMOND, DIAMOND, EMPTY,
-                            DIAMOND, STICK, EMPTY,
-                            EMPTY, STICK, EMPTY }, DIAMOND_AXE, 1, true),
-        r(3, 3, new int[] { OAK_PLANKS, EMPTY, EMPTY,
-                            STICK, EMPTY, EMPTY,
-                            STICK, EMPTY, EMPTY }, WOODEN_SHOVEL, 1, false),
-        r(3, 3, new int[] { STONE, EMPTY, EMPTY,
-                            STICK, EMPTY, EMPTY,
-                            STICK, EMPTY, EMPTY }, STONE_SHOVEL, 1, false),
-        r(3, 3, new int[] { IRON_INGOT, EMPTY, EMPTY,
-                            STICK, EMPTY, EMPTY,
-                            STICK, EMPTY, EMPTY }, IRON_SHOVEL, 1, false),
-        r(3, 3, new int[] { DIAMOND, EMPTY, EMPTY,
-                            STICK, EMPTY, EMPTY,
-                            STICK, EMPTY, EMPTY }, DIAMOND_SHOVEL, 1, false),
-        r(3, 3, new int[] { EMPTY, OAK_PLANKS, EMPTY,
-                            EMPTY, OAK_PLANKS, EMPTY,
-                            EMPTY, STICK, EMPTY }, WOODEN_SWORD, 1, false),
-        r(3, 3, new int[] { EMPTY, STONE, EMPTY,
-                            EMPTY, STONE, EMPTY,
-                            EMPTY, STICK, EMPTY }, STONE_SWORD, 1, false),
-        r(3, 3, new int[] { EMPTY, IRON_INGOT, EMPTY,
-                            EMPTY, IRON_INGOT, EMPTY,
-                            EMPTY, STICK, EMPTY }, IRON_SWORD, 1, false),
-        r(3, 3, new int[] { EMPTY, DIAMOND, EMPTY,
-                            EMPTY, DIAMOND, EMPTY,
-                            EMPTY, STICK, EMPTY }, DIAMOND_SWORD, 1, false),
-        r(3, 3, new int[] { OAK_PLANKS, OAK_PLANKS, EMPTY,
-                            EMPTY, STICK, EMPTY,
-                            EMPTY, STICK, EMPTY }, WOODEN_HOE, 1, true),
-        r(3, 3, new int[] { STONE, STONE, EMPTY,
-                            EMPTY, STICK, EMPTY,
-                            EMPTY, STICK, EMPTY }, STONE_HOE, 1, true),
-        r(3, 3, new int[] { IRON_INGOT, IRON_INGOT, EMPTY,
-                            EMPTY, STICK, EMPTY,
-                            EMPTY, STICK, EMPTY }, IRON_HOE, 1, true),
-        r(3, 3, new int[] { DIAMOND, DIAMOND, EMPTY,
-                            EMPTY, STICK, EMPTY,
-                            EMPTY, STICK, EMPTY }, DIAMOND_HOE, 1, true),
-
-        // Combat, food and miscellaneous classic recipes.
-        r(1, 3, new int[] { FLINT, STICK, FEATHER }, ARROW, 4, false),
-        r(3, 3, new int[] { EMPTY, STICK, STRING,
-                            STICK, EMPTY, STRING,
-                            EMPTY, STICK, STRING }, BOW, 1, true),
-        r(3, 3, new int[] { EMPTY, EMPTY, EMPTY,
-                            WHEAT, WHEAT, WHEAT,
-                            EMPTY, EMPTY, EMPTY }, BREAD, 1, false),
-        r(3, 3, new int[] { EMPTY, STICK, EMPTY,
-                            STICK, EMPTY, STICK,
-                            EMPTY, STICK, EMPTY }, RAIL, 16, false),
-        r(2, 1, new int[] { FLINT, IRON_INGOT }, FLINT_AND_STEEL, 1, true)
+        r(3, 3, new int[] { OAK_PLANKS, OAK_PLANKS, OAK_PLANKS, EMPTY, STICK, EMPTY, EMPTY, STICK, EMPTY }, WOODEN_PICKAXE, 1, false),
+        r(3, 3, new int[] { STONE, STONE, STONE, EMPTY, STICK, EMPTY, EMPTY, STICK, EMPTY }, STONE_PICKAXE, 1, false),
+        r(3, 3, new int[] { IRON_INGOT, IRON_INGOT, IRON_INGOT, EMPTY, STICK, EMPTY, EMPTY, STICK, EMPTY }, IRON_PICKAXE, 1, false),
+        r(3, 3, new int[] { DIAMOND, DIAMOND, DIAMOND, EMPTY, STICK, EMPTY, EMPTY, STICK, EMPTY }, DIAMOND_PICKAXE, 1, false),
+        r(3, 3, new int[] { OAK_PLANKS, OAK_PLANKS, EMPTY, OAK_PLANKS, STICK, EMPTY, EMPTY, STICK, EMPTY }, WOODEN_AXE, 1, true),
+        r(3, 3, new int[] { STONE, STONE, EMPTY, STONE, STICK, EMPTY, EMPTY, STICK, EMPTY }, STONE_AXE, 1, true),
+        r(3, 3, new int[] { IRON_INGOT, IRON_INGOT, EMPTY, IRON_INGOT, STICK, EMPTY, EMPTY, STICK, EMPTY }, IRON_AXE, 1, true),
+        r(3, 3, new int[] { DIAMOND, DIAMOND, EMPTY, DIAMOND, STICK, EMPTY, EMPTY, STICK, EMPTY }, DIAMOND_AXE, 1, true),
+        r(1, 3, new int[] { OAK_PLANKS, STICK, STICK }, WOODEN_SHOVEL, 1, false),
+        r(1, 3, new int[] { STONE, STICK, STICK }, STONE_SHOVEL, 1, false),
+        r(1, 3, new int[] { IRON_INGOT, STICK, STICK }, IRON_SHOVEL, 1, false),
+        r(1, 3, new int[] { DIAMOND, STICK, STICK }, DIAMOND_SHOVEL, 1, false),
+        r(1, 3, new int[] { OAK_PLANKS, OAK_PLANKS, STICK }, WOODEN_SWORD, 1, false),
+        r(1, 3, new int[] { STONE, STONE, STICK }, STONE_SWORD, 1, false),
+        r(1, 3, new int[] { IRON_INGOT, IRON_INGOT, STICK }, IRON_SWORD, 1, false),
+        r(1, 3, new int[] { DIAMOND, DIAMOND, STICK }, DIAMOND_SWORD, 1, false),
+        r(3, 2, new int[] { OAK_PLANKS, OAK_PLANKS, EMPTY, EMPTY, STICK, EMPTY }, WOODEN_HOE, 1, true),
+        r(3, 2, new int[] { STONE, STONE, EMPTY, EMPTY, STICK, EMPTY }, STONE_HOE, 1, true),
+        r(3, 2, new int[] { IRON_INGOT, IRON_INGOT, EMPTY, EMPTY, STICK, EMPTY }, IRON_HOE, 1, true),
+        r(3, 2, new int[] { DIAMOND, DIAMOND, EMPTY, EMPTY, STICK, EMPTY }, DIAMOND_HOE, 1, true),
+        r(3, 2, new int[] { LEATHER, LEATHER, LEATHER, LEATHER, EMPTY, LEATHER }, LEATHER_HELMET, 1, false),
+        r(3, 3, new int[] { LEATHER, EMPTY, LEATHER, LEATHER, LEATHER, LEATHER, LEATHER, LEATHER, LEATHER }, LEATHER_CHESTPLATE, 1, false),
+        r(3, 3, new int[] { LEATHER, LEATHER, LEATHER, LEATHER, EMPTY, LEATHER, LEATHER, EMPTY, LEATHER }, LEATHER_LEGGINGS, 1, false),
+        r(3, 2, new int[] { LEATHER, EMPTY, LEATHER, LEATHER, EMPTY, LEATHER }, LEATHER_BOOTS, 1, false),
+        r(3, 2, new int[] { IRON_INGOT, IRON_INGOT, IRON_INGOT, IRON_INGOT, EMPTY, IRON_INGOT }, IRON_HELMET, 1, false),
+        r(3, 3, new int[] { IRON_INGOT, EMPTY, IRON_INGOT, IRON_INGOT, IRON_INGOT, IRON_INGOT, IRON_INGOT, IRON_INGOT, IRON_INGOT }, IRON_CHESTPLATE, 1, false),
+        r(3, 3, new int[] { IRON_INGOT, IRON_INGOT, IRON_INGOT, IRON_INGOT, EMPTY, IRON_INGOT, IRON_INGOT, EMPTY, IRON_INGOT }, IRON_LEGGINGS, 1, false),
+        r(3, 2, new int[] { IRON_INGOT, EMPTY, IRON_INGOT, IRON_INGOT, EMPTY, IRON_INGOT }, IRON_BOOTS, 1, false),
+        r(3, 2, new int[] { GOLD_INGOT, GOLD_INGOT, GOLD_INGOT, GOLD_INGOT, EMPTY, GOLD_INGOT }, GOLD_HELMET, 1, false),
+        r(3, 3, new int[] { GOLD_INGOT, EMPTY, GOLD_INGOT, GOLD_INGOT, GOLD_INGOT, GOLD_INGOT, GOLD_INGOT, GOLD_INGOT, GOLD_INGOT }, GOLD_CHESTPLATE, 1, false),
+        r(3, 3, new int[] { GOLD_INGOT, GOLD_INGOT, GOLD_INGOT, GOLD_INGOT, EMPTY, GOLD_INGOT, GOLD_INGOT, EMPTY, GOLD_INGOT }, GOLD_LEGGINGS, 1, false),
+        r(3, 2, new int[] { GOLD_INGOT, EMPTY, GOLD_INGOT, GOLD_INGOT, EMPTY, GOLD_INGOT }, GOLD_BOOTS, 1, false),
+        r(3, 2, new int[] { DIAMOND, DIAMOND, DIAMOND, DIAMOND, EMPTY, DIAMOND }, DIAMOND_HELMET, 1, false),
+        r(3, 3, new int[] { DIAMOND, EMPTY, DIAMOND, DIAMOND, DIAMOND, DIAMOND, DIAMOND, DIAMOND, DIAMOND }, DIAMOND_CHESTPLATE, 1, false),
+        r(3, 3, new int[] { DIAMOND, DIAMOND, DIAMOND, DIAMOND, EMPTY, DIAMOND, DIAMOND, EMPTY, DIAMOND }, DIAMOND_LEGGINGS, 1, false),
+        r(3, 2, new int[] { DIAMOND, EMPTY, DIAMOND, DIAMOND, EMPTY, DIAMOND }, DIAMOND_BOOTS, 1, false)
     };
 
     // Wheat is a reserved ingredient until farming is implemented.
