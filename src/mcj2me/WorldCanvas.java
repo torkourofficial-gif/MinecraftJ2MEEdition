@@ -1983,25 +1983,37 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Mesh createDroppedBlockMesh(int type) {
         if (type < 0 || type >= BLOCK_TILE_X.length || type >= BLOCK_TILE_Y.length
                 || type >= blockIcons.length) return createDroppedItemMesh(blockIcons[0]);
+        // Resolve each face explicitly. Do not infer the dropped-block face
+        // textures from the GUI icon coordinates: those are a different atlas.
+        // Terrain tiles are 16x16 cells in terrain.png.
         int topX = BLOCK_TILE_X[type], topY = BLOCK_TILE_Y[type];
         int sideX = topX, sideY = topY, bottomX = topX, bottomY = topY;
-        if (type == TerrainGenerator.BLOCK_GRASS) {
-            topX = 0; topY = 0;
-            sideX = 3; sideY = 0;
-            bottomX = 2; bottomY = 0;
-        } else if (type == TerrainGenerator.BLOCK_WOOD) {
-            topX = 5; topY = 1;
-            sideX = 4; sideY = 1;
-            bottomX = 5; bottomY = 1;
-        } else if (type == TerrainGenerator.BLOCK_STONE) {
-            topX = 1; topY = 0;
-            sideX = 1; sideY = 0;
-            bottomX = 1; bottomY = 0;
-        } else if (type == TerrainGenerator.BLOCK_TNT) {
-            // Classic terrain atlas: TNT has a distinct top label tile.
-            topX = 9; topY = 0;
-            sideX = 8; sideY = 0;
-            bottomX = 9; bottomY = 0;
+        switch (type) {
+            case TerrainGenerator.BLOCK_GRASS:
+                topX = 0; topY = 0;
+                sideX = 3; sideY = 0;
+                bottomX = 2; bottomY = 0;
+                break;
+            case TerrainGenerator.BLOCK_DIRT:
+                topX = 2; topY = 0;
+                sideX = 2; sideY = 0;
+                bottomX = 2; bottomY = 0;
+                break;
+            case TerrainGenerator.BLOCK_STONE:
+                topX = 1; topY = 0;
+                sideX = 1; sideY = 0;
+                bottomX = 1; bottomY = 0;
+                break;
+            case TerrainGenerator.BLOCK_WOOD:
+                topX = 5; topY = 1;
+                sideX = 4; sideY = 1;
+                bottomX = 5; bottomY = 1;
+                break;
+            case TerrainGenerator.BLOCK_TNT:
+                topX = 9; topY = 0;
+                sideX = 8; sideY = 0;
+                bottomX = 9; bottomY = 0;
+                break;
         }
         short[] p = {
             -3,-3,-3, -3,3,-3, 3,-3,-3, 3,3,-3,
@@ -2030,10 +2042,13 @@ final class WorldCanvas extends Canvas implements Runnable {
                 int pi=(base+k)*3,xx=p[pi],yy=p[pi+1],zz=p[pi+2];
                 int uf=(horizontal || !xFace)?(xx==maxX?1:0):(zz==maxZ?1:0);
                 int vf=horizontal?(zz==maxZ?1:0):(yy==maxY?1:0);
-                boolean ore=(tileX[face]==2 && (tileY[face]==1 || tileY[face]==2 || tileY[face]==3))
-                    || (tileX[face]==1 && tileY[face]==2);
-                // Grass-side UVs are already oriented for the dropped cube.
-                if(ore)uf=1-uf;
+                boolean ore = (type == TerrainGenerator.BLOCK_COAL_ORE
+                    || type == TerrainGenerator.BLOCK_IRON_ORE
+                    || type == TerrainGenerator.BLOCK_GOLD_ORE
+                    || type == TerrainGenerator.BLOCK_DIAMOND_ORE);
+                // Keep the ore pattern orientation tied to the block type, not
+                // to a coincidental atlas coordinate shared by unrelated tiles.
+                if (ore) uf = 1 - uf;
                 uv[b+k*2]=(short)(uf*1024); uv[b+k*2+1]=(short)(vf*1024);
             }
             int[] faceVertexIndices={base,base+1,base+2,base+3};
