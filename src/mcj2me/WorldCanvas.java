@@ -216,7 +216,6 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int lastMiningDelay = 4;
     private boolean breakHeld;
     private int miningProgress;
-    private int foodMessageTicks = 0;
     private static final int MAX_DROPPED_ITEMS = 8;
     private final Mesh[] droppedMeshes = new Mesh[MAX_DROPPED_ITEMS];
     private final int[] droppedTypes = new int[MAX_DROPPED_ITEMS];
@@ -1833,20 +1832,6 @@ final class WorldCanvas extends Canvas implements Runnable {
         spawnDroppedItem(type, blockIcons[type], x, y, z);
     }
 
-    private void spawnDroppedFood(float x, float y, float z) {
-        int[] pixels = new int[16 * 16];
-        for (int py = 0; py < 16; py++) {
-            for (int px = 0; px < 16; px++) {
-                boolean meat = (px > 2 && px < 13 && py > 3 && py < 13)
-                    || (px > 5 && px < 15 && py > 5 && py < 11);
-                pixels[py * 16 + px] = meat
-                    ? (((px + py) % 4 == 0) ? 0xFFB83C24 : 0xFFDD7540)
-                    : 0xFF7D4027;
-            }
-        }
-        spawnDroppedItem(-1, Image.createRGBImage(pixels, 16, 16, false), x, y, z);
-    }
-
     private void spawnDroppedItem(int type, Image icon, float x, float y, float z) {
         if (droppedItemGroup == null || icon == null) return;
         int slot = -1;
@@ -2013,14 +1998,12 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     private void tickSurvival() {
         if (worldMode != IndevViewerMIDlet.MODE_SURVIVAL) return;
-        if (foodMessageTicks > 0) foodMessageTicks--;
         if (zombieDamageCooldown > 0) zombieDamageCooldown--;
         if (hostileMobs != null && zombieDamageCooldown == 0
                 && hostileMobs.touchesPlayer(cameraX, cameraZ)) {
             health -= 2;
             if (health < 0) health = 0;
             zombieDamageCooldown = 25;
-            foodMessageTicks = 25;
             if (health == 0) {
                 health = 10;
                 cameraX = 64.0f;
