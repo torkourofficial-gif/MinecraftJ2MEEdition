@@ -1266,11 +1266,20 @@ final class WorldCanvas extends Canvas implements Runnable {
                     if (terrain.isLeafBlockAt(bx, by, bz)) return false;
                 }
 
-                // Tree trunks are generated separately from terrain voxels.
+                // Tree logs are separate voxels, just like leaves. Check
+                // each remaining log individually so mining one segment
+                // immediately removes collision only for that segment.
                 if (terrain.isTreeAt(bx, bz)) {
                     int treeBase = terrain.getHeight(bx, bz);
                     int treeTop = treeBase + terrain.getTreeHeight(bx, bz);
-                    if (headY > treeBase && feetY < treeTop) return false;
+                    int firstTreeY = Math.max(treeBase, firstBodyY);
+                    int lastTreeY = Math.min(treeTop - 1, lastBodyY);
+                    for (int treeY = firstTreeY; treeY <= lastTreeY; treeY++) {
+                        if (headY > treeY && feetY < treeY + 1.0f
+                                && terrain.isTreeTrunkAt(bx, treeY, bz)) {
+                            return false;
+                        }
+                    }
                 }
             }
         }
