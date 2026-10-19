@@ -16,7 +16,7 @@ public final class crafts {
     private crafts() { }
 
     public static final int EMPTY = -1;
-    public static final int WHEAT = 104;
+    public static final int WHEAT = 104, REDSTONE = 105;
 
     // Existing WorldCanvas IDs.
     public static final int GRASS = 0, DIRT = 1, STONE = 2, WOOD = 3, LEAVES = 4;
@@ -152,7 +152,7 @@ public final class crafts {
         r(2, 1, new int[] { OAK_PLANKS, OAK_PLANKS }, WOODEN_BUTTON, 1, false),
         r(2, 2, new int[] { STICK, EMPTY,
                             STONE, STONE }, LEVER, 1, false),
-        r(1, 2, new int[] { STICK, COAL }, REDSTONE_TORCH, 1, false),
+        r(1, 2, new int[] { STICK, REDSTONE }, REDSTONE_TORCH, 1, false),
 
         // Storage, transport and paper.
         r(3, 3, new int[] { OAK_PLANKS, EMPTY, OAK_PLANKS,
