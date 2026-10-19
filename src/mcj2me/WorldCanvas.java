@@ -1417,13 +1417,13 @@ final class WorldCanvas extends Canvas implements Runnable {
         float uz=(float)Math.cos(yr)*(float)Math.sin(pr);
         // Match Minecraft's familiar first-person transform (about
         // x=+0.56, y=-0.52, z=-0.72 in camera space).
-        float forward=0.72f, right=0.56f, down=0.52f;
+        float forward=0.48f, right=0.38f, down=0.28f;
         float swingX=0.0f, swingY=0.0f, swingZ=0.0f;
         if (eatingTicks > 0) {
             int elapsed=EATING_DURATION_TICKS-eatingTicks;
-            forward=0.52f;
-            down=0.20f-((elapsed%8<4)?0.06f:0.0f);
-            right=0.36f;
+            forward=0.40f;
+            down=0.08f-((elapsed%8<4)?0.04f:0.0f);
+            right=0.28f;
         } else if (handSwingTicks > 0) {
             float phase=(8-handSwingTicks)%8;
             float swing=(float)Math.sin(phase*Math.PI/4.0);
