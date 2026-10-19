@@ -3983,6 +3983,26 @@ final class WorldCanvas extends Canvas implements Runnable {
             return;
         }
 
+        int[] flowerHit = raycastFlower();
+        if (flowerHit != null && terrain.removeFlowerAt(flowerHit[0], flowerHit[1])) {
+            int flowerType = flowerHit[2];
+            lastMiningDelay = 1;
+            if (worldMode == IndevViewerMIDlet.MODE_CREATIVE) {
+                if (flowerType < inventory.length && inventory[flowerType] < 64) {
+                    inventory[flowerType]++;
+                    addItemToSlots(flowerType);
+                }
+            } else if (flowerType >= 0 && flowerType < blockIcons.length) {
+                spawnDroppedItem(flowerType, blockIcons[flowerType],
+                    flowerHit[0] + 0.5f, terrain.getHeight(flowerHit[0], flowerHit[1]) + 0.25f,
+                    flowerHit[1] + 0.5f);
+            }
+            spawnBlockParticles(flowerType, flowerHit[0] + 0.5f,
+                terrain.getHeight(flowerHit[0], flowerHit[1]) + 0.25f, flowerHit[1] + 0.5f);
+            invalidateEditedArea(flowerHit[0], flowerHit[0], flowerHit[1], flowerHit[1]);
+            return;
+        }
+
         int[] leafHit = raycastLeafBlock();
         if (leafHit != null && terrain.removeLeafBlock(leafHit[0], leafHit[1], leafHit[2])) {
             lastMiningDelay = miningDelay(4);
@@ -4689,6 +4709,36 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         updateCamera();
     }
+    private int[] raycastFlower() {
+        // Flowers are thin plants above the surface, not solid terrain voxels.
+        // Sample the ray and stop if a solid block is encountered first.
+        int[] solidHit = raycastSurface();
+        float solidDistance = solidHit == null ? BLOCK_REACH + 1.0f : surfaceHitResult[4] / 1000.0f;
+        double yr = Math.PI * pitch / 180.0;
+        double xr = Math.PI * yaw / 180.0;
+        float dx = (float)(Math.sin(xr) * Math.cos(yr));
+        float dy = (float)Math.sin(yr);
+        float dz = (float)(-Math.cos(xr) * Math.cos(yr));
+        float distance;
+        for (distance = 0.05f; distance <= BLOCK_REACH && distance < solidDistance; distance += 0.04f) {
+            float px = cameraX + dx * distance;
+            float py = cameraY + dy * distance;
+            float pz = cameraZ + dz * distance;
+            int x = floorVoxel(px), z = floorVoxel(pz);
+            int type = terrain.getFlowerType(x, z);
+            if (type < 0) continue;
+            float flowerBase = terrain.getHeight(x, z);
+            if (py >= flowerBase && py <= flowerBase + 0.85f) {
+                leafHitResult[0] = x;
+                leafHitResult[1] = z;
+                leafHitResult[2] = type;
+                leafHitResult[3] = (int)(distance * 1000.0f);
+                return leafHitResult;
+            }
+        }
+        return null;
+    }
+
     private int[] raycastLeafBlock() {
         // A leaf is selectable only if it is the first block intersected.
         int[] solidHit = raycastSurface();
