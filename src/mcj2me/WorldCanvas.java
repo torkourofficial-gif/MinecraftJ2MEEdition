@@ -1645,9 +1645,8 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private Mesh createHeldItemMesh(int item) {
-        // Food is a thin, double-sided textured plane, not a cube. Keep buckets
-        // as solid 3D models, while pork/beef use the same flat item geometry
-        // as classic Minecraft's dropped food sprites.
+        // Items whose inventory icons come from items.png use a thin, double-sided
+        // sprite plane so the atlas alpha stays transparent in first person.
         if (isItemsAtlasIconItem(item)) {
             // Every icon sourced from items.png is a cut-out sprite, not a cube.
             // Keep the atlas alpha for buckets, food, materials, tools, and armor alike.
