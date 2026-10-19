@@ -343,7 +343,7 @@ final class PassiveMob {
         final Appearance normal;
         float x, z, homeX, homeZ, dirX, dirZ;
         float jumpY = 0.0f, jumpVelocity = 0.0f;
-        int health = 3, hurtTicks, wanderTicks, hopCooldown;
+        int health = 10, hurtTicks, wanderTicks, hopCooldown;
         final int mobType;
         boolean alive = true;
         boolean rendered;
