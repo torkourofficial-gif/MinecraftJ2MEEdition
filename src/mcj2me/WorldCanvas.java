@@ -827,9 +827,20 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
             int heartY=h-36, heartX=(w-90)/2;
             for(int heart=0;heart<10;heart++){
-                int value=health-heart*2, sx=value>=2?52:(value==1?61:16);
-                if(hudIconsImage!=null)g.drawRegion(hudIconsImage,sx,0,9,9,0,
-                    heartX+heart*9,heartY,Graphics.TOP|Graphics.LEFT);
+                int value=health-heart*2;
+                int hx=heartX+heart*9;
+                if(hudIconsImage!=null){
+                    // Draw the black empty-heart container first, then its red fill.
+                    g.drawRegion(hudIconsImage,16,0,9,9,0,
+                        hx,heartY,Graphics.TOP|Graphics.LEFT);
+                    if(value>=2){
+                        g.drawRegion(hudIconsImage,52,0,9,9,0,
+                            hx,heartY,Graphics.TOP|Graphics.LEFT);
+                    }else if(value==1){
+                        g.drawRegion(hudIconsImage,61,0,9,9,0,
+                            hx,heartY,Graphics.TOP|Graphics.LEFT);
+                    }
+                }
             }
         } else {
             g.setColor(0xDDDDDD);
@@ -1916,7 +1927,8 @@ final class WorldCanvas extends Canvas implements Runnable {
                 int vf=horizontal?(zz==maxZ?1:0):(yy==maxY?1:0);
                 boolean ore=(tileX[face]==2 && (tileY[face]==1 || tileY[face]==2 || tileY[face]==3))
                     || (tileX[face]==1 && tileY[face]==2);
-                if((type==TerrainGenerator.BLOCK_GRASS && face<4)||ore)uf=1-uf;
+                // Grass-side UVs are already oriented for the dropped cube.
+                if(ore)uf=1-uf;
                 uv[b+k*2]=(short)(uf*1024); uv[b+k*2+1]=(short)(vf*1024);
             }
             int[] faceVertexIndices={base,base+1,base+2,base+3};
