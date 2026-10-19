@@ -2338,7 +2338,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         spawnExplosionDebris(debrisTypes, debrisX, debrisY, debrisZ);
         invalidateEditedArea(cx - radius, cx + radius, cz - radius, cz + radius);
-        resolvePlayerAfterTerrainEdit();
+        // Terrain edits must not snap the player to a column's surface height.
+        // Normal movement resolves support using the voxel-aware ground query.
     }
 
     private void breakBlock() {
@@ -2416,7 +2417,9 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (!terrain.removeBlockAt(x, blockY, z)) return;
         }
         invalidateEditedArea(x, x, z, z);
-        resolvePlayerAfterTerrainEdit();
+        // Mining changes terrain only; do not snap cameraY to getHeight().
+        // That shortcut can lift the player several blocks when mining a side
+        // face or while the jump arc is still active.
     }
 
     private void setupDecorations() {
