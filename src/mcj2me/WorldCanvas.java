@@ -1915,21 +1915,27 @@ final class WorldCanvas extends Canvas implements Runnable {
         int[] tileX = {sideX, sideX, sideX, sideX, topX, bottomX};
         int[] tileY = {sideY, sideY, sideY, sideY, topY, bottomY};
         for (int face = 0; face < 6; face++) {
-            int b = face * 8;
-            uv[b] = 0; uv[b+1] = 0;
-            uv[b+2] = 0; uv[b+3] = 1024;
-            uv[b+4] = 1024; uv[b+5] = 0;
-            uv[b+6] = 1024; uv[b+7] = 1024;
-            if (type == TerrainGenerator.BLOCK_GRASS && face < 4) {
-                uv[b] = 1024;
-                uv[b+2] = 1024;
-                uv[b+4] = 0;
-                uv[b+6] = 0;
+            int b=face*8, base=face*4;
+            boolean horizontal=face>=4, xFace=face==2 || face==3;
+            int minX=32767,maxX=-32768,minY=32767,maxY=-32768,minZ=32767,maxZ=-32768;
+            for(int k=0;k<4;k++){
+                int pi=(base+k)*3,xx=p[pi],yy=p[pi+1],zz=p[pi+2];
+                if(xx<minX)minX=xx; if(xx>maxX)maxX=xx;
+                if(yy<minY)minY=yy; if(yy>maxY)maxY=yy;
+                if(zz<minZ)minZ=zz; if(zz>maxZ)maxZ=zz;
             }
-            int base = face * 4;
-            int[] faceVertexIndices = {base, base + 1, base + 2, base + 3};
-            faceIndices[face] = new TriangleStripArray(faceVertexIndices, new int[] {4});
-            faceAppearances[face] = getTerrainTileAppearance((tileY[face] << 4) | tileX[face]);
+            for(int k=0;k<4;k++){
+                int pi=(base+k)*3,xx=p[pi],yy=p[pi+1],zz=p[pi+2];
+                int uf=(horizontal || !xFace)?(xx==maxX?1:0):(zz==maxZ?1:0);
+                int vf=horizontal?(zz==maxZ?1:0):(yy==maxY?1:0);
+                boolean ore=(tileX[face]==2 && (tileY[face]==1 || tileY[face]==2 || tileY[face]==3))
+                    || (tileX[face]==1 && tileY[face]==2);
+                if((type==TerrainGenerator.BLOCK_GRASS && face<4)||ore)uf=1-uf;
+                uv[b+k*2]=(short)(uf*1024); uv[b+k*2+1]=(short)(vf*1024);
+            }
+            int[] faceVertexIndices={base,base+1,base+2,base+3};
+            faceIndices[face]=new TriangleStripArray(faceVertexIndices,new int[]{4});
+            faceAppearances[face]=getTerrainTileAppearance((tileY[face]<<4)|tileX[face]);
         }
         VertexArray pa = new VertexArray(24, 3, 2);
         pa.set(0, 24, p);
