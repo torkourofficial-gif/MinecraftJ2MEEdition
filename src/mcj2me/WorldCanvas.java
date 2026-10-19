@@ -190,6 +190,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         64, 64, 64, 64, 64, 64, 64, 64,
         64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 1, 0, 0, 0
     };
+    private static final int SLOT_SAVE_MARKER = 0x534C4F54; // 'SLOT'
     private int selectedSlot = 0, particleTicks = 0, actionCooldown = 0;
     private int tntFuseTicks = 0, tntX = -1, tntZ = -1, tntFlashCounter = 0;
     private boolean tntFlashOn = false;
@@ -299,6 +300,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         out.writeInt(dayTick); out.writeInt(selectedSlot);
         out.writeInt(inventory.length);
         for (int i = 0; i < inventory.length; i++) out.writeInt(inventory[i]);
+        out.writeInt(SLOT_SAVE_MARKER);
         for (int i = 0; i < hotbarItems.length; i++) out.writeInt(hotbarItems[i]);
         for (int i = 0; i < mainInventoryItems.length; i++) out.writeInt(mainInventoryItems[i]);
         out.writeInt(decorationCount);
@@ -338,17 +340,19 @@ final class WorldCanvas extends Canvas implements Runnable {
         if (invCount < 0 || invCount > inventory.length)
             throw new Exception("Invalid saved inventory");
         for (int i = 0; i < invCount; i++) inventory[i] = Math.max(0, in.readInt());
-        // New saves persist the exact slot arrangement. Older saves are migrated
-        // into hotbar-first order without changing the amount of any item.
-        if (in.available() >= (hotbarItems.length + mainInventoryItems.length) * 4 + 4) {
+        // Marker makes the new slot data unambiguous while preserving old saves.
+        int slotMarkerOrDecorationCount = in.readInt();
+        int savedCount;
+        if (slotMarkerOrDecorationCount == SLOT_SAVE_MARKER) {
             for (int i = 0; i < hotbarItems.length; i++) hotbarItems[i] = in.readInt();
             for (int i = 0; i < mainInventoryItems.length; i++) mainInventoryItems[i] = in.readInt();
+            savedCount = in.readInt();
         } else {
             for (int i = 0; i < hotbarItems.length; i++) hotbarItems[i] = -1;
             for (int i = 0; i < mainInventoryItems.length; i++) mainInventoryItems[i] = -1;
             for (int type = 0; type < inventory.length; type++) if (inventory[type] > 0) addItemToSlots(type);
+            savedCount = slotMarkerOrDecorationCount;
         }
-        int savedCount = in.readInt();
         if (savedCount < 0 || savedCount > MAX_DECORATIONS)
             throw new Exception("Invalid saved decorations");
         decorationCount = 0;
