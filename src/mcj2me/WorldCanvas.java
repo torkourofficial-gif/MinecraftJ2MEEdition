@@ -224,6 +224,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private final float[] droppedX = new float[MAX_DROPPED_ITEMS];
     private final float[] droppedY = new float[MAX_DROPPED_ITEMS];
     private final float[] droppedZ = new float[MAX_DROPPED_ITEMS];
+    private final float[] droppedVelocityY = new float[MAX_DROPPED_ITEMS];
     private final int[] droppedAge = new int[MAX_DROPPED_ITEMS];
     private Group droppedItemGroup;
 
@@ -1894,6 +1895,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             droppedX[slot] = x;
             droppedY[slot] = y;
             droppedZ[slot] = z;
+            droppedVelocityY[slot] = 0.0f;
             droppedAge[slot] = 0;
             mesh.setTranslation(x, y, z);
             droppedItemGroup.addChild(mesh);
@@ -2022,9 +2024,23 @@ final class WorldCanvas extends Canvas implements Runnable {
             Mesh mesh = droppedMeshes[i];
             if (mesh == null) continue;
             droppedAge[i]++;
-            float bob = (float)Math.sin(droppedAge[i] * 0.18f) * 0.07f;
+            // Dropped items obey gravity and settle on the actual voxel surface,
+            // including placed blocks and exposed blocks below mined gaps.
+            float previousY = droppedY[i];
+            droppedVelocityY[i] -= 0.025f;
+            if (droppedVelocityY[i] < -0.45f) droppedVelocityY[i] = -0.45f;
+            droppedY[i] += droppedVelocityY[i];
+            if (droppedVelocityY[i] < 0.0f) {
+                int bx = (int) Math.floor(droppedX[i]);
+                int bz = (int) Math.floor(droppedZ[i]);
+                int by = (int) Math.floor(droppedY[i] - 0.12f);
+                if (terrain.getBlockTypeAt(bx, by, bz) >= 0) {
+                    droppedY[i] = by + 1.12f;
+                    droppedVelocityY[i] = 0.0f;
+                }
+            }
             mesh.setOrientation(droppedAge[i] * 9.0f, 0.0f, 1.0f, 0.0f);
-            mesh.setTranslation(droppedX[i], droppedY[i] + bob, droppedZ[i]);
+            mesh.setTranslation(droppedX[i], droppedY[i], droppedZ[i]);
             float dx = droppedX[i] - cameraX;
             float dy = droppedY[i] - cameraY;
             float dz = droppedZ[i] - cameraZ;
