@@ -124,7 +124,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Thread thread;
     private boolean running;
     private int frameSkipCounter = 0;
-    private final int[] surfaceHitResult = new int[5];
+    private final int[] surfaceHitResult = new int[8];
     private final int[] leafHitResult = new int[3];
     private boolean paused;
     private boolean pauseOverlayOpen;
@@ -1165,8 +1165,7 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     private float groundAtColumn(int x, int z, float feetY) {
         if (x < 0 || z < 0 || x >= TerrainGenerator.SIZE || z >= TerrainGenerator.SIZE) return 0.0f;
-        int startY = Math.min(floorVoxel(feetY + 0.02f), terrain.getHeight(x, z) - 1);
-        if (startY >= TerrainGenerator.HEIGHT) startY = TerrainGenerator.HEIGHT - 1;
+        int startY = Math.min(floorVoxel(feetY + 0.02f), TerrainGenerator.HEIGHT - 1);
         for (int y = startY; y >= 0; y--) {
             if (terrain.getBlockTypeAt(x, y, z) >= 0) return y + 1.0f;
         }
@@ -1790,6 +1789,19 @@ final class WorldCanvas extends Canvas implements Runnable {
                 }
             }
         }
+        for (int p = 0; p < terrain.getPlacedBlockCount(); p++) {
+            int id = terrain.getPlacedBlockIdAtIndex(p);
+            int py = id / (TerrainGenerator.SIZE * TerrainGenerator.SIZE);
+            int rem = id - py * TerrainGenerator.SIZE * TerrainGenerator.SIZE;
+            int pz = rem / TerrainGenerator.SIZE, px = rem - pz * TerrainGenerator.SIZE;
+            if (px < startX || px >= startX + CHUNK || pz < startZ || pz >= startZ + CHUNK) continue;
+            if (terrain.getBlockTypeAt(px - 1, py, pz) < 0) quads++;
+            if (terrain.getBlockTypeAt(px + 1, py, pz) < 0) quads++;
+            if (terrain.getBlockTypeAt(px, py - 1, pz) < 0) quads++;
+            if (terrain.getBlockTypeAt(px, py + 1, pz) < 0) quads++;
+            if (terrain.getBlockTypeAt(px, py, pz - 1) < 0) quads++;
+            if (terrain.getBlockTypeAt(px, py, pz + 1) < 0) quads++;
+        }
         int vertexCount = quads * 4;
         int flowerVertexCount = flowerQuads * 4;
         short[] flowerPositions = new short[flowerVertexCount * 3];
@@ -1876,6 +1888,34 @@ final class WorldCanvas extends Canvas implements Runnable {
             }
         }
 
+        for (int p = 0; p < terrain.getPlacedBlockCount(); p++) {
+            int id = terrain.getPlacedBlockIdAtIndex(p);
+            int py = id / (TerrainGenerator.SIZE * TerrainGenerator.SIZE);
+            int rem = id - py * TerrainGenerator.SIZE * TerrainGenerator.SIZE;
+            int pz = rem / TerrainGenerator.SIZE, px = rem - pz * TerrainGenerator.SIZE;
+            if (px < startX || px >= startX + CHUNK || pz < startZ || pz >= startZ + CHUNK) continue;
+            int type = terrain.getPlacedBlockTypeAtIndex(p);
+            int tx = BLOCK_TILE_X[type], ty = BLOCK_TILE_Y[type];
+            if (terrain.getBlockTypeAt(px - 1, py, pz) < 0)
+                vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
+                    px,py,pz+1, px,py+1,pz+1, px,py,pz, px,py+1,pz, tx,ty);
+            if (terrain.getBlockTypeAt(px + 1, py, pz) < 0)
+                vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
+                    px+1,py,pz, px+1,py+1,pz, px+1,py,pz+1, px+1,py+1,pz+1, tx,ty);
+            if (terrain.getBlockTypeAt(px, py - 1, pz) < 0)
+                vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
+                    px,py,pz, px+1,py,pz, px,py,pz+1, px+1,py,pz+1, tx,ty);
+            if (terrain.getBlockTypeAt(px, py + 1, pz) < 0)
+                vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
+                    px,py+1,pz, px,py+1,pz+1, px+1,py+1,pz, px+1,py+1,pz+1, tx,ty);
+            if (terrain.getBlockTypeAt(px, py, pz - 1) < 0)
+                vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
+                    px,py,pz, px,py+1,pz, px+1,py,pz, px+1,py+1,pz, tx,ty);
+            if (terrain.getBlockTypeAt(px, py, pz + 1) < 0)
+                vertex = addQuad(positions, texCoords, colors, stripLengths, vertex, strip++,
+                    px+1,py,pz+1, px+1,py+1,pz+1, px,py,pz+1, px,py+1,pz+1, tx,ty);
+        }
+
         Group chunkGroup = new Group();
         if (vertexCount > 0) {
             VertexArray vertexArray = new VertexArray(vertexCount, 3, 2);
@@ -1937,7 +1977,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             // Never emit a greedy surface quad for a voxel recorded as removed.
             // This is the source of the lingering "ghost top" after side mining
             // or loading older edited-world data.
-            if (h <= 0 || terrain.isBlockRemoved(wx, h - 1, wz)) {
+            if (h <= 0 || terrain.isBlockRemoved(wx, h - 1, wz) || terrain.getPlacedBlockTypeAt(wx, h, wz) >= 0) {
                 keys[x][z] = -1; hs[x][z] = h;
                 bases[x][z] = 0; glows[x][z] = 0;
                 continue;
@@ -2386,6 +2426,16 @@ final class WorldCanvas extends Canvas implements Runnable {
             return;
         }
 
+        int[] placedHit = raycastSurface();
+        if (placedHit != null) {
+            int placedType = terrain.getPlacedBlockTypeAt(placedHit[0], placedHit[2], placedHit[1]);
+            if (placedType >= 0 && terrain.removePlacedBlockAt(placedHit[0], placedHit[2], placedHit[1])) {
+                if (placedType < inventory.length && inventory[placedType] < 64) inventory[placedType]++;
+                spawnBlockParticles(placedType, placedHit[0] + 0.5f, placedHit[2] + 0.5f, placedHit[1] + 0.5f);
+                invalidateEditedArea(placedHit[0], placedHit[0], placedHit[1], placedHit[1]);
+                return;
+            }
+        }
         // hit = {x, z, blockY, sideHit}; sideHit allows mining exposed cliff/cave-wall faces.
         int[] hit = raycastSurface();
         if (hit == null) return;
@@ -2493,12 +2543,18 @@ final class WorldCanvas extends Canvas implements Runnable {
         else if (type == BLOCK_SAPLING) mesh.setScale(0.48f, 0.62f, 1.0f);
         else if (type != BLOCK_DOOR) mesh.setScale(0.38f, 0.48f, 1.0f);
         Group pivot = null;
+        float placedYaw = yaw;
         if (type == BLOCK_DOOR) {
-            // Put the panel under a separate transform whose origin is the hinge.
-            // Rotating this parent makes the far edge travel along a semicircular arc.
+            placedYaw = ((int) Math.floor((yaw + 45.0f) / 90.0f)) * 90.0f;
+            while (placedYaw >= 360.0f) placedYaw -= 360.0f;
+            while (placedYaw < 0.0f) placedYaw += 360.0f;
             pivot = new Group();
-            pivot.setOrientation(yaw, 0.0f, 1.0f, 0.0f);
-            pivot.setTranslation(x - 0.5f, y, z);
+            pivot.setOrientation(placedYaw, 0.0f, 1.0f, 0.0f);
+            float hingeX = x - 0.5f, hingeZ = z - 0.5f;
+            if (placedYaw == 90.0f) hingeZ += 1.0f;
+            else if (placedYaw == 180.0f) { hingeX += 1.0f; hingeZ += 1.0f; }
+            else if (placedYaw == 270.0f) hingeX += 1.0f;
+            pivot.setTranslation(hingeX, y, hingeZ);
             mesh.setTranslation(0.0f, 0.0f, 0.0f);
             pivot.addChild(mesh);
             decorationGroup.addChild(pivot);
@@ -2514,7 +2570,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         decorationX[at] = x;
         decorationY[at] = y;
         decorationZ[at] = z;
-        decorationYaw[at] = yaw;
+        decorationYaw[at] = (type == BLOCK_DOOR) ? placedYaw : yaw;
         decorationOpen[at] = false;
         return true;
     }
@@ -2650,44 +2706,37 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void placeBlock() {
-        // Use the place/interact key on an existing door to open or close it.
-        // This check comes before inventory validation, so interaction works
-        // even when the currently selected hotbar slot is empty.
         int decorationHit = raycastDecoration();
         if (decorationHit >= 0 && decorationTypes[decorationHit] == BLOCK_DOOR) {
             toggleDoor(decorationHit);
             return;
         }
         if (selectedSlot < 0 || selectedSlot >= inventory.length || inventory[selectedSlot] <= 0) return;
-        if (selectedSlot == ITEM_EMPTY_BUCKET) {
-            collectWaterBucket();
-            return;
-        }
+        if (selectedSlot == ITEM_EMPTY_BUCKET) { collectWaterBucket(); return; }
         int[] hit = raycastSurface();
         if (hit == null) return;
-        int x = hit[0], z = hit[1], h = terrain.getHeight(x, z);
-        if (selectedSlot == ITEM_WATER_BUCKET) {
-            placeWaterBucket(x, z, h);
-            return;
-        }
+        int x = hit[5], y = hit[6], z = hit[7];
+        if (x < 1 || z < 1 || x >= TerrainGenerator.SIZE - 1 ||
+                z >= TerrainGenerator.SIZE - 1 || y < 0 || y >= TerrainGenerator.HEIGHT) return;
+        if (selectedSlot == ITEM_WATER_BUCKET) { placeWaterBucket(x, z, y); return; }
         if (selectedSlot >= BLOCK_TORCH && selectedSlot <= BLOCK_DOOR) {
             if (decorationCount >= MAX_DECORATIONS) return;
-            if (h >= TerrainGenerator.HEIGHT - 3) return;
-            int decorationHeight = (selectedSlot == BLOCK_DOOR) ? 2 : 1;
-            if (!isPlacementSpaceClear(x, h, z, decorationHeight)) return;
-            if (placeDecoration(selectedSlot, x + 0.5f, h, z + 0.5f)) {
+            int decorationHeight = selectedSlot == BLOCK_DOOR ? 2 : 1;
+            if (!isPlacementSpaceClear(x, y, z, decorationHeight)) return;
+            if (placeDecoration(selectedSlot, x + 0.5f, y, z + 0.5f)) {
                 inventory[selectedSlot]--;
                 updateTorchLights();
                 if (selectedSlot == BLOCK_TORCH) invalidateEditedArea(x, x, z, z);
             }
             return;
         }
-        if (h >= TerrainGenerator.HEIGHT - 3) return;
-        // The current terrain model stores a single top block per X/Z column.
-        // Raising that column here overwrote the true subsurface material and
-        // created phantom faces. Refuse solid-block placement rather than corrupting terrain.
-        // Decorations and water buckets remain placeable until sparse placed voxels
-        // have their own persistent storage and independent mesh generation.
+        if (selectedSlot == TerrainGenerator.BLOCK_BEDROCK ||
+                selectedSlot > TerrainGenerator.BLOCK_WOOL_BLACK) return;
+        if (!isPlacementSpaceClear(x, y, z, 1)) return;
+        if (terrain.setPlacedBlockAt(x, y, z, selectedSlot)) {
+            inventory[selectedSlot]--;
+            invalidateEditedArea(x, x, z, z);
+        }
     }
 
     /**
@@ -2715,16 +2764,16 @@ final class WorldCanvas extends Canvas implements Runnable {
                     by < decorationY[d] + (decorationTypes[d] == BLOCK_DOOR ? 2 : 1))
                     return false;
             }
-            if (Math.abs(cameraX - (x + 0.5f)) < 0.25f &&
-                Math.abs(cameraZ - (z + 0.5f)) < 0.25f &&
+            if (Math.abs(cameraX - (x + 0.5f)) < PLAYER_HALF_WIDTH &&
+                Math.abs(cameraZ - (z + 0.5f)) < PLAYER_HALF_WIDTH &&
                 by + 1.0f > feetY && by < headY) return false;
         }
         return true;
     }
 
-    private void placeWaterBucket(int x, int z, int groundHeight) {
-        int level = groundHeight + 1;
-        if (level >= TerrainGenerator.HEIGHT - 1 || terrain.isWaterAt(x, z)) return;
+    private void placeWaterBucket(int x, int z, int targetY) {
+        int level = targetY + 1;
+        if (level >= TerrainGenerator.HEIGHT - 1 || terrain.isWaterAt(x, z) || terrain.getHeight(x, z) > targetY) return;
         if (isWaterFlowBlocked(x, z, level)) return;
         int free = -1;
         for (int i = 0; i < MAX_WATER_SOURCES; i++) {
@@ -2945,19 +2994,20 @@ final class WorldCanvas extends Canvas implements Runnable {
                             surfaceHitResult[2] = surface - 1;
                             surfaceHitResult[3] = 0;
                             surfaceHitResult[4] = (int)(topDistance * 1000.0f);
+                            surfaceHitResult[5] = x; surfaceHitResult[6] = surface; surfaceHitResult[7] = z;
                             return surfaceHitResult;
                         }
                     }
                 }
-                boolean occupied = y < surface && terrain.getBlockTypeAt(x, y, z) >= 0;
-                boolean topFace = enteredAxis == 1 && dy < 0.0f
-                    && y == surface - 1 && occupied;
+                boolean occupied = terrain.getBlockTypeAt(x, y, z) >= 0;
+                boolean topFace = enteredAxis == 1 && dy < 0.0f && occupied
+                    && terrain.getBlockTypeAt(x, y + 1, z) < 0;
                 boolean sideFace = false;
 
                 if (occupied && (enteredAxis == 0 || enteredAxis == 2)) {
                     int previousHeight = terrain.getHeight(previousX, previousZ);
                     int previousType = terrain.getBlockTypeAt(previousX, y, previousZ);
-                    sideFace = y < surface && (y >= previousHeight || previousType < 0);
+                    sideFace = y >= previousHeight || previousType < 0;
                 }
 
                 if (topFace || sideFace) {
@@ -2966,6 +3016,8 @@ final class WorldCanvas extends Canvas implements Runnable {
                     surfaceHitResult[2] = y;
                     surfaceHitResult[3] = sideFace ? 1 : 0;
                     surfaceHitResult[4] = (int)(distance * 1000.0f);
+                    if (topFace) { surfaceHitResult[5] = x; surfaceHitResult[6] = y + 1; surfaceHitResult[7] = z; }
+                    else { surfaceHitResult[5] = previousX; surfaceHitResult[6] = previousY; surfaceHitResult[7] = previousZ; }
                     return surfaceHitResult;
                 }
             }
