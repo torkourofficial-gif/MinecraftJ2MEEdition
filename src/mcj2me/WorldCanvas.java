@@ -1309,15 +1309,20 @@ final class WorldCanvas extends Canvas implements Runnable {
             for (int k=0;k<4;k++) {
                 int u, v;
                 if (face==4) {
-                    u=(k<2)?r[0]:r[2]; v=(k==0||k==2)?r[3]:r[1];
+                    // Top: +Z is the front edge, which belongs to the
+                    // bottom edge of the top-face rectangle in the skin net.
+                    u=(k<2)?r[0]:r[2]; v=(k==0||k==2)?r[1]:r[3];
                 } else if (face==5) {
-                    u=(k==0||k==2)?r[2]:r[0]; v=(k<2)?r[1]:r[3];
+                    // Bottom uses the same front-edge convention: vertices
+                    // on +Z map to the rectangle's bottom edge, not its top.
+                    u=(k<2)?r[0]:r[2]; v=(k==0||k==2)?r[3]:r[1];
                 } else {
                     u=(k<2)?r[0]:r[2]; v=(k==0||k==2)?r[3]:r[1];
-                    // Face 1 is the camera-facing (+Z) front, whose vertex
-                    // order runs right-to-left; face 2 is the outer side,
-                    // whose vertex order also runs opposite to atlas U.
-                    if (face==1 || face==2) u=(k<2)?r[2]:r[0];
+                    // Match the skin's unfolded net to each face's vertex
+                    // order. Front (+Z) starts at +X; both side faces run
+                    // opposite their atlas U direction. The back (-Z) face
+                    // already follows its atlas direction.
+                    if (face==1 || face==2 || face==3) u=(k<2)?r[2]:r[0];
                 }
                 uv[face*8+k*2]=(short)(u*1024/64);
                 // M3G texture V runs from the image's bottom edge. Flip the
