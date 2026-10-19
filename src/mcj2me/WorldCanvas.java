@@ -588,6 +588,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         // The steak sprite is immediately to the right of the porkchop on row 5.
         // Row 6, column 8 is the saddle, which was accidentally used before.
         blockIcons[ITEM_RAW_BEEF] = createFoodItemsIcon(itemsImage, 8, 5);
+        // Leather is the item directly below the raw porkchop in items.png.
+        // Use the real 16x16 atlas sprite rather than a generated text/icon placeholder.
+        blockIcons[crafts.LEATHER] = createFoodItemsIcon(itemsImage, 7, 6);
         for (int ci = 44; ci < blockIcons.length; ci++) blockIcons[ci] = createCraftIcon(ci);
         setupStage = "loading /mcj2me/clouds.png";
         Image cloudsImage = ResourceImages.load("/mcj2me/clouds.png");
@@ -1137,6 +1140,14 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     }
 
+    // On some Windows Mobile/MIDP handsets the D-pad centre is reported as
+    // the configured jump key instead of Canvas.FIRE. Treat that binding as
+    // confirm while a menu is open, without changing its in-world jump action.
+    private boolean isConfirmKey(int keyCode, int action) {
+        return isConfirmKey(keyCode, action)
+            || keyCode == 13 || IndevViewerMIDlet.controlPressed(CONTROL_JUMP, keyCode, action);
+    }
+
     protected synchronized void keyPressed(int keyCode) {
         int action = getGameAction(keyCode);
 
@@ -1144,7 +1155,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (action == UP || action == DOWN || keyCode == '2' || keyCode == '8') {
                 deathSelection = 1 - deathSelection;
                 repaint();
-            } else if (action == FIRE || keyCode == '5' || keyCode == ' ' || keyCode == 10) {
+            } else if (isConfirmKey(keyCode, action) || keyCode == 10) {
                 if (deathSelection == 0) respawnPlayer();
                 else midlet.returnToMainMenu();
             }
@@ -1171,7 +1182,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (action == UP || action == DOWN || keyCode == '2' || keyCode == '8') {
                 pauseSelection = (pauseSelection + 1) % 2;
                 repaint();
-            } else if (action == FIRE || keyCode == '5' || keyCode == ' ' || keyCode == 10) {
+            } else if (isConfirmKey(keyCode, action)) {
                 if (pauseSelection == 0) midlet.openPauseSettings();
                 else midlet.returnToMainMenu();
             }
