@@ -195,9 +195,6 @@ final class WorldCanvas extends Canvas implements Runnable {
     private int handSwingTicks = 0;
     private int eatingTicks = 0;
     private int eatingItem = -1;
-    private Image heldItemScaled;
-    private int heldItemScaledType = -2;
-    private int heldItemScaledSize = -1;
     private static final int EATING_DURATION_TICKS = 50; // 2 seconds at the 40 ms game tick.
     private int tntFuseTicks = 0, tntX = -1, tntZ = -1, tntFlashCounter = 0;
     private boolean tntFlashOn = false;
@@ -248,6 +245,11 @@ final class WorldCanvas extends Canvas implements Runnable {
     private final float[] droppedVelocityY = new float[MAX_DROPPED_ITEMS];
     private final int[] droppedAge = new int[MAX_DROPPED_ITEMS];
     private Group droppedItemGroup;
+    private Group heldItemGroup;
+    private Mesh heldItemMesh;
+    private int heldItemType = -2;
+    private boolean heldItemIsArm;
+    private Appearance heldArmAppearance;
 
     WorldCanvas(IndevViewerMIDlet owner, String name, int seed) {
         this(owner, name, seed, 0, IndevViewerMIDlet.MODE_CREATIVE, null);
@@ -519,6 +521,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         cloudGroup = new Group();
         blockParticleGroup = new Group();
         droppedItemGroup = new Group();
+        heldItemGroup = new Group();
         decorationGroup = new Group();
         camera = new Camera();
 
@@ -533,6 +536,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         inventoryImage = ResourceImages.load("/mcj2me/inventory.png");
         setupStage = "loading /mcj2me/items.png";
         Image itemsImage = ResourceImages.load("/mcj2me/items.png");
+        setupStage = "loading /mcj2me/char.png";
+        Image charImage = ResourceImages.load("/mcj2me/char.png");
+        heldArmAppearance = createHeldTextureAppearance(charImage);
         hudIconsImage = ResourceImages.load("/mcj2me/icons.png");
         setupStage = "creating inventory icon 0 (grass)";
         blockIcons[0] = createGuiBlockIcon(GUI_ICON_X[0], GUI_ICON_Y[0]);
@@ -656,6 +662,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         world.addChild(waterGroup);
         world.addChild(decorationGroup);
         world.addChild(droppedItemGroup);
+        world.addChild(heldItemGroup);
         setupStage = "creating decorations and torch lights";
         setupDecorations();
         setupTorchLights();
@@ -725,6 +732,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 updateMovement();
                 tickEating();
                 if (handSwingTicks > 0) handSwingTicks--;
+                updateHeldItem();
                 tickMining();
                 tickSurvival();
                 tickDroppedItems();
@@ -1041,7 +1049,6 @@ final class WorldCanvas extends Canvas implements Runnable {
                 }
             }
         }
-        drawHeldItem(g);
         int cx = w / 2, cy = h / 2;
         g.setColor(0xFFFFFF);
         g.drawLine(cx - 3, cy, cx + 3, cy);
@@ -1247,58 +1254,164 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
     }
 
-    private Image scaleHeldIcon(Image source, int size) {
-        if (source == null || size <= 0) return source;
-        int sw = source.getWidth(), sh = source.getHeight();
-        int[] src = new int[sw * sh];
-        source.getRGB(src, 0, sw, 0, 0, sw, sh);
-        int[] dst = new int[size * size];
-        for (int y = 0; y < size; y++) {
-            int sy = y * sh / size;
-            for (int x = 0; x < size; x++) dst[y * size + x] = src[sy * sw + x * sw / size];
-        }
-        return Image.createRGBImage(dst, size, size, true);
+    private Appearance createHeldTextureAppearance(Image image) {
+        Texture2D texture = new Texture2D(new Image2D(Image2D.RGBA, image));
+        texture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
+        texture.setWrapping(Texture2D.WRAP_CLAMP, Texture2D.WRAP_CLAMP);
+        Appearance appearance = new Appearance();
+        appearance.setTexture(0, texture);
+        PolygonMode mode = new PolygonMode();
+        mode.setCulling(PolygonMode.CULL_NONE);
+        mode.setShading(PolygonMode.SHADE_FLAT);
+        appearance.setPolygonMode(mode);
+        return appearance;
     }
 
-    private void drawHeldItem(Graphics g) {
+    private Mesh createHeldArmMesh() {
+        // Classic char.png is a 64x32 Steve skin. The right arm UVs are the
+        // standard 4x12x4 cuboid at atlas origin (40,16), including all six faces.
+        int x=40, y=16, w=4, h=12, d=4;
+        int[][] rects = {
+            {x+d, y+d, x+d+w, y+d+h},             // front
+            {x+d+w+d, y+d, x+d+w+d+w, y+d+h},     // back
+            {x, y+d, x+d, y+d+h},                 // outer side
+            {x+d+w, y+d, x+d+w+d, y+d+h},         // inner side
+            {x+d, y, x+d+w, y+d},                 // top
+            {x+d+w, y, x+d+w+w, y+d}              // bottom
+        };
+        short[] p = {
+            -2,-6,-2, -2,6,-2, 2,-6,-2, 2,6,-2,
+            2,-6,2, 2,6,2, -2,-6,2, -2,6,2,
+            -2,-6,2, -2,6,2, -2,-6,-2, -2,6,-2,
+            2,-6,-2, 2,6,-2, 2,-6,2, 2,6,2,
+            -2,6,-2, -2,6,2, 2,6,-2, 2,6,2,
+            -2,-6,2, -2,-6,-2, 2,-6,2, 2,-6,-2
+        };
+        short[] uv = new short[48];
+        for (int face=0; face<6; face++) {
+            int[] r=rects[face];
+            for (int k=0;k<4;k++) {
+                int u, v;
+                if (face==4) {
+                    u=(k<2)?r[0]:r[2]; v=(k==0||k==2)?r[3]:r[1];
+                } else if (face==5) {
+                    u=(k==0||k==2)?r[2]:r[0]; v=(k<2)?r[1]:r[3];
+                } else {
+                    u=(k<2)?r[0]:r[2]; v=(k==0||k==2)?r[3]:r[1];
+                    if (face==1 || face==2) u=(k<2)?r[2]:r[0];
+                }
+                uv[face*8+k*2]=(short)(u*1024/64);
+                uv[face*8+k*2+1]=(short)(v*1024/32);
+            }
+        }
+        int[] indices = new int[24];
+        int[] strips = new int[6];
+        for (int i=0;i<24;i++) indices[i]=i;
+        for (int i=0;i<6;i++) strips[i]=4;
+        VertexArray positions = new VertexArray(24,3,2);
+        positions.set(0,24,p);
+        VertexArray texCoords = new VertexArray(24,2,2);
+        texCoords.set(0,24,uv);
+        VertexBuffer buffer = new VertexBuffer();
+        buffer.setPositions(positions,1.0f/16.0f,null);
+        buffer.setTexCoords(0,texCoords,1.0f/1024.0f,null);
+        return new Mesh(buffer,new TriangleStripArray(indices,strips),heldArmAppearance);
+    }
+
+    private Mesh createHeldItemMesh(int item) {
+        if (item < ITEM_WATER_BUCKET) {
+            Mesh block = createDroppedBlockMesh(item);
+            block.setScale(2.15f,2.15f,2.15f);
+            return block;
+        }
+        // Non-block items use a shallow, six-sided 3D model textured from their
+        // inventory icon. This keeps meat/buckets volumetric rather than HUD sprites.
+        Image icon = blockIcons[item];
+        Appearance appearance = createHeldTextureAppearance(icon);
+        short[] p = {
+            -4,-5,-1, -4,5,-1, 4,-5,-1, 4,5,-1,
+            4,-5,1, 4,5,1, -4,-5,1, -4,5,1,
+            -4,-5,1, -4,5,1, -4,-5,-1, -4,5,-1,
+            4,-5,-1, 4,5,-1, 4,-5,1, 4,5,1,
+            -4,5,-1, -4,5,1, 4,5,-1, 4,5,1,
+            -4,-5,1, -4,-5,-1, 4,-5,1, 4,-5,-1
+        };
+        short[] uv = new short[48];
+        for (int face=0;face<6;face++) {
+            for (int k=0;k<4;k++) {
+                int u=(k<2)?0:1024;
+                int v=(k==0||k==2)?1024:0;
+                uv[face*8+k*2]=(short)u;
+                uv[face*8+k*2+1]=(short)v;
+            }
+        }
+        int[] indices=new int[24], strips=new int[6];
+        for(int i=0;i<24;i++) indices[i]=i;
+        for(int i=0;i<6;i++) strips[i]=4;
+        VertexArray positions=new VertexArray(24,3,2); positions.set(0,24,p);
+        VertexArray texCoords=new VertexArray(24,2,2); texCoords.set(0,24,uv);
+        VertexBuffer buffer=new VertexBuffer();
+        buffer.setPositions(positions,1.0f/16.0f,null);
+        buffer.setTexCoords(0,texCoords,1.0f/1024.0f,null);
+        Mesh result=new Mesh(buffer,new TriangleStripArray(indices,strips),appearance);
+        result.setScale(1.25f,1.25f,1.25f);
+        return result;
+    }
+
+    private void updateHeldItem() {
+        if (heldItemGroup == null) return;
         int item = eatingTicks > 0 ? eatingItem : selectedItemType();
-        if (item < 0 || item >= blockIcons.length) return;
-        if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL && inventory[item] <= 0) return;
-        int w = getWidth(), h = getHeight();
-        int swing = handSwingTicks > 0 ? handSwingTicks : 0;
-        int phase = swing > 0 ? (swing % 10) : 0;
-        int offsetY = swing > 0 ? (int)(Math.sin(phase * Math.PI / 5.0) * 9.0) : 0;
+        boolean hasItem = item >= 0 && item < inventory.length
+            && (worldMode != IndevViewerMIDlet.MODE_SURVIVAL || inventory[item] > 0);
+        boolean arm = !hasItem;
+        int type = hasItem ? item : -1;
+        if (heldItemMesh == null || type != heldItemType || arm != heldItemIsArm) {
+            if (heldItemMesh != null) heldItemGroup.removeChild(heldItemMesh);
+            try {
+                heldItemMesh = arm ? createHeldArmMesh() : createHeldItemMesh(type);
+                heldItemGroup.addChild(heldItemMesh);
+                heldItemType = type;
+                heldItemIsArm = arm;
+            } catch (Exception e) {
+                heldItemMesh = null;
+                heldItemType = -2;
+                return;
+            }
+        }
+        float yr=(float)(yaw*Math.PI/180.0);
+        float pr=(float)(pitch*Math.PI/180.0);
+        float cosPitch=(float)Math.cos(pr);
+        float fx=(float)Math.sin(yr)*cosPitch;
+        float fy=(float)Math.sin(pr);
+        float fz=-(float)Math.cos(yr)*cosPitch;
+        float rx=(float)Math.cos(yr), rz=(float)Math.sin(yr);
+        float ux=-(float)Math.sin(yr)*(float)Math.sin(pr);
+        float uy=cosPitch;
+        float uz=(float)Math.cos(yr)*(float)Math.sin(pr);
+        float forward=0.95f, right=0.43f, down=0.48f;
+        float swingX=0.0f, swingY=0.0f, swingZ=0.0f;
         if (eatingTicks > 0) {
-            int elapsed = EATING_DURATION_TICKS - eatingTicks;
-            offsetY -= (elapsed % 8 < 4 ? 5 : 0);
+            int elapsed=EATING_DURATION_TICKS-eatingTicks;
+            forward=0.62f;
+            down=0.18f-((elapsed%8<4)?0.06f:0.0f);
+            right=0.20f;
+        } else if (handSwingTicks > 0) {
+            float phase=(8-handSwingTicks)%8;
+            float swing=(float)Math.sin(phase*Math.PI/4.0);
+            forward += swing*0.12f;
+            down += Math.abs(swing)*0.10f;
+            right -= swing*0.08f;
+            swingX=swing*12.0f;
         }
-        int handX = w - 45;
-        int handY = h - 70 + offsetY;
-        // Lightweight first-person hand silhouette: no extra M3G mesh allocations.
-        g.setColor(0x7B5138);
-        g.fillRect(handX + 8, handY + 24, 20, 31);
-        g.setColor(0xD7A477);
-        g.fillRect(handX + 5, handY + 13, 21, 18);
-        g.fillTriangle(handX + 5, handY + 14, handX + 1, handY + 25,
-                       handX + 9, handY + 28);
-        int itemX = handX - 3;
-        int itemY = handY - 3;
-        if (swing > 0 && eatingTicks == 0) {
-            itemX += (phase < 5 ? phase : 10 - phase) - 2;
-            itemY += phase < 5 ? phase * 2 : (10 - phase) * 2;
-        }
-        if (eatingTicks > 0) {
-            itemX -= 8;
-            itemY -= 16 + ((EATING_DURATION_TICKS - eatingTicks) % 8 < 4 ? 4 : 0);
-        }
-        int size = (item == ITEM_RAW_PORKCHOP || item == ITEM_RAW_BEEF
-                || item == ITEM_WATER_BUCKET || item == ITEM_EMPTY_BUCKET) ? 25 : 31;
-        if (heldItemScaled == null || heldItemScaledType != item || heldItemScaledSize != size) {
-            heldItemScaled = scaleHeldIcon(blockIcons[item], size);
-            heldItemScaledType = item;
-            heldItemScaledSize = size;
-        }
-        g.drawImage(heldItemScaled, itemX, itemY, Graphics.TOP | Graphics.LEFT);
+        float px=cameraX+fx*forward+rx*right+ux*(-down);
+        float py=cameraY+fy*forward+uy*(-down);
+        float pz=cameraZ+fz*forward+rz*right+uz*(-down);
+        Transform transform=new Transform();
+        transform.setIdentity();
+        transform.postTranslate(px,py,pz);
+        transform.postRotate(-yaw,0.0f,1.0f,0.0f);
+        transform.postRotate(pitch+swingX,1.0f,0.0f,0.0f);
+        heldItemGroup.setTransform(transform);
     }
 
     private void cycleSelectedBlock(int direction) {
