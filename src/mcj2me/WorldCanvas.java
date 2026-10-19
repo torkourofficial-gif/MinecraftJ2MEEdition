@@ -3950,6 +3950,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         spawnBlockParticles(type, x + 0.5f, blockY + 0.5f, z + 0.5f);
 
+        if (blockY == h - 1 && terrain.isTreeAt(x, z)) {
+            // The generated trunk base is anchored to the terrain height. Do not
+            // lower that column while its tree exists, or the whole procedural
+            // trunk would be regenerated one block lower / appear to disappear.
+            return;
+        }
         if (blockY == h - 1) {
             // Surface mining reveals the next layer at the top.
             int nextType = terrain.getSubsurfaceType(x, h - 2, z);
@@ -4237,6 +4243,12 @@ final class WorldCanvas extends Canvas implements Runnable {
             if (terrain.isTreeAt(x, z)) {
                 int base = terrain.getHeight(x, z);
                 if (terrain.isTreeTrunkAt(x, y, z)) {
+                    // Leaves are solid selectable voxels too. Never let the
+                    // trunk ray skip a leaf in front and select a hidden log.
+                    int[] leafHit = raycastLeafBlock();
+                    if (leafHit != null && leafHit[3] < (int)(distance * 1000.0f)) {
+                        return null;
+                    }
                     treeHitResult[0] = x;
                     treeHitResult[1] = z;
                     treeHitResult[2] = y;
@@ -4539,8 +4551,10 @@ final class WorldCanvas extends Canvas implements Runnable {
         float distance = 0.0f;
         while (distance <= BLOCK_REACH) {
             if (terrain.isLeafBlockAt(x, y, z)) {
-                if ((int)(distance * 1000.0f) <= solidDistance) {
+                int leafDistance = (int)(distance * 1000.0f);
+                if (leafDistance <= solidDistance) {
                     leafHitResult[0] = x; leafHitResult[1] = y; leafHitResult[2] = z;
+                    leafHitResult[3] = leafDistance;
                     return leafHitResult;
                 }
                 return null;
