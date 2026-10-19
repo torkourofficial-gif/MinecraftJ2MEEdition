@@ -35,6 +35,9 @@ final class TerrainGenerator {
     private int placedBlockCount;
     private int[] removedTreeIds = new int[16];
     private int removedTreeCount;
+    // Each mined log is saved independently, using the same packed voxel ID as leaves.
+    private int[] removedTreeBlockIds = new int[32];
+    private int removedTreeBlockCount;
     // 0=unknown, 1=tree, -1=no tree. Tiny cache for the regular tree grid.
     private final byte[][] treeAtCache = new byte[SIZE][SIZE];
     private final int seed;
@@ -472,6 +475,30 @@ final class TerrainGenerator {
         return true;
     }
 
+    /** True when this exact generated log voxel still exists. */
+    boolean isTreeTrunkAt(int x, int y, int z) {
+        if (x < 4 || z < 4 || x >= SIZE - 4 || z >= SIZE - 4 || y < 0 || y >= HEIGHT) return false;
+        if (!isTreeAt(x, z)) return false;
+        int base = getHeight(x, z);
+        if (y < base || y >= base + getTreeHeight(x, z)) return false;
+        int id = leafId(x, y, z);
+        for (int i = 0; i < removedTreeBlockCount; i++) if (removedTreeBlockIds[i] == id) return false;
+        return true;
+    }
+
+    /** Remove only one log voxel; the rest of the trunk and canopy remain. */
+    boolean removeTreeBlockAt(int x, int y, int z) {
+        if (!isTreeTrunkAt(x, y, z)) return false;
+        int id = leafId(x, y, z);
+        if (removedTreeBlockCount == removedTreeBlockIds.length) {
+            int[] expanded = new int[removedTreeBlockIds.length * 2];
+            System.arraycopy(removedTreeBlockIds, 0, expanded, 0, removedTreeBlockCount);
+            removedTreeBlockIds = expanded;
+        }
+        removedTreeBlockIds[removedTreeBlockCount++] = id;
+        return true;
+    }
+
     int getTreeHeight(int x, int z) {
         // Natural variation similar to early Indev trees: short and tall trunks.
         return 3 + ((hash(x + 19, z - 7) >>> 3) & 1)
@@ -553,6 +580,9 @@ final class TerrainGenerator {
         for (int i = 0; i < placedBlockCount; i++) { out.writeInt(placedBlockIds[i]); out.writeByte(placedBlockTypes[i]); }
         out.writeInt(removedTreeCount);
         for (int i = 0; i < removedTreeCount; i++) out.writeInt(removedTreeIds[i]);
+        // Optional per-log removals; appended so older save formats still load.
+        out.writeInt(removedTreeBlockCount);
+        for (int i = 0; i < removedTreeBlockCount; i++) out.writeInt(removedTreeBlockIds[i]);
         out.flush();
         return bytes.toByteArray();
     }
@@ -601,6 +631,14 @@ final class TerrainGenerator {
             if (treeCount > removedTreeIds.length) removedTreeIds = new int[treeCount];
             removedTreeCount = treeCount;
             for (int i = 0; i < treeCount; i++) removedTreeIds[i] = in.readInt();
+        }
+        removedTreeBlockCount = 0;
+        if (in.available() >= 4) {
+            int logCount = in.readInt();
+            if (logCount < 0 || logCount > SIZE * SIZE * HEIGHT) throw new Exception("Invalid saved removed tree blocks");
+            if (logCount > removedTreeBlockIds.length) removedTreeBlockIds = new int[logCount];
+            removedTreeBlockCount = logCount;
+            for (int i = 0; i < logCount; i++) removedTreeBlockIds[i] = in.readInt();
         }
         for (int x = 0; x < SIZE; x++)
             for (int z = 0; z < SIZE; z++) treeAtCache[x][z] = 0;
