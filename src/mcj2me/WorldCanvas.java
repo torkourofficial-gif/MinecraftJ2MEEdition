@@ -1357,11 +1357,10 @@ final class WorldCanvas extends Canvas implements Runnable {
                     u=(k<2)?r[0]:r[2]; v=(k==0||k==2)?r[3]:r[1];
                 } else {
                     u=(k<2)?r[0]:r[2]; v=(k==0||k==2)?r[3]:r[1];
-                    // Match the skin's unfolded net to each face's vertex
-                    // order. Front (+Z) starts at +X; both side faces run
-                    // opposite their atlas U direction. The back (-Z) face
-                    // already follows its atlas direction.
-                    if (face==1 || face==2 || face==3) u=(k<2)?r[2]:r[0];
+                    // Match the skin's unfolded net to each face's vertex order.
+                    // Front (+Z), back (-Z), and both side faces have vertex
+                    // order opposite to the atlas U direction.
+                    if (face==0 || face==2 || face==3) u=(k<2)?r[2]:r[0];
                 }
                 uv[face*8+k*2]=(short)(u*1024/64);
                 // M3G texture V runs from the image's bottom edge. Flip the
