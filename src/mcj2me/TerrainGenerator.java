@@ -345,7 +345,8 @@ final class TerrainGenerator {
     }
     boolean setPlacedBlockAt(int x, int y, int z, int type) {
         if (x < 1 || z < 1 || x >= SIZE - 1 || z >= SIZE - 1 || y < 0 || y >= HEIGHT) return false;
-        if (type < BLOCK_GRASS || type > BLOCK_WOOL_BLACK || (type >= 16 && type <= 20)) return false;
+        if ((type < BLOCK_GRASS || type > BLOCK_WOOL_BLACK) && type != BLOCK_CRAFTING_TABLE) return false;
+        if (type >= 16 && type <= 20) return false;
         if (getBlockTypeAt(x, y, z) >= 0) return false;
         if (placedBlockCount == placedBlockIds.length) {
             int size = placedBlockIds.length * 2;
