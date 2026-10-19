@@ -3377,9 +3377,18 @@ final class WorldCanvas extends Canvas implements Runnable {
                     flowerVertex = addQuad(flowerPositions, flowerTexCoords, flowerColors,
                         flowerStripLengths, flowerVertex, flowerStrip++, x, h, z,
                         x + 1, h, z + 1, x, h + 1, z, x + 1, h + 1, z + 1, fx, fy);
+                    // Flip V on the plant planes: flower atlas tiles use the opposite Y orientation.
+                    for (int fv = flowerVertex - 4; fv < flowerVertex; fv++) {
+                        int uv = fv * 2 + 1;
+                        flowerTexCoords[uv] = (short)(fy * 32 + 16 - flowerTexCoords[uv]);
+                    }
                     flowerVertex = addQuad(flowerPositions, flowerTexCoords, flowerColors,
                         flowerStripLengths, flowerVertex, flowerStrip++, x + 1, h, z,
                         x, h, z + 1, x + 1, h + 1, z, x, h + 1, z + 1, fx, fy);
+                    for (int fv = flowerVertex - 4; fv < flowerVertex; fv++) {
+                        int uv = fv * 2 + 1;
+                        flowerTexCoords[uv] = (short)(fy * 32 + 16 - flowerTexCoords[uv]);
+                    }
                 }
                 if (terrain.isTreeAt(x, z)) {
                     int base = terrain.getTreeBaseHeight(x, z), th = terrain.getTreeHeight(x, z), y;
