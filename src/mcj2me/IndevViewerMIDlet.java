@@ -13,6 +13,8 @@ public final class IndevViewerMIDlet extends MIDlet {
     static int fogLevel = 1;
     static int frameskip = 0;
     static boolean humbleMode = false;
+    static final int MODE_CREATIVE = 0;
+    static final int MODE_SURVIVAL = 1;
 
     // Values above 1000 represent MIDP directional actions, not device key codes.
     public static final int CONTROL_FORWARD = 0, CONTROL_BACKWARD = 1;
@@ -142,10 +144,10 @@ public final class IndevViewerMIDlet extends MIDlet {
         worldSelectScreen.show();
     }
 
-    void startGame(String worldName, int seed, int worldId) {
+    void startGame(String worldName, int seed, int worldId, int mode) {
         if (titleScreen != null) titleScreen.stop();
         if (worldCanvas != null) { worldCanvas.stop(); worldCanvas = null; }
-        loadingCanvas = new WorldLoadingCanvas(this, worldName, seed, worldId);
+        loadingCanvas = new WorldLoadingCanvas(this, worldName, seed, worldId, mode);
         Display.getDisplay(this).setCurrent(loadingCanvas);
         loadingCanvas.start();
     }
