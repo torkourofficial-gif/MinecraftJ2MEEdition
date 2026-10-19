@@ -1338,7 +1338,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             Mesh block = createDroppedBlockMesh(item);
             // Dropped cube geometry is 0.25 blocks wide; 1.6x gives the
             // classic first-person held-block size of roughly 0.4 blocks.
-            block.setScale(1.6f,1.6f,1.6f);
+            block.setScale(1.0f,1.0f,1.0f);
             CompositingMode heldPass = new CompositingMode();
             heldPass.setDepthTestEnable(false);
             heldPass.setDepthWriteEnable(false);
@@ -1381,7 +1381,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         buffer.setPositions(positions,1.0f/16.0f,null);
         buffer.setTexCoords(0,texCoords,1.0f/1024.0f,null);
         Mesh result=new Mesh(buffer,new TriangleStripArray(indices,strips),appearance);
-        result.setScale(1.25f,1.25f,1.25f);
+        result.setScale(0.85f,0.85f,0.85f);
         return result;
     }
 
@@ -1446,6 +1446,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         transform.postRotate(-yaw,0.0f,1.0f,0.0f);
         transform.postRotate(pitch+swingX,1.0f,0.0f,0.0f);
         transform.postRotate(45.0f,0.0f,1.0f,0.0f);
+        if (arm) {
+            // Vanilla's first-person arm is visibly canted, not a vertical column.
+            // Our arm mesh is centered, so a moderate screen-space roll reproduces
+            // the familiar diagonal without importing the full player-model offsets.
+            transform.postRotate(-32.0f,0.0f,0.0f,1.0f);
+        }
         heldItemGroup.setTransform(transform);
     }
 
