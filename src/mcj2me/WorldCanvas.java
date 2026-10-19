@@ -1921,6 +1921,12 @@ final class WorldCanvas extends Canvas implements Runnable {
             uv[b+2] = 0; uv[b+3] = 1024;
             uv[b+4] = 1024; uv[b+5] = 0;
             uv[b+6] = 1024; uv[b+7] = 1024;
+            if (type == TerrainGenerator.BLOCK_GRASS && face < 4) {
+                uv[b] = 1024;
+                uv[b+2] = 1024;
+                uv[b+4] = 0;
+                uv[b+6] = 0;
+            }
             int base = face * 4;
             int[] faceVertexIndices = {base, base + 1, base + 2, base + 3};
             faceIndices[face] = new TriangleStripArray(faceVertexIndices, new int[] {4});
