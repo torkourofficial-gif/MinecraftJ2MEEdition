@@ -685,6 +685,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         CompositingMode flowerBlend = new CompositingMode();
         flowerBlend.setBlending(CompositingMode.ALPHA);
         flowerBlend.setAlphaThreshold(0.5f);
+        // Cut-out pixels must not write to the depth buffer: otherwise a
+        // transparent part of a flower can hide translucent water behind it.
+        flowerBlend.setDepthWriteEnable(false);
         flowerAppearance.setCompositingMode(flowerBlend);
 
         PolygonMode transparentPolygonMode = new PolygonMode();
@@ -3422,18 +3425,9 @@ final class WorldCanvas extends Canvas implements Runnable {
                     flowerVertex = addQuad(flowerPositions, flowerTexCoords, flowerColors,
                         flowerStripLengths, flowerVertex, flowerStrip++, x, h, z,
                         x + 1, h, z + 1, x, h + 1, z, x + 1, h + 1, z + 1, fx, fy);
-                    // Flip V on the plant planes: flower atlas tiles use the opposite Y orientation.
-                    for (int fv = flowerVertex - 4; fv < flowerVertex; fv++) {
-                        int uv = fv * 2 + 1;
-                        flowerTexCoords[uv] = (short)(fy * 32 + 16 - flowerTexCoords[uv]);
-                    }
                     flowerVertex = addQuad(flowerPositions, flowerTexCoords, flowerColors,
                         flowerStripLengths, flowerVertex, flowerStrip++, x + 1, h, z,
                         x, h, z + 1, x + 1, h + 1, z, x, h + 1, z + 1, fx, fy);
-                    for (int fv = flowerVertex - 4; fv < flowerVertex; fv++) {
-                        int uv = fv * 2 + 1;
-                        flowerTexCoords[uv] = (short)(fy * 32 + 16 - flowerTexCoords[uv]);
-                    }
                 }
                 if (terrain.isTreeAt(x, z)) {
                     int base = terrain.getTreeBaseHeight(x, z), th = terrain.getTreeHeight(x, z), y;
@@ -4148,15 +4142,6 @@ final class WorldCanvas extends Canvas implements Runnable {
                 (short)((BLOCK_TILE_X[tileIndex] + 1) * 16 - 1), (short)((BLOCK_TILE_Y[tileIndex] + 1) * 16 - 1),
                 (short)((BLOCK_TILE_X[tileIndex] + 1) * 16 - 1), (short)(BLOCK_TILE_Y[tileIndex] * 16 + 1)
             };
-            // Natural flowers flip V when their chunk mesh is built. Apply the
-            // same vertical UV flip to placeable flowers so both versions match.
-            if (i == 1 || i == 2) {
-                int flowerTileY = BLOCK_TILE_Y[tileIndex];
-                for (int vertex = 0; vertex < 4; vertex++) {
-                    int vIndex = vertex * 2 + 1;
-                    uv[vIndex] = (short)(flowerTileY * 32 + 16 - uv[vIndex]);
-                }
-            }
             VertexArray va = new VertexArray(4, 3, 2);
             va.set(0, 4, positions);
             VertexArray ta = new VertexArray(4, 2, 2);
