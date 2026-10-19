@@ -76,8 +76,8 @@ final class WorldSelectScreen extends Canvas implements CommandListener {
             drawRow(g, 10, h / 2 - 27, w - 20, 24, "Mode: " + (createMode == IndevViewerMIDlet.MODE_SURVIVAL ? "SURVIVAL" : "CREATIVE"), createSelection == 1);
             drawRow(g, 10, h / 2 + 1, w - 20, 24, "Create New World", createSelection == 2);
             drawRow(g, 10, h / 2 + 29, w - 20, 24, "Cancel", createSelection == 3);
-            g.drawString("UP/DOWN: choose   FIRE: select", w / 2, h - 25, Graphics.BOTTOM | Graphics.HCENTER);
-            g.drawString("BACK: world list", w / 2, h - 8, Graphics.BOTTOM | Graphics.HCENTER);
+            g.drawString("UP/DOWN: choose  4/6: mode", w / 2, h - 25, Graphics.BOTTOM | Graphics.HCENTER);
+            g.drawString("FIRE: select   BACK: list", w / 2, h - 8, Graphics.BOTTOM | Graphics.HCENTER);
             return;
         }
         g.drawString("Select World", w / 2, 8, Graphics.TOP | Graphics.HCENTER);
