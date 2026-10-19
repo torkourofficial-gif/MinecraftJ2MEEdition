@@ -667,9 +667,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         mapCraftItemIcon(itemsImage, crafts.LEATHER, 7, 6);
         for (int ci = 44; ci < blockIcons.length; ci++)
             if (blockIcons[ci] == null) blockIcons[ci] = createItemsIcon(itemsImage, ci % 16, ci / 16);
-        // Every inventory sprite needed from items.png has been cropped into
-        // blockIcons; release the full decoded sheet before creating the world.
+        // The inventory sprites have been cropped into small 16x16 images.
+        // Release the full decoded sheets before M3G allocates chunk geometry:
+        // gui_blocks.png alone can occupy about 1 MiB as a 512x512 ARGB image.
         itemsImage = null;
+        guiBlocksImage = null;
+        System.gc();
 
         setupStage = "loading /mcj2me/clouds.png";
         Image cloudsImage = ResourceImages.load("/mcj2me/clouds.png");
