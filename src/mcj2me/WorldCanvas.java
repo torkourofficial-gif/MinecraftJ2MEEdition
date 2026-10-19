@@ -998,8 +998,9 @@ final class WorldCanvas extends Canvas implements Runnable {
             } else if (isSwimming()) {
                 verticalVelocity = Math.max(verticalVelocity, 0.24f);
                 airborne = true;
-            } else if (airborne && jumpTapWindowTicks > 0) {
-                // Tap jump twice quickly: enable creative-style flight.
+            } else if (airborne && jumpTapWindowTicks > 0
+                    && cameraY > getGroundHeightBelow(cameraX,cameraZ,cameraY-PLAYER_EYE_HEIGHT)+PLAYER_EYE_HEIGHT+0.12f) {
+                // Only treat a double-tap as flight while genuinely airborne.
                 flying = true;
                 verticalVelocity = 0.0f;
             } else if (!airborne || cameraY <= getGroundHeightBelow(cameraX,cameraZ,cameraY-PLAYER_EYE_HEIGHT)+PLAYER_EYE_HEIGHT+0.12f) {
