@@ -1570,7 +1570,17 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private Appearance createHeldTextureAppearance(Image image) {
-        Texture2D texture = new Texture2D(new Image2D(Image2D.RGBA, image));
+        // Inventory icons are shared by the held-item and dropped-item paths.
+        // Reuse their cached Texture2D instead of uploading a second copy when
+        // the player selects an item that has already been dropped (or vice versa).
+        Texture2D texture = null;
+        for (int i = 0; i < blockIcons.length; i++) {
+            if (blockIcons[i] == image) {
+                texture = getCachedItemIconTexture(image);
+                break;
+            }
+        }
+        if (texture == null) texture = new Texture2D(new Image2D(Image2D.RGBA, image));
         texture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
         texture.setWrapping(Texture2D.WRAP_CLAMP, Texture2D.WRAP_CLAMP);
         // The first-person skin must preserve the source pixels exactly.
