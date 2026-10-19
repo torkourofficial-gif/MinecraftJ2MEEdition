@@ -107,6 +107,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     // Reuse transforms during paint instead of allocating two objects every rendered frame.
     private final Transform paintCameraTransform = new Transform();
     private final Transform paintHeldTransform = new Transform();
+    // Reuse transforms in the per-tick camera/held-item updates; allocating
+    // these every tick creates avoidable garbage on small CLDC heaps.
+    private final Transform cameraTransformScratch = new Transform();
+    private final Transform heldTransformScratch = new Transform();
 
     private Appearance groundAppearance;
     private Appearance flowerAppearance;
@@ -1862,7 +1866,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         float px=cameraX+fx*forward+rx*right+ux*(-down);
         float py=cameraY+fy*forward+uy*(-down);
         float pz=cameraZ+fz*forward+rz*right+uz*(-down);
-        Transform transform=new Transform();
+        Transform transform = heldTransformScratch;
         transform.setIdentity();
         transform.postTranslate(px,py,pz);
         // Minecraft's standard held-item yaw is 45 degrees. The right arm
@@ -2241,7 +2245,7 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void updateCamera() {
-        Transform transform = new Transform();
+        Transform transform = cameraTransformScratch;
         transform.setIdentity();
 
         // Translate first in the transform product so the camera position
