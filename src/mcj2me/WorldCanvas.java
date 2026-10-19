@@ -1013,24 +1013,24 @@ final class WorldCanvas extends Canvas implements Runnable {
                 }
             }
         }
-        int cursorX = gridX + (inventoryCursor % 9) * 18;
-        int cursorY = gridY + (inventoryCursor / 9) * 18;
+        // One cursor moves between the 27 inventory slots and the 2x2
+        // crafting preview/output. Slots 27-30 are recipe cells; 31 is output.
+        int cursorX;
+        int cursorY;
+        if (inventoryCursor >= 27 && inventoryCursor <= 30) {
+            int craftSlot = inventoryCursor - 27;
+            cursorX = panelX + 91 + (craftSlot % 2) * 18;
+            cursorY = panelY + 17 + (craftSlot / 2) * 18;
+        } else if (inventoryCursor == 31) {
+            cursorX = panelX + 139;
+            cursorY = panelY + 34;
+        } else {
+            cursorX = gridX + (inventoryCursor % 9) * 18;
+            cursorY = gridY + (inventoryCursor / 9) * 18;
+        }
         g.setColor(0xFFFFFF);
         g.drawRect(cursorX - 1, cursorY - 1, 17, 17);
         g.drawRect(cursorX - 2, cursorY - 2, 19, 19);
-        int selectedItem = worldMode == IndevViewerMIDlet.MODE_SURVIVAL
-            ? mainInventoryItems[inventoryCursor] : inventoryPageStart + inventoryCursor;
-        String selectedName = selectedItem >= 0 && selectedItem < BLOCK_NAMES.length
-            ? ((worldMode == IndevViewerMIDlet.MODE_SURVIVAL
-                && inventory[selectedItem] <= 0) ? "EMPTY" : BLOCK_NAMES[selectedItem])
-            : "EMPTY";
-        g.setColor(0xFFFFFF);
-        String inventoryHelp = worldMode == IndevViewerMIDlet.MODE_SURVIVAL
-            ? "5 select, 1-3 recipe, 0 craft, * close"
-            : "5 select, 1-3 recipe, 0 craft, 7/9 page";
-        g.drawString(selectedName + " (" + inventoryHelp + ")",
-            Math.max(2, panelX), Math.min(getHeight() - 16, panelY + panelH + 2),
-            Graphics.TOP | Graphics.LEFT);
         drawRecipePreview(g, false, panelX, panelY);
     }
 
@@ -1232,24 +1232,59 @@ final class WorldCanvas extends Canvas implements Runnable {
                 repaint();
                 return;
             }
-            int col = inventoryCursor % 9;
-            int row = inventoryCursor / 9;
-            if (action == LEFT || keyCode == '4') col--;
-            else if (action == RIGHT || keyCode == '6') col++;
-            else if (action == UP || keyCode == '2') row--;
-            else if (action == DOWN || keyCode == '8') row++;
-            if (col < 0) col = 0;
-            if (col > 8) col = 8;
-            if (row < 0) row = 0;
-            if (row > 2) row = 2;
-            inventoryCursor = row * 9 + col;
+            boolean left = action == LEFT || keyCode == '4';
+            boolean right = action == RIGHT || keyCode == '6';
+            boolean up = action == UP || keyCode == '2';
+            boolean down = action == DOWN || keyCode == '8';
+            if (inventoryCursor < 27) {
+                int col = inventoryCursor % 9;
+                int row = inventoryCursor / 9;
+                if (left && col > 0) col--;
+                else if (right && col < 8) col++;
+                else if (up) {
+                    if (row > 0) row--;
+                    else if (col >= 4 && col <= 7) {
+                        inventoryCursor = (col == 7) ? 31 : 27 + ((col - 5) < 0 ? 0 : (col - 5));
+                        repaint();
+                        return;
+                    }
+                } else if (down && row < 2) row++;
+                inventoryCursor = row * 9 + col;
+            } else if (inventoryCursor <= 30) {
+                int craftSlot = inventoryCursor - 27;
+                int col = craftSlot % 2;
+                int row = craftSlot / 2;
+                if (left) {
+                    if (col > 0) inventoryCursor--;
+                    else inventoryCursor = 31;
+                } else if (right) {
+                    if (col < 1) inventoryCursor++;
+                    else inventoryCursor = 31;
+                } else if (up) {
+                    if (row > 0) inventoryCursor -= 2;
+                    else inventoryCursor = 31;
+                } else if (down) {
+                    if (row < 1) inventoryCursor += 2;
+                    else inventoryCursor = 31;
+                }
+            } else if (inventoryCursor == 31) {
+                if (left) inventoryCursor = 28;
+                else if (right) inventoryCursor = 27;
+                else if (up) inventoryCursor = 29;
+                else if (down) inventoryCursor = 27;
+            }
             if (action == FIRE || keyCode == '5' || keyCode == ' ') {
-                int item = inventoryPageStart + inventoryCursor;
-                if (item >= 0 && item < BLOCK_NAMES.length && item != TerrainGenerator.BLOCK_BEDROCK) {
-                    if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
-                        if (inventory[item] > 0) assignHotbarItem(selectedSlot, item);
-                    } else {
-                        assignHotbarItem(selectedSlot, item);
+                if (inventoryCursor == 31) {
+                    craftRecipe(crafts.inventoryRecipeAt(craftingRecipeCursor));
+                } else if (inventoryCursor < 27) {
+                    int item = worldMode == IndevViewerMIDlet.MODE_SURVIVAL
+                        ? mainInventoryItems[inventoryCursor] : inventoryPageStart + inventoryCursor;
+                    if (item >= 0 && item < BLOCK_NAMES.length && item != TerrainGenerator.BLOCK_BEDROCK) {
+                        if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
+                            if (inventory[item] > 0) assignHotbarItem(selectedSlot, item);
+                        } else {
+                            assignHotbarItem(selectedSlot, item);
+                        }
                     }
                 }
             }
@@ -2451,7 +2486,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         String status = !hasItems ? "NEED MATERIALS" : (hasRoom ? "READY x" + recipe.outputCount : "INVENTORY FULL");
         g.drawString(status, panelX + 7, panelY + (table ? 110 : 67), Graphics.TOP | Graphics.LEFT);
         g.setColor(0xFFFFFF);
-        g.drawString((craftingRecipeCursor + 1) + "/" + count + (table ? " 2/8 browse 5 craft" : " 1-3 select 0 craft"),
+        g.drawString((craftingRecipeCursor + 1) + "/" + count,
             panelX + 7, panelY + (table ? 124 : 77), Graphics.TOP | Graphics.LEFT);
     }
 
