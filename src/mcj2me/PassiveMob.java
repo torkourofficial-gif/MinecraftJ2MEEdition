@@ -17,6 +17,7 @@ final class PassiveMob {
     private int tick;
     private boolean deathEvent;
     private float deathX, deathY, deathZ;
+    private int deathType = -1;
 
     PassiveMob(Group parent, TerrainGenerator terrain, float startX, float startZ) throws Exception {
         this.terrain = terrain;
@@ -39,7 +40,7 @@ final class PassiveMob {
             }
             Appearance appearance = appearances[types[i]];
             Mesh mesh = createMobMesh(appearance, types[i]);
-            Mob mob = new Mob(mesh, appearance, x + 0.5f, z + 0.5f, random);
+            Mob mob = new Mob(mesh, appearance, x + 0.5f, z + 0.5f, types[i], random);
             mobs[i] = mob;
             group.addChild(mesh);
             mob.rendered = true;
@@ -93,6 +94,7 @@ final class PassiveMob {
             deathX = target.x;
             deathZ = target.z;
             deathY = terrain.getHeight((int)target.x, (int)target.z) + target.jumpY + 0.45f;
+            deathType = target.mobType;
             deathEvent = true;
         }
         return true;
@@ -107,6 +109,7 @@ final class PassiveMob {
     float getDeathX() { return deathX; }
     float getDeathY() { return deathY; }
     float getDeathZ() { return deathZ; }
+    int getDeathType() { return deathType; }
 
     static final int MOB_COW = 0;
     static final int MOB_PIG = 1;
@@ -341,11 +344,12 @@ final class PassiveMob {
         float x, z, homeX, homeZ, dirX, dirZ;
         float jumpY = 0.0f, jumpVelocity = 0.0f;
         int health = 3, hurtTicks, wanderTicks, hopCooldown;
+        final int mobType;
         boolean alive = true;
         boolean rendered;
 
-        Mob(Mesh mesh, Appearance normal, float x, float z, Random random) {
-            this.mesh = mesh; this.normal = normal;
+        Mob(Mesh mesh, Appearance normal, float x, float z, int mobType, Random random) {
+            this.mesh = mesh; this.normal = normal; this.mobType = mobType;
             this.x = this.homeX = x; this.z = this.homeZ = z;
             hopCooldown = 4 + random.nextInt(24);
             chooseDirection(random);
