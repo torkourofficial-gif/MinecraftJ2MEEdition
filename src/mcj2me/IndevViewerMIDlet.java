@@ -120,6 +120,7 @@ public final class IndevViewerMIDlet extends MIDlet {
     private WorldCanvas worldCanvas;
     private WorldSelectScreen worldSelectScreen;
     private WorldLoadingCanvas loadingCanvas;
+    private final GameMusic music = new GameMusic();
 
     private void saveWorld(WorldCanvas canvas) {
         if (canvas == null || canvas.getWorldId() <= 0 || canvas.hasSetupError()) return;
@@ -130,21 +131,25 @@ public final class IndevViewerMIDlet extends MIDlet {
     public void startApp() {
         loadControls();
         if (worldCanvas!=null) {
+            music.startWorld();
             Display.getDisplay(this).setCurrent(worldCanvas);
             worldCanvas.start();
             return;
         }
+        music.startMenu();
         if (titleScreen==null) titleScreen=new TitleScreen(this);
         Display.getDisplay(this).setCurrent(titleScreen);
         titleScreen.start();
     }
     void openWorldSelect() {
+        music.startMenu();
         if (titleScreen != null) titleScreen.stop();
         if (worldSelectScreen == null) worldSelectScreen = new WorldSelectScreen(this);
         worldSelectScreen.show();
     }
 
     void startGame(String worldName, int seed, int worldId, int mode) {
+        music.stop();
         if (titleScreen != null) titleScreen.stop();
         if (worldCanvas != null) { worldCanvas.stop(); worldCanvas = null; }
         loadingCanvas = new WorldLoadingCanvas(this, worldName, seed, worldId, mode);
@@ -157,10 +162,12 @@ public final class IndevViewerMIDlet extends MIDlet {
         loadingCanvas = null;
         worldCanvas = loaded;
         Display.getDisplay(this).setCurrent(worldCanvas);
+        music.startWorld();
         worldCanvas.start();
     }
 
     void worldLoadFailed(String message) {
+        music.startMenu();
         if (loadingCanvas != null) loadingCanvas.stopLoading();
         loadingCanvas = null;
         if (titleScreen == null) titleScreen = new TitleScreen(this);
@@ -179,6 +186,7 @@ public final class IndevViewerMIDlet extends MIDlet {
         if (worldCanvas != null) worldCanvas.pause();
     }
     void openPauseSettings() {
+        music.stop();
         saveWorld(worldCanvas);
         if (titleScreen == null) titleScreen = new TitleScreen(this);
         titleScreen.showPauseMenu();
@@ -191,10 +199,12 @@ public final class IndevViewerMIDlet extends MIDlet {
     }
     void resumeGame() {
         if (titleScreen!=null) titleScreen.stop();
+        music.startWorld();
         Display.getDisplay(this).setCurrent(worldCanvas);
         if (worldCanvas!=null) worldCanvas.resume();
     }
     void returnToMainMenu() {
+        music.startMenu();
         saveWorld(worldCanvas);
         if (worldCanvas!=null) worldCanvas.stop();
         worldCanvas = null;
@@ -204,6 +214,7 @@ public final class IndevViewerMIDlet extends MIDlet {
         titleScreen.start();
     }
     public void quitGame() {
+        music.stop();
         saveWorld(worldCanvas);
         if (titleScreen!=null) titleScreen.stop();
         if (worldCanvas!=null) worldCanvas.stop();
@@ -211,11 +222,13 @@ public final class IndevViewerMIDlet extends MIDlet {
         notifyDestroyed();
     }
     public void pauseApp() {
+        music.stop();
         saveWorld(worldCanvas);
         if (titleScreen!=null) titleScreen.stop();
         if (worldCanvas!=null) worldCanvas.pause();
     }
     public void destroyApp(boolean unconditional) {
+        music.stop();
         saveWorld(worldCanvas);
         if (titleScreen!=null) titleScreen.stop();
         if (worldCanvas!=null) worldCanvas.stop();
