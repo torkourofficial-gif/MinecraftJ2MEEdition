@@ -1294,6 +1294,11 @@ final class WorldCanvas extends Canvas implements Runnable {
         Texture2D texture = new Texture2D(new Image2D(Image2D.RGBA, image));
         texture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
         texture.setWrapping(Texture2D.WRAP_CLAMP, Texture2D.WRAP_CLAMP);
+        // The first-person skin must preserve the source pixels exactly.
+        // MODULATE can darken the skin on some older M3G implementations
+        // when the immediate-mode pass reuses renderer state, so replace
+        // the fragment colour with the texture rather than multiplying it.
+        texture.setBlending(Texture2D.FUNC_REPLACE);
         Appearance appearance = new Appearance();
         appearance.setTexture(0, texture);
         PolygonMode mode = new PolygonMode();
@@ -1371,6 +1376,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         VertexBuffer buffer = new VertexBuffer();
         buffer.setPositions(positions,1.0f/16.0f,null);
         buffer.setTexCoords(0,texCoords,1.0f/1024.0f,null);
+        // Explicitly keep the mesh's fallback vertex colour white. The skin
+        // texture is the colour source; no baked vertex tint should darken it.
+        buffer.setDefaultColor(0xFFFFFFFF);
         Mesh arm = new Mesh(buffer,new TriangleStripArray(indices,strips),heldArmAppearance);
         // The first-person arm should read smaller than a full block on the
         // narrow portrait display; scale uniformly to avoid an oversized fist.
