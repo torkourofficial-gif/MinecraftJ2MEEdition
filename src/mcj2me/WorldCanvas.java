@@ -1216,13 +1216,16 @@ final class WorldCanvas extends Canvas implements Runnable {
                 repaint();
                 return;
             }
-            if (worldMode != IndevViewerMIDlet.MODE_SURVIVAL && keyCode == '9' && inventoryPageStart == 0) {
-                inventoryPageStart = 15;
+            if (worldMode != IndevViewerMIDlet.MODE_SURVIVAL && keyCode == '9') {
+                inventoryPageStart += 27;
+                if (inventoryPageStart >= BLOCK_NAMES.length) inventoryPageStart = 0;
                 repaint();
                 return;
             }
-            if (worldMode != IndevViewerMIDlet.MODE_SURVIVAL && keyCode == '7' && inventoryPageStart != 0) {
-                inventoryPageStart = 0;
+            if (worldMode != IndevViewerMIDlet.MODE_SURVIVAL && keyCode == '7') {
+                inventoryPageStart -= 27;
+                if (inventoryPageStart < 0)
+                    inventoryPageStart = ((BLOCK_NAMES.length - 1) / 27) * 27;
                 repaint();
                 return;
             }
@@ -2439,12 +2442,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         boolean ready = hasIngredients(recipe) && canReceiveCraftOutput(recipe);
         g.setColor(ready ? 0x66FF66 : 0xFF7777);
         String resultName = recipe.output >= 0 && recipe.output < BLOCK_NAMES.length ? BLOCK_NAMES[recipe.output] : "ITEM";
-        g.drawString(resultName, panelX + 7, panelY + (table ? 96 : 59), Graphics.TOP | Graphics.LEFT);
+        g.drawString(resultName, panelX + 7, panelY + (table ? 96 : 55), Graphics.TOP | Graphics.LEFT);
         g.drawString(ready ? "READY x" + recipe.outputCount : "NEED MATERIALS",
-            panelX + 7, panelY + (table ? 110 : 73), Graphics.TOP | Graphics.LEFT);
+            panelX + 7, panelY + (table ? 110 : 67), Graphics.TOP | Graphics.LEFT);
         g.setColor(0xFFFFFF);
-        g.drawString((craftingRecipeCursor + 1) + "/" + count + (table ? " 2/8 next 5 craft" : " 7/9 next 1 craft"),
-            panelX + 7, panelY + (table ? 124 : 87), Graphics.TOP | Graphics.LEFT);
+        g.drawString((craftingRecipeCursor + 1) + "/" + count + (table ? " 2/8 browse 5 craft" : " 1-3 select 0 craft"),
+            panelX + 7, panelY + (table ? 124 : 77), Graphics.TOP | Graphics.LEFT);
     }
 
     private void drawCraftingTableMenu(Graphics g) {
