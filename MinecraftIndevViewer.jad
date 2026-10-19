@@ -1,4 +1,4 @@
-MIDlet-1: Minecraft Indev Viewer, , mcj2me.IndevViewerMIDlet
+MIDlet-1: Minecraft Indev Viewer, /mcj2me/iconM.png, mcj2me.IndevViewerMIDlet
 MIDlet-Name: Minecraft Indev Viewer
 MIDlet-Vendor: Toemsoxd
 MIDlet-Version: 0.1.0
