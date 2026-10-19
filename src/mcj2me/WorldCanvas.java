@@ -1645,6 +1645,24 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private Mesh createHeldItemMesh(int item) {
+        // Flowers are crossed plant sprites, not cubes. Flip only their held
+        // first-person UVs vertically; inventory and dropped flowers keep their
+        // original orientation.
+        if (item == BLOCK_YELLOW_FLOWER || item == BLOCK_RED_FLOWER) {
+            Mesh flower = createDroppedItemMesh(blockIcons[item], true);
+            Appearance flowerAppearance = flower.getAppearance(0);
+            if (flowerAppearance != null) {
+                flowerAppearance.setLayer(7);
+                CompositingMode flowerPass = new CompositingMode();
+                flowerPass.setBlending(CompositingMode.ALPHA);
+                flowerPass.setAlphaThreshold(0.5f);
+                flowerPass.setDepthTestEnable(false);
+                flowerPass.setDepthWriteEnable(false);
+                flowerAppearance.setCompositingMode(flowerPass);
+            }
+            flower.setScale(1.18f, 1.18f, 1.0f);
+            return flower;
+        }
         // Items whose inventory icons come from items.png use a thin, double-sided
         // sprite plane so the atlas alpha stays transparent in first person.
         if (isItemsAtlasIconItem(item)) {
@@ -3001,8 +3019,19 @@ final class WorldCanvas extends Canvas implements Runnable {
             droppedMeshes[slot] = null;
         }
         try {
-            Mesh mesh = type >= 0 && type < ITEM_RAW_PORKCHOP
-                ? createDroppedBlockMesh(type) : createDroppedItemMesh(icon);
+            // Only actual placeable cube items use the terrain block mesh.
+            // IDs 16-20 are crossed decorations, 40-43 are buckets/food, and
+            // crafting-table inventory ID 45 maps to stored voxel ID 40.
+            Mesh mesh;
+            if (type == crafts.CRAFTING_TABLE) {
+                mesh = createDroppedBlockMesh(TerrainGenerator.BLOCK_CRAFTING_TABLE);
+            } else if ((type >= TerrainGenerator.BLOCK_GRASS && type <= TerrainGenerator.BLOCK_OBSIDIAN)
+                    || (type >= TerrainGenerator.BLOCK_IRON_BLOCK
+                        && type <= TerrainGenerator.BLOCK_WOOL_BLACK)) {
+                mesh = createDroppedBlockMesh(type);
+            } else {
+                mesh = createDroppedItemMesh(icon);
+            }
             droppedMeshes[slot] = mesh;
             droppedTypes[slot] = type;
             droppedX[slot] = x;
