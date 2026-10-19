@@ -2622,7 +2622,11 @@ final class WorldCanvas extends Canvas implements Runnable {
             lastMiningDelay = miningDelay(type);
             int removedDecorationX = (int)decorationX[decorationHit];
             int removedDecorationZ = (int)decorationZ[decorationHit];
-            if (inventory[type] < 64) inventory[type]++;
+            if (worldMode == IndevViewerMIDlet.MODE_CREATIVE) {
+                if (inventory[type] < 64) inventory[type]++;
+            } else {
+                spawnDroppedBlock(type, decorationX[decorationHit], decorationY[decorationHit] + 0.35f, decorationZ[decorationHit]);
+            }
             spawnBlockParticles(type, decorationX[decorationHit], decorationY[decorationHit] + 0.35f,
                 decorationZ[decorationHit]);
             if (decorationTypes[decorationHit] == BLOCK_DOOR && decorationPivots[decorationHit] != null)
@@ -2654,6 +2658,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         int[] leafHit = raycastLeafBlock();
         if (leafHit != null && terrain.removeLeafBlock(leafHit[0], leafHit[1], leafHit[2])) {
             lastMiningDelay = miningDelay(4);
+            if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL)
+                spawnDroppedBlock(4, leafHit[0] + 0.5f, leafHit[1] + 0.5f, leafHit[2] + 0.5f);
             spawnBlockParticles(4, leafHit[0] + 0.5f, leafHit[1] + 0.5f,
                 leafHit[2] + 0.5f);
             invalidateEditedArea(leafHit[0], leafHit[0], leafHit[2], leafHit[2]);
