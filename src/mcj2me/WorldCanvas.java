@@ -1641,7 +1641,7 @@ final class WorldCanvas extends Canvas implements Runnable {
             // Classic tools and sticks are textured, double-sided 3D planes,
             // not cubes. Keep the PNG alpha so the transparent icon background
             // does not become a solid rectangle in first person.
-            Mesh sprite = createDroppedItemMesh(blockIcons[item]);
+            Mesh sprite = createDroppedItemMesh(blockIcons[item], true);
             Appearance spriteAppearance = sprite.getAppearance(0);
             if (spriteAppearance != null) {
                 spriteAppearance.setLayer(7);
@@ -3121,6 +3121,10 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private Mesh createDroppedItemMesh(Image icon) {
+        return createDroppedItemMesh(icon, false);
+    }
+
+    private Mesh createDroppedItemMesh(Image icon, boolean flipVertical) {
         Texture2D texture = new Texture2D(new Image2D(Image2D.RGBA, icon));
         texture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
         texture.setWrapping(Texture2D.WRAP_CLAMP, Texture2D.WRAP_CLAMP);
@@ -3133,7 +3137,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         // Item entities use a thin, double-sided sprite plane rather than a cube.
         // The Y-axis spin in tickDroppedItems reproduces the classic rotating drop.
         short[] p = {-3,-3,0, -3,3,0, 3,-3,0, 3,3,0};
-        short[] uv = {0,0, 0,1024, 1024,0, 1024,1024};
+        short[] uv = flipVertical
+            ? new short[] {0,1024, 0,0, 1024,1024, 1024,0}
+            : new short[] {0,0, 0,1024, 1024,0, 1024,1024};
         int[] indices = {0,1,2,3};
         int[] strips = {4};
         VertexArray pa = new VertexArray(4, 3, 2);
