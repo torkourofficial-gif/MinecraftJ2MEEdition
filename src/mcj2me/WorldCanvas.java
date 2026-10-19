@@ -53,6 +53,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     private Texture2D terrainTexture;
     private VertexBuffer[] decorationBuffers = new VertexBuffer[6];
     private Appearance[] decorationAppearances = new Appearance[6];
+    // Door panels share immutable geometry; each placed door keeps its own pivot.
+    private VertexBuffer doorVertexBuffer;
+    private IndexBuffer doorIndexBuffer;
     private TriangleStripArray decorationTriangles;
     private static final int MAX_DECORATIONS = 32;
     private final Mesh[] decorationMeshes = new Mesh[MAX_DECORATIONS];
@@ -4336,6 +4339,9 @@ final class WorldCanvas extends Canvas implements Runnable {
      * door instead of spinning it around its center.
      */
     private Mesh createDoorMesh(Appearance appearance) {
+        if (doorVertexBuffer != null && doorIndexBuffer != null) {
+            return new Mesh(doorVertexBuffer, doorIndexBuffer, appearance);
+        }
         final int quadCount = 8;
         short[] positions = new short[quadCount * 12];
         short[] texCoords = new short[quadCount * 8];
@@ -4375,6 +4381,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         int[] indices = new int[v];
         for (int i=0; i<v; i++) indices[i]=i;
         TriangleStripArray triangles = new TriangleStripArray(indices, stripLengths);
+        doorVertexBuffer = vb;
+        doorIndexBuffer = triangles;
         return new Mesh(vb, triangles, appearance);
     }
 
