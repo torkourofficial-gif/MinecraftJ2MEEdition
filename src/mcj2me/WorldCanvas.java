@@ -1267,6 +1267,9 @@ final class WorldCanvas extends Canvas implements Runnable {
         mode.setCulling(PolygonMode.CULL_NONE);
         mode.setShading(PolygonMode.SHADE_FLAT);
         appearance.setPolygonMode(mode);
+        // M3G layers are rendered in ascending order. Keep first-person
+        // geometry on a dedicated top layer, then disable depth occlusion too.
+        appearance.setLayer(7);
         CompositingMode heldPass = new CompositingMode();
         heldPass.setDepthTestEnable(false);
         heldPass.setDepthWriteEnable(false);
@@ -1341,7 +1344,10 @@ final class WorldCanvas extends Canvas implements Runnable {
             heldPass.setDepthWriteEnable(false);
             for (int sub=0; sub<block.getSubmeshCount(); sub++) {
                 Appearance faceAppearance = block.getAppearance(sub);
-                if (faceAppearance != null) faceAppearance.setCompositingMode(heldPass);
+                if (faceAppearance != null) {
+                    faceAppearance.setLayer(7);
+                    faceAppearance.setCompositingMode(heldPass);
+                }
             }
             return block;
         }
@@ -1434,9 +1440,12 @@ final class WorldCanvas extends Canvas implements Runnable {
         transform.postTranslate(px,py,pz);
         // Minecraft's standard held-item yaw is 45 degrees. The right arm
         // is additionally canted so it rises from the lower-right like vanilla.
-        transform.postRotate(45.0f-yaw,0.0f,1.0f,0.0f);
+        // Cancel the camera orientation first, then apply a fixed vanilla-like
+        // 45-degree item angle in camera space. Never subtract yaw twice:
+        // that made the arm twist as the player turned.
+        transform.postRotate(-yaw,0.0f,1.0f,0.0f);
         transform.postRotate(pitch+swingX,1.0f,0.0f,0.0f);
-        if (arm) transform.postRotate(35.0f,0.0f,0.0f,1.0f);
+        transform.postRotate(45.0f,0.0f,1.0f,0.0f);
         heldItemGroup.setTransform(transform);
     }
 
