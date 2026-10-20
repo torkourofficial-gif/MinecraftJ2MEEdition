@@ -87,13 +87,13 @@ final class WorldStore {
     static synchronized void saveState(int worldId, byte[] state) throws Exception {
         // SD snapshots are opt-in. If the optional file protocol fails, keep
         // the existing RMS path as a compatibility fallback.
-        if (IndevViewerMIDlet.isSdStorageEnabled() && FileWorldStore.isAvailable()) {
-            try {
+        try {
+            if (IndevViewerMIDlet.isSdStorageEnabled() && FileWorldStore.isAvailable()) {
                 FileWorldStore.save(worldId, state);
                 return;
-            } catch (Throwable unavailable) {
-                // Continue with RMS; JSR-75 may be absent from this runtime.
             }
+        } catch (Throwable unavailable) {
+            // Continue with RMS; JSR-75 may be absent from this runtime.
         }
         String name = stateStoreName(worldId);
         try { RecordStore.deleteRecordStore(name); } catch (RecordStoreNotFoundException ignored) { }
@@ -111,13 +111,13 @@ final class WorldStore {
     }
 
     static synchronized byte[] loadState(int worldId) throws Exception {
-        if (IndevViewerMIDlet.isSdStorageEnabled() && FileWorldStore.isAvailable()) {
-            try {
+        try {
+            if (IndevViewerMIDlet.isSdStorageEnabled() && FileWorldStore.isAvailable()) {
                 byte[] state = FileWorldStore.load(worldId);
                 if (state != null) return state;
-            } catch (Throwable missingOrUnavailable) {
-                // Old worlds and unsupported devices continue using RMS.
             }
+        } catch (Throwable missingOrUnavailable) {
+            // Old worlds and unsupported devices continue using RMS.
         }
         RecordStore rs = null;
         try {
