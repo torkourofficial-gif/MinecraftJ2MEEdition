@@ -8,10 +8,8 @@ import javax.microedition.io.Connector;
 import javax.microedition.io.file.FileConnection;
 
 /**
- * Optional microSD snapshot backend. Uses only MIDP Connector stream types so
- * the game can still compile on profiles where the JSR-75 FileConnection API
- * is not on the compile classpath. The file: protocol itself is optional at
- * runtime; callers must fall back to RMS when it is unavailable.
+ * Optional microSD snapshot backend. Uses the optional JSR-75 FileConnection API. The file: protocol is optional
+ * at runtime; callers must fall back to RMS when it is unavailable.
  *
  * This stores the existing world snapshot externally; it is not virtual RAM
  * and does not serialize live M3G objects.
@@ -57,7 +55,7 @@ final class FileWorldStore {
     }
 
     static synchronized byte[] load(int worldId) throws Exception {
-        StreamConnection connection = null;
+        FileConnection connection = null;
         DataInputStream in = null;
         try {
             connection = (FileConnection) Connector.open(url(worldId), Connector.READ, true);
