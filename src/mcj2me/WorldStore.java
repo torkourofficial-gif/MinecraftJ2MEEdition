@@ -93,7 +93,9 @@ final class WorldStore {
                 return;
             }
         } catch (Throwable unavailable) {
-            // Continue with RMS; JSR-75 may be absent from this runtime.
+            // Remove a possibly partial/stale card snapshot before writing the
+            // latest state to RMS, otherwise a later load could roll back.
+            try { FileWorldStore.delete(worldId); } catch (Throwable ignored) { }
         }
         String name = stateStoreName(worldId);
         try { RecordStore.deleteRecordStore(name); } catch (RecordStoreNotFoundException ignored) { }
