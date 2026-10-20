@@ -45,6 +45,22 @@ final class TerrainGenerator {
     private final byte[][] treeAtCache = new byte[SIZE][SIZE];
     private final int seed;
 
+    // Compact, seeded 2D Perlin gradient lattices. The tables store only an
+    // 8-way gradient index per lattice point (one byte), not a full noise map.
+    // This keeps heap use low on JBed while avoiding repeated hash() calls
+    // for every terrain column.
+    private static final int[] GRAD_X = {1024, -1024, 0, 0, 724, -724, 724, -724};
+    private static final int[] GRAD_Z = {0, 0, 1024, -1024, 724, 724, -724, -724};
+    private static final int SCALE_BROAD = 32;
+    private static final int SCALE_MEDIUM = 12;
+    private static final int SCALE_FINE = 4;
+    private static final int BROAD_GRID = (SIZE - 1) / SCALE_BROAD + 2;
+    private static final int MEDIUM_GRID = (SIZE - 1) / SCALE_MEDIUM + 2;
+    private static final int FINE_GRID = (SIZE - 1) / SCALE_FINE + 2;
+    private final byte[] broadGradients = new byte[BROAD_GRID * BROAD_GRID];
+    private final byte[] mediumGradients = new byte[MEDIUM_GRID * MEDIUM_GRID];
+    private final byte[] fineGradients = new byte[FINE_GRID * FINE_GRID];
+
     TerrainGenerator() {
         this(makeSeed());
     }
@@ -53,13 +69,19 @@ final class TerrainGenerator {
         seed = worldSeed;
         Random random = new Random(seed);
 
+        // Build each octave's gradient lattice once. This is tiny (~1.3 KB)
+        // and removes four seeded hash operations from every noise sample.
+        initGradientTable(broadGradients, BROAD_GRID, 32, 0x13579);
+        initGradientTable(mediumGradients, MEDIUM_GRID, 12, 0x2468B);
+        initGradientTable(fineGradients, FINE_GRID, 4, 0x5A17D);
+
         // Generate natural terrain, cut caves first, then carve/fill lakes last.
         // This lets the basin geometry overwrite cave cuts wherever they overlap.
         for (int x = 0; x < SIZE; x++) {
             for (int z = 0; z < SIZE; z++) {
-                int broad = valueNoise(x, z, 32);
-                int medium = valueNoise(x, z, 12);
-                int fine = valueNoise(x, z, 4);
+                int broad = perlin2D(x, z, SCALE_BROAD);
+                int medium = perlin2D(x, z, SCALE_MEDIUM);
+                int fine = perlin2D(x, z, SCALE_FINE);
                 int h = 27 + broad * 12 / 1024
                            + medium * 5 / 1024
                            + fine * 2 / 1024;
@@ -750,22 +772,59 @@ final class TerrainGenerator {
         return shade;
     }
 
-    private int valueNoise(int x, int z, int scale) {
+    private void initGradientTable(byte[] table, int width, int scale, int salt) {
+        int height = table.length / width;
+        for (int gz = 0; gz < height; gz++) {
+            for (int gx = 0; gx < width; gx++) {
+                table[gz * width + gx] = (byte) (hash(gx + salt, gz - salt) & 7);
+            }
+        }
+    }
+
+    /**
+     * Fixed-point 2D gradient Perlin noise. Gradients are seeded once into
+     * compact byte lattices; each sample performs only four table reads,
+     * integer dot products and interpolation. No floating point or trig.
+     * Output is roughly in the same +/-1024 range as the previous noise.
+     */
+    private int perlin2D(int x, int z, int scale) {
+        byte[] gradients;
+        int width;
+        if (scale == SCALE_BROAD) {
+            gradients = broadGradients;
+            width = BROAD_GRID;
+        } else if (scale == SCALE_MEDIUM) {
+            gradients = mediumGradients;
+            width = MEDIUM_GRID;
+        } else {
+            gradients = fineGradients;
+            width = FINE_GRID;
+        }
+
         int gx = x / scale;
         int gz = z / scale;
         int fx = (x % scale) * 256 / scale;
         int fz = (z % scale) * 256 / scale;
 
-        // Smooth interpolation in fixed-point arithmetic (0..256).
+        int ix = fx;
+        int iz = fz;
+        // Quintic fade is more expensive and unnecessary at this target.
+        // Cubic smoothstep keeps the surface continuous with integer math.
         fx = (fx * fx * (768 - 2 * fx)) >> 16;
         fz = (fz * fz * (768 - 2 * fz)) >> 16;
 
-        int a = hash(gx, gz);
-        int b = hash(gx + 1, gz);
-        int c = hash(gx, gz + 1);
-        int d = hash(gx + 1, gz + 1);
-        int top = a + ((b - a) * fx >> 8);
-        int bottom = c + ((d - c) * fx >> 8);
+        int i00 = gradients[gz * width + gx] & 7;
+        int i10 = gradients[gz * width + gx + 1] & 7;
+        int i01 = gradients[(gz + 1) * width + gx] & 7;
+        int i11 = gradients[(gz + 1) * width + gx + 1] & 7;
+
+        int n00 = (GRAD_X[i00] * ix + GRAD_Z[i00] * iz) >> 8;
+        int n10 = (GRAD_X[i10] * (ix - 256) + GRAD_Z[i10] * iz) >> 8;
+        int n01 = (GRAD_X[i01] * ix + GRAD_Z[i01] * (iz - 256)) >> 8;
+        int n11 = (GRAD_X[i11] * (ix - 256) + GRAD_Z[i11] * (iz - 256)) >> 8;
+
+        int top = n00 + ((n10 - n00) * fx >> 8);
+        int bottom = n01 + ((n11 - n01) * fx >> 8);
         return top + ((bottom - top) * fz >> 8);
     }
 
