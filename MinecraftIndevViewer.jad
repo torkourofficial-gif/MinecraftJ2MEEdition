@@ -5,3 +5,4 @@ MIDlet-Version: 0.1.0
 MIDlet-Description: Procedural Minecraft Indev spectator terrain viewer
 MicroEdition-Configuration: CLDC-1.1
 MicroEdition-Profile: MIDP-2.0
+MIDlet-Permissions-Opt: javax.microedition.io.Connector.file.read, javax.microedition.io.Connector.file.write
