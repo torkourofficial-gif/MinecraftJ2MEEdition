@@ -137,6 +137,7 @@ final class WorldStore {
     }
 
     static synchronized void delete(int worldId) throws Exception {
+        try { FileWorldStore.delete(worldId); } catch (Throwable ignored) { }
         RecordStore catalogue = null;
         try {
             catalogue = RecordStore.openRecordStore(STORE, false);
