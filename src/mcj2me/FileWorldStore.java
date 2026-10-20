@@ -76,6 +76,16 @@ final class FileWorldStore {
         }
     }
 
+    static synchronized void delete(int worldId) throws Exception {
+        FileConnection connection = null;
+        try {
+            connection = (FileConnection) Connector.open(url(worldId), Connector.READ_WRITE, true);
+            if (connection.exists()) connection.delete();
+        } finally {
+            if (connection != null) try { connection.close(); } catch (Exception ignored) { }
+        }
+    }
+
     private static String url(int worldId) throws Exception {
         String root = System.getProperty("fileconn.dir.memorycard");
         if (root == null || root.length() == 0)
