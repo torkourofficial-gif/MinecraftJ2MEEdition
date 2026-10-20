@@ -85,6 +85,16 @@ final class WorldStore {
     }
 
     static synchronized void saveState(int worldId, byte[] state) throws Exception {
+        // SD snapshots are opt-in. If the optional file protocol fails, keep
+        // the existing RMS path as a compatibility fallback.
+        if (IndevViewerMIDlet.isSdStorageEnabled() && FileWorldStore.isAvailable()) {
+            try {
+                FileWorldStore.save(worldId, state);
+                return;
+            } catch (Exception unavailable) {
+                // Continue with RMS; do not lose the user's save.
+            }
+        }
         String name = stateStoreName(worldId);
         try { RecordStore.deleteRecordStore(name); } catch (RecordStoreNotFoundException ignored) { }
         if (state == null || state.length == 0) return;
@@ -101,6 +111,14 @@ final class WorldStore {
     }
 
     static synchronized byte[] loadState(int worldId) throws Exception {
+        if (IndevViewerMIDlet.isSdStorageEnabled() && FileWorldStore.isAvailable()) {
+            try {
+                byte[] state = FileWorldStore.load(worldId);
+                if (state != null) return state;
+            } catch (Exception missingOrUnavailable) {
+                // Old worlds and unsupported devices continue using RMS.
+            }
+        }
         RecordStore rs = null;
         try {
             rs = RecordStore.openRecordStore(stateStoreName(worldId), false);
