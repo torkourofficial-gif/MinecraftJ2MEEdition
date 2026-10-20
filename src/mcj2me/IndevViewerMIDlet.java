@@ -4,11 +4,15 @@ import javax.microedition.midlet.MIDlet;
 import javax.microedition.lcdui.Display;
 import javax.microedition.lcdui.Alert;
 import javax.microedition.lcdui.AlertType;
+import javax.microedition.lcdui.Command;
+import javax.microedition.lcdui.CommandListener;
+import javax.microedition.lcdui.Form;
+import javax.microedition.lcdui.StringItem;
 import javax.microedition.rms.RecordStore;
 import javax.microedition.rms.RecordStoreException;
 
 /** MIDP entry point. The world is created only after Singleplayer is selected. */
-public final class IndevViewerMIDlet extends MIDlet {
+public final class IndevViewerMIDlet extends MIDlet implements CommandListener {
     static int sensitivity = 3;
     static int fogLevel = 1;
     static int frameskip = 0;
@@ -117,6 +121,12 @@ public final class IndevViewerMIDlet extends MIDlet {
         return 52;
     }
 
+    private static boolean sdStorageEnabled;
+    private static boolean storageChoiceLoaded;
+    private Form storagePermissionForm;
+    private Command storageAllowCommand;
+    private Command storageDenyCommand;
+
     private TitleScreen titleScreen;
     private WorldCanvas worldCanvas;
     private WorldSelectScreen worldSelectScreen;
@@ -131,14 +141,80 @@ public final class IndevViewerMIDlet extends MIDlet {
 
     public void startApp() {
         loadControls();
-        if (worldCanvas!=null) {
+        if (!loadStorageChoice()) {
+            showStoragePermission();
+            return;
+        }
+        continueStartApp();
+    }
+
+    /** True when the user has already answered the one-time SD storage question. */
+    private boolean loadStorageChoice() {
+        if (storageChoiceLoaded) return true;
+        RecordStore store = null;
+        try {
+            store = RecordStore.openRecordStore("mcj2me-storage", false);
+            if (store.getNumRecords() > 0) {
+                byte[] value = store.getRecord(1);
+                sdStorageEnabled = value != null && value.length > 0 && value[0] == 1;
+                storageChoiceLoaded = true;
+                return true;
+            }
+        } catch (Exception firstLaunchOrUnavailable) {
+            // No saved answer: ask once and persist the decision if RMS works.
+        } finally {
+            if (store != null) try { store.closeRecordStore(); } catch (RecordStoreException ignored) { }
+        }
+        return false;
+    }
+
+    private void showStoragePermission() {
+        if (storagePermissionForm == null) {
+            storagePermissionForm = new Form("World storage");
+            storagePermissionForm.append(new StringItem("Use microSD storage?",
+                "Minecraft can save world snapshots to the memory card to keep persistent data outside RMS. " +
+                "This is optional and does not turn the card into RAM. If unavailable, the game keeps using phone storage."));
+            storageAllowCommand = new Command("Allow", Command.OK, 1);
+            storageDenyCommand = new Command("Use phone", Command.CANCEL, 2);
+            storagePermissionForm.addCommand(storageAllowCommand);
+            storagePermissionForm.addCommand(storageDenyCommand);
+            storagePermissionForm.setCommandListener(this);
+        }
+        Display.getDisplay(this).setCurrent(storagePermissionForm);
+    }
+
+    public void commandAction(Command command, javax.microedition.lcdui.Displayable displayable) {
+        if (displayable != storagePermissionForm) return;
+        sdStorageEnabled = command == storageAllowCommand;
+        storageChoiceLoaded = true;
+        RecordStore store = null;
+        try {
+            store = RecordStore.openRecordStore("mcj2me-storage", true);
+            byte[] value = new byte[] { (byte) (sdStorageEnabled ? 1 : 0) };
+            if (store.getNumRecords() > 0) store.setRecord(1, value, 0, value.length);
+            else store.addRecord(value, 0, value.length);
+        } catch (Exception ignored) {
+            // Keep the in-memory choice for this session; RMS is the fallback.
+        } finally {
+            if (store != null) try { store.closeRecordStore(); } catch (RecordStoreException ignored) { }
+        }
+        storagePermissionForm = null;
+        continueStartApp();
+    }
+
+    static boolean isSdStorageEnabled() {
+        return storageChoiceLoaded && sdStorageEnabled;
+    }
+
+    private void continueStartApp() {
+        if (worldCanvas != null) {
             music.startWorld();
             Display.getDisplay(this).setCurrent(worldCanvas);
             worldCanvas.start();
             return;
         }
         music.startMenu();
-        if (titleScreen==null) titleScreen=new TitleScreen(this);
+        if (titleScreen == null) titleScreen = new TitleScreen(this);
         Display.getDisplay(this).setCurrent(titleScreen);
         titleScreen.start();
     }
