@@ -2373,16 +2373,22 @@ final class WorldCanvas extends Canvas implements Runnable {
         float forwardX = (float) Math.sin(radians);
         float forwardZ = -(float) Math.cos(radians);
 
-        // First discard chunks outside the local window or behind the player.
+        // Keep only meshes in the local window that can contribute to the
+        // current view. Merely disabling rendering does not release M3G
+        // vertex/index storage, which is expensive on the 8 MB JBed heap.
+        // TerrainGenerator retains world data and edits, so these meshes can
+        // be rebuilt from the same state when the player turns around.
         for (int x = 0; x < 8; x++) {
             for (int z = 0; z < 8; z++) {
                 boolean inRange = Math.abs(x - centerX) <= RADIUS
                     && Math.abs(z - centerZ) <= RADIUS;
-                // Retain nearby chunks behind the camera; unload only outside range.
-                if (!inRange) {
-                    removeChunkMeshes(x, z);
+                boolean inView = inRange && isChunkInFront(x, z, forwardX, forwardZ);
+                if (!inView) {
+                    if (activeChunks[x][z] != null || activeWaterChunks[x][z] != null) {
+                        removeChunkMeshes(x, z);
+                    }
                     builtChunks[x][z] = false;
-                    editedChunks[x][z] = false;
+                    if (!inRange) editedChunks[x][z] = false;
                 }
             }
         }
