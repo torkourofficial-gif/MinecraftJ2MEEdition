@@ -5,7 +5,7 @@ import java.io.DataOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import javax.microedition.io.Connector;
-import javax.microedition.io.StreamConnection;
+import javax.microedition.io.file.FileConnection;
 
 /**
  * Optional microSD snapshot backend. Uses only MIDP Connector stream types so
@@ -35,10 +35,12 @@ final class FileWorldStore {
     static synchronized void save(int worldId, byte[] state) throws Exception {
         if (state == null) state = new byte[0];
         String url = url(worldId);
-        StreamConnection connection = null;
+        FileConnection connection = null;
         DataOutputStream out = null;
         try {
-            connection = (StreamConnection) Connector.open(url, Connector.WRITE, true);
+            connection = (FileConnection) Connector.open(url, Connector.READ_WRITE, true);
+            if (!connection.exists()) connection.create();
+            else connection.truncate(0);
             OutputStream stream = connection.openOutputStream();
             out = new DataOutputStream(stream);
             // A length-prefixed record makes stale trailing bytes harmless on
@@ -58,7 +60,8 @@ final class FileWorldStore {
         StreamConnection connection = null;
         DataInputStream in = null;
         try {
-            connection = (StreamConnection) Connector.open(url(worldId), Connector.READ, true);
+            connection = (FileConnection) Connector.open(url(worldId), Connector.READ, true);
+            if (!connection.exists()) throw new Exception("World file not found");
             InputStream stream = connection.openInputStream();
             in = new DataInputStream(stream);
             if (in.readInt() != MAGIC) throw new Exception("Invalid SD world file");
