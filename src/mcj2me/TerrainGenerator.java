@@ -61,6 +61,15 @@ final class TerrainGenerator {
     private final byte[] mediumGradients = new byte[MEDIUM_GRID * MEDIUM_GRID];
     private final byte[] fineGradients = new byte[FINE_GRID * FINE_GRID];
 
+    // Per-axis coordinate caches remove division, modulo and fade math from each sample.
+    // Byte arrays keep the extra footprint below 2.5 KB for all three scales.
+    private final byte[] broadXCell = new byte[SIZE], broadXFrac = new byte[SIZE], broadXFade = new byte[SIZE];
+    private final byte[] broadZCell = new byte[SIZE], broadZFrac = new byte[SIZE], broadZFade = new byte[SIZE];
+    private final byte[] mediumXCell = new byte[SIZE], mediumXFrac = new byte[SIZE], mediumXFade = new byte[SIZE];
+    private final byte[] mediumZCell = new byte[SIZE], mediumZFrac = new byte[SIZE], mediumZFade = new byte[SIZE];
+    private final byte[] fineXCell = new byte[SIZE], fineXFrac = new byte[SIZE], fineXFade = new byte[SIZE];
+    private final byte[] fineZCell = new byte[SIZE], fineZFrac = new byte[SIZE], fineZFade = new byte[SIZE];
+
     TerrainGenerator() {
         this(makeSeed());
     }
@@ -74,6 +83,12 @@ final class TerrainGenerator {
         initGradientTable(broadGradients, BROAD_GRID, 32, 0x13579);
         initGradientTable(mediumGradients, MEDIUM_GRID, 12, 0x2468B);
         initGradientTable(fineGradients, FINE_GRID, 4, 0x5A17D);
+        initAxisTable(broadXCell, broadXFrac, broadXFade, SCALE_BROAD);
+        initAxisTable(broadZCell, broadZFrac, broadZFade, SCALE_BROAD);
+        initAxisTable(mediumXCell, mediumXFrac, mediumXFade, SCALE_MEDIUM);
+        initAxisTable(mediumZCell, mediumZFrac, mediumZFade, SCALE_MEDIUM);
+        initAxisTable(fineXCell, fineXFrac, fineXFade, SCALE_FINE);
+        initAxisTable(fineZCell, fineZFrac, fineZFade, SCALE_FINE);
 
         // Generate natural terrain, cut caves first, then carve/fill lakes last.
         // This lets the basin geometry overwrite cave cuts wherever they overlap.
@@ -781,42 +796,53 @@ final class TerrainGenerator {
         }
     }
 
+    /** Precompute integer lattice coordinates and fade weights for one axis. */
+    private void initAxisTable(byte[] cells, byte[] fractions, byte[] fades, int scale) {
+        for (int p = 0; p < SIZE; p++) {
+            int cell = p / scale;
+            int fraction = (p % scale) * 256 / scale;
+            cells[p] = (byte) cell;
+            fractions[p] = (byte) fraction;
+            fades[p] = (byte) ((fraction * fraction * (768 - 2 * fraction)) >> 16);
+        }
+    }
+
     /**
-     * Fixed-point 2D gradient Perlin noise. Gradients are seeded once into
-     * compact byte lattices; each sample performs only four table reads,
-     * integer dot products and interpolation. No floating point or trig.
-     * Output is roughly in the same +/-1024 range as the previous noise.
+     * Fixed-point 2D gradient Perlin noise. All coordinate division, modulo
+     * and fade calculations are moved out of the 16K-column generation loop.
+     * Each sample now performs table reads, dot products and interpolation only.
      */
     private int perlin2D(int x, int z, int scale) {
         byte[] gradients;
         int width;
+        byte[] xCells, xFractions, xFades, zCells, zFractions, zFades;
         if (scale == SCALE_BROAD) {
-            gradients = broadGradients;
-            width = BROAD_GRID;
+            gradients = broadGradients; width = BROAD_GRID;
+            xCells = broadXCell; xFractions = broadXFrac; xFades = broadXFade;
+            zCells = broadZCell; zFractions = broadZFrac; zFades = broadZFade;
         } else if (scale == SCALE_MEDIUM) {
-            gradients = mediumGradients;
-            width = MEDIUM_GRID;
+            gradients = mediumGradients; width = MEDIUM_GRID;
+            xCells = mediumXCell; xFractions = mediumXFrac; xFades = mediumXFade;
+            zCells = mediumZCell; zFractions = mediumZFrac; zFades = mediumZFade;
         } else {
-            gradients = fineGradients;
-            width = FINE_GRID;
+            gradients = fineGradients; width = FINE_GRID;
+            xCells = fineXCell; xFractions = fineXFrac; xFades = fineXFade;
+            zCells = fineZCell; zFractions = fineZFrac; zFades = fineZFade;
         }
 
-        int gx = x / scale;
-        int gz = z / scale;
-        int fx = (x % scale) * 256 / scale;
-        int fz = (z % scale) * 256 / scale;
+        int gx = xCells[x] & 255;
+        int gz = zCells[z] & 255;
+        int ix = xFractions[x] & 255;
+        int iz = zFractions[z] & 255;
+        int fx = xFades[x] & 255;
+        int fz = zFades[z] & 255;
 
-        int ix = fx;
-        int iz = fz;
-        // Quintic fade is more expensive and unnecessary at this target.
-        // Cubic smoothstep keeps the surface continuous with integer math.
-        fx = (fx * fx * (768 - 2 * fx)) >> 16;
-        fz = (fz * fz * (768 - 2 * fz)) >> 16;
-
-        int i00 = gradients[gz * width + gx] & 7;
-        int i10 = gradients[gz * width + gx + 1] & 7;
-        int i01 = gradients[(gz + 1) * width + gx] & 7;
-        int i11 = gradients[(gz + 1) * width + gx + 1] & 7;
+        int row0 = gz * width + gx;
+        int row1 = row0 + width;
+        int i00 = gradients[row0] & 7;
+        int i10 = gradients[row0 + 1] & 7;
+        int i01 = gradients[row1] & 7;
+        int i11 = gradients[row1 + 1] & 7;
 
         int n00 = (GRAD_X[i00] * ix + GRAD_Z[i00] * iz) >> 8;
         int n10 = (GRAD_X[i10] * (ix - 256) + GRAD_Z[i10] * iz) >> 8;
@@ -827,7 +853,6 @@ final class TerrainGenerator {
         int bottom = n01 + ((n11 - n01) * fx >> 8);
         return top + ((bottom - top) * fz >> 8);
     }
-
     private int hash(int x, int z) {
         int n = x * 374761393 + z * 668265263 + seed + 0x51ED270B;
         n = (n ^ (n >>> 13)) * 1274126177;
