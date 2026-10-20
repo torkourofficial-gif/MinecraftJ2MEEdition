@@ -91,8 +91,8 @@ final class WorldStore {
             try {
                 FileWorldStore.save(worldId, state);
                 return;
-            } catch (Exception unavailable) {
-                // Continue with RMS; do not lose the user's save.
+            } catch (Throwable unavailable) {
+                // Continue with RMS; JSR-75 may be absent from this runtime.
             }
         }
         String name = stateStoreName(worldId);
@@ -115,7 +115,7 @@ final class WorldStore {
             try {
                 byte[] state = FileWorldStore.load(worldId);
                 if (state != null) return state;
-            } catch (Exception missingOrUnavailable) {
+            } catch (Throwable missingOrUnavailable) {
                 // Old worlds and unsupported devices continue using RMS.
             }
         }
