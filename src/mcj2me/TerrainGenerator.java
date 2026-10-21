@@ -409,6 +409,29 @@ final class TerrainGenerator {
         return false;
     }
 
+    /**
+     * Build a compact chunk-local bitset of mined voxels. Meshing checks many
+     * cells repeatedly; scanning the sparse edit list for every cell becomes
+     * increasingly expensive as a player mines more blocks.
+     */
+    void fillRemovedBlockMask(int startX, int startZ, int chunkSize, byte[] mask) {
+        int required = (chunkSize * chunkSize * HEIGHT + 7) >> 3;
+        if (mask == null || mask.length < required) return;
+        for (int i = 0; i < required; i++) mask[i] = 0;
+        int chunkEndX = startX + chunkSize, chunkEndZ = startZ + chunkSize;
+        for (int i = 0; i < removedBlockCount; i++) {
+            int id = removedBlockIds[i];
+            int y = id / (SIZE * SIZE);
+            int rem = id - y * SIZE * SIZE;
+            int z = rem / SIZE, x = rem - z * SIZE;
+            if (x < startX || x >= chunkEndX || z < startZ || z >= chunkEndZ
+                    || y < 0 || y >= HEIGHT) continue;
+            int localX = x - startX, localZ = z - startZ;
+            int bit = (y * chunkSize + localX) * chunkSize + localZ;
+            mask[bit >> 3] |= (byte) (1 << (bit & 7));
+        }
+    }
+
     /** True when this exact XYZ voxel has been mined. */
     boolean isBlockRemoved(int x, int y, int z) {
         if (x < 0 || z < 0 || x >= SIZE || z >= SIZE || y < 0 || y >= HEIGHT) return false;
