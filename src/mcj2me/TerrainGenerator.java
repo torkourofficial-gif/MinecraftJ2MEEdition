@@ -45,6 +45,31 @@ final class TerrainGenerator {
     private final byte[][] treeAtCache = new byte[SIZE][SIZE];
     private final int seed;
 
+    // Compact, seeded 2D Perlin gradient lattices. The tables store only an
+    // 8-way gradient index per lattice point (one byte), not a full noise map.
+    // This keeps heap use low on JBed while avoiding repeated hash() calls
+    // for every terrain column.
+    private static final int[] GRAD_X = {1024, -1024, 0, 0, 724, -724, 724, -724};
+    private static final int[] GRAD_Z = {0, 0, 1024, -1024, 724, 724, -724, -724};
+    private static final int SCALE_BROAD = 32;
+    private static final int SCALE_MEDIUM = 12;
+    private static final int SCALE_FINE = 4;
+    private static final int BROAD_GRID = (SIZE - 1) / SCALE_BROAD + 2;
+    private static final int MEDIUM_GRID = (SIZE - 1) / SCALE_MEDIUM + 2;
+    private static final int FINE_GRID = (SIZE - 1) / SCALE_FINE + 2;
+    private final byte[] broadGradients = new byte[BROAD_GRID * BROAD_GRID];
+    private final byte[] mediumGradients = new byte[MEDIUM_GRID * MEDIUM_GRID];
+    private final byte[] fineGradients = new byte[FINE_GRID * FINE_GRID];
+
+    // Per-axis coordinate caches remove division, modulo and fade math from each sample.
+    // Byte arrays keep the extra footprint below 2.5 KB for all three scales.
+    private final byte[] broadXCell = new byte[SIZE], broadXFrac = new byte[SIZE], broadXFade = new byte[SIZE];
+    private final byte[] broadZCell = new byte[SIZE], broadZFrac = new byte[SIZE], broadZFade = new byte[SIZE];
+    private final byte[] mediumXCell = new byte[SIZE], mediumXFrac = new byte[SIZE], mediumXFade = new byte[SIZE];
+    private final byte[] mediumZCell = new byte[SIZE], mediumZFrac = new byte[SIZE], mediumZFade = new byte[SIZE];
+    private final byte[] fineXCell = new byte[SIZE], fineXFrac = new byte[SIZE], fineXFade = new byte[SIZE];
+    private final byte[] fineZCell = new byte[SIZE], fineZFrac = new byte[SIZE], fineZFade = new byte[SIZE];
+
     TerrainGenerator() {
         this(makeSeed());
     }
@@ -53,13 +78,25 @@ final class TerrainGenerator {
         seed = worldSeed;
         Random random = new Random(seed);
 
+        // Build each octave's gradient lattice once. This is tiny (~1.3 KB)
+        // and removes four seeded hash operations from every noise sample.
+        initGradientTable(broadGradients, BROAD_GRID, 32, 0x13579);
+        initGradientTable(mediumGradients, MEDIUM_GRID, 12, 0x2468B);
+        initGradientTable(fineGradients, FINE_GRID, 4, 0x5A17D);
+        initAxisTable(broadXCell, broadXFrac, broadXFade, SCALE_BROAD);
+        initAxisTable(broadZCell, broadZFrac, broadZFade, SCALE_BROAD);
+        initAxisTable(mediumXCell, mediumXFrac, mediumXFade, SCALE_MEDIUM);
+        initAxisTable(mediumZCell, mediumZFrac, mediumZFade, SCALE_MEDIUM);
+        initAxisTable(fineXCell, fineXFrac, fineXFade, SCALE_FINE);
+        initAxisTable(fineZCell, fineZFrac, fineZFade, SCALE_FINE);
+
         // Generate natural terrain, cut caves first, then carve/fill lakes last.
         // This lets the basin geometry overwrite cave cuts wherever they overlap.
         for (int x = 0; x < SIZE; x++) {
             for (int z = 0; z < SIZE; z++) {
-                int broad = valueNoise(x, z, 32);
-                int medium = valueNoise(x, z, 12);
-                int fine = valueNoise(x, z, 4);
+                int broad = perlin2D(x, z, SCALE_BROAD);
+                int medium = perlin2D(x, z, SCALE_MEDIUM);
+                int fine = perlin2D(x, z, SCALE_FINE);
                 int h = 27 + broad * 12 / 1024
                            + medium * 5 / 1024
                            + fine * 2 / 1024;
@@ -370,6 +407,29 @@ final class TerrainGenerator {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Build a compact chunk-local bitset of mined voxels. Meshing checks many
+     * cells repeatedly; scanning the sparse edit list for every cell becomes
+     * increasingly expensive as a player mines more blocks.
+     */
+    void fillRemovedBlockMask(int startX, int startZ, int chunkSize, byte[] mask) {
+        int required = (chunkSize * chunkSize * HEIGHT + 7) >> 3;
+        if (mask == null || mask.length < required) return;
+        for (int i = 0; i < required; i++) mask[i] = 0;
+        int chunkEndX = startX + chunkSize, chunkEndZ = startZ + chunkSize;
+        for (int i = 0; i < removedBlockCount; i++) {
+            int id = removedBlockIds[i];
+            int y = id / (SIZE * SIZE);
+            int rem = id - y * SIZE * SIZE;
+            int z = rem / SIZE, x = rem - z * SIZE;
+            if (x < startX || x >= chunkEndX || z < startZ || z >= chunkEndZ
+                    || y < 0 || y >= HEIGHT) continue;
+            int localX = x - startX, localZ = z - startZ;
+            int bit = (y * chunkSize + localX) * chunkSize + localZ;
+            mask[bit >> 3] |= (byte) (1 << (bit & 7));
+        }
     }
 
     /** True when this exact XYZ voxel has been mined. */
@@ -750,25 +810,72 @@ final class TerrainGenerator {
         return shade;
     }
 
-    private int valueNoise(int x, int z, int scale) {
-        int gx = x / scale;
-        int gz = z / scale;
-        int fx = (x % scale) * 256 / scale;
-        int fz = (z % scale) * 256 / scale;
-
-        // Smooth interpolation in fixed-point arithmetic (0..256).
-        fx = (fx * fx * (768 - 2 * fx)) >> 16;
-        fz = (fz * fz * (768 - 2 * fz)) >> 16;
-
-        int a = hash(gx, gz);
-        int b = hash(gx + 1, gz);
-        int c = hash(gx, gz + 1);
-        int d = hash(gx + 1, gz + 1);
-        int top = a + ((b - a) * fx >> 8);
-        int bottom = c + ((d - c) * fx >> 8);
-        return top + ((bottom - top) * fz >> 8);
+    private void initGradientTable(byte[] table, int width, int scale, int salt) {
+        int height = table.length / width;
+        for (int gz = 0; gz < height; gz++) {
+            for (int gx = 0; gx < width; gx++) {
+                table[gz * width + gx] = (byte) (hash(gx + salt, gz - salt) & 7);
+            }
+        }
     }
 
+    /** Precompute integer lattice coordinates and fade weights for one axis. */
+    private void initAxisTable(byte[] cells, byte[] fractions, byte[] fades, int scale) {
+        for (int p = 0; p < SIZE; p++) {
+            int cell = p / scale;
+            int fraction = (p % scale) * 256 / scale;
+            cells[p] = (byte) cell;
+            fractions[p] = (byte) fraction;
+            fades[p] = (byte) ((fraction * fraction * (768 - 2 * fraction)) >> 16);
+        }
+    }
+
+    /**
+     * Fixed-point 2D gradient Perlin noise. All coordinate division, modulo
+     * and fade calculations are moved out of the 16K-column generation loop.
+     * Each sample now performs table reads, dot products and interpolation only.
+     */
+    private int perlin2D(int x, int z, int scale) {
+        byte[] gradients;
+        int width;
+        byte[] xCells, xFractions, xFades, zCells, zFractions, zFades;
+        if (scale == SCALE_BROAD) {
+            gradients = broadGradients; width = BROAD_GRID;
+            xCells = broadXCell; xFractions = broadXFrac; xFades = broadXFade;
+            zCells = broadZCell; zFractions = broadZFrac; zFades = broadZFade;
+        } else if (scale == SCALE_MEDIUM) {
+            gradients = mediumGradients; width = MEDIUM_GRID;
+            xCells = mediumXCell; xFractions = mediumXFrac; xFades = mediumXFade;
+            zCells = mediumZCell; zFractions = mediumZFrac; zFades = mediumZFade;
+        } else {
+            gradients = fineGradients; width = FINE_GRID;
+            xCells = fineXCell; xFractions = fineXFrac; xFades = fineXFade;
+            zCells = fineZCell; zFractions = fineZFrac; zFades = fineZFade;
+        }
+
+        int gx = xCells[x] & 255;
+        int gz = zCells[z] & 255;
+        int ix = xFractions[x] & 255;
+        int iz = zFractions[z] & 255;
+        int fx = xFades[x] & 255;
+        int fz = zFades[z] & 255;
+
+        int row0 = gz * width + gx;
+        int row1 = row0 + width;
+        int i00 = gradients[row0] & 7;
+        int i10 = gradients[row0 + 1] & 7;
+        int i01 = gradients[row1] & 7;
+        int i11 = gradients[row1 + 1] & 7;
+
+        int n00 = (GRAD_X[i00] * ix + GRAD_Z[i00] * iz) >> 8;
+        int n10 = (GRAD_X[i10] * (ix - 256) + GRAD_Z[i10] * iz) >> 8;
+        int n01 = (GRAD_X[i01] * ix + GRAD_Z[i01] * (iz - 256)) >> 8;
+        int n11 = (GRAD_X[i11] * (ix - 256) + GRAD_Z[i11] * (iz - 256)) >> 8;
+
+        int top = n00 + ((n10 - n00) * fx >> 8);
+        int bottom = n01 + ((n11 - n01) * fx >> 8);
+        return top + ((bottom - top) * fz >> 8);
+    }
     private int hash(int x, int z) {
         int n = x * 374761393 + z * 668265263 + seed + 0x51ED270B;
         n = (n ^ (n >>> 13)) * 1274126177;

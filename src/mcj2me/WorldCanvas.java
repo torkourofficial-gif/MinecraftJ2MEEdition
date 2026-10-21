@@ -148,6 +148,15 @@ final class WorldCanvas extends Canvas implements Runnable {
     private final int[] greedyRectBase = new int[CHUNK * CHUNK];
     private final int[] greedyRectGlow = new int[CHUNK * CHUNK];
     private final int[] greedyPerTile = new int[256];
+    // Cache expensive deterministic surface queries once per chunk build; the
+    // counting and emission passes otherwise repeat flower/tree lookups.
+    private final byte[] chunkFlowerTypes = new byte[CHUNK * CHUNK];
+    private final byte[] chunkTreeFlags = new byte[CHUNK * CHUNK];
+    private final byte[] chunkTreeBases = new byte[CHUNK * CHUNK];
+    private final byte[] chunkTreeHeights = new byte[CHUNK * CHUNK];
+    // 16x16x64 mined-voxel lookup, bit-packed to just 2 KiB per meshing pass.
+    private final byte[] chunkRemovedMask = new byte[(CHUNK * CHUNK * TerrainGenerator.HEIGHT + 7) >> 3];
+    private int meshingChunkStartX, meshingChunkStartZ;
     private Thread thread;
     private boolean running;
     private int frameSkipCounter = 0;
@@ -3470,6 +3479,27 @@ final class WorldCanvas extends Canvas implements Runnable {
         for (int i = 0; i < shadeCacheKeys.length; i++) shadeCacheKeys[i] = -1;
         int startX = chunkX * CHUNK;
         int startZ = chunkZ * CHUNK;
+        meshingChunkStartX = startX;
+        meshingChunkStartZ = startZ;
+        terrain.fillRemovedBlockMask(startX, startZ, CHUNK, chunkRemovedMask);
+        // Surface decorations are deterministic for an unchanged world. Cache
+        // their per-column decisions so both mesh passes share one result.
+        for (int cx = 0; cx < CHUNK; cx++) {
+            for (int cz = 0; cz < CHUNK; cz++) {
+                int wx = startX + cx, wz = startZ + cz;
+                int ci = cx * CHUNK + cz;
+                chunkFlowerTypes[ci] = (byte) terrain.getFlowerType(wx, wz);
+                boolean tree = terrain.isTreeAt(wx, wz);
+                chunkTreeFlags[ci] = tree ? (byte) 1 : (byte) 0;
+                if (tree) {
+                    chunkTreeBases[ci] = (byte) terrain.getTreeBaseHeight(wx, wz);
+                    chunkTreeHeights[ci] = (byte) terrain.getTreeHeight(wx, wz);
+                } else {
+                    chunkTreeBases[ci] = 0;
+                    chunkTreeHeights[ci] = 0;
+                }
+            }
+        }
         int quads = 0;
         int flowerQuads = 0;
         int x, z, h;
@@ -3478,7 +3508,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 h = terrain.getHeight(x, z);
                 int yy;
                 for (yy = 0; yy < h; yy++) {
-                    if (terrain.isBlockRemoved(x, yy, z)) continue;
+                    if (isRemovedDuringChunkBuild(x, yy, z)) continue;
                     if (isTerrainFaceExposed(x, yy, z, x - 1, z)) quads++;
                     if (isTerrainFaceExposed(x, yy, z, x + 1, z)) quads++;
                     if (isTerrainFaceExposed(x, yy, z, x, z - 1)) quads++;
@@ -3486,14 +3516,14 @@ final class WorldCanvas extends Canvas implements Runnable {
                     // A mined voxel exposes the underside of the block above
                     // and the top of the block below. Natural top faces remain
                     // handled by the greedy surface mesh to avoid duplicates.
-                    if (yy + 1 < h && terrain.isBlockRemoved(x, yy + 1, z)) quads++;
-                    if (yy > 0 && terrain.isBlockRemoved(x, yy - 1, z)) quads++;
+                    if (yy + 1 < h && isRemovedDuringChunkBuild(x, yy + 1, z)) quads++;
+                    if (yy > 0 && isRemovedDuringChunkBuild(x, yy - 1, z)) quads++;
                 }
-                int flowerType = terrain.getFlowerType(x, z);
+                int flowerType = chunkFlowerTypes[(x - startX) * CHUNK + (z - startZ)];
                 if (flowerType >= 0) flowerQuads += 2;
-                if (terrain.isTreeAt(x, z)) {
-                    int treeBase = terrain.getTreeBaseHeight(x, z);
-                    int treeHeight = terrain.getTreeHeight(x, z);
+                if (chunkTreeFlags[(x - startX) * CHUNK + (z - startZ)] != 0) {
+                    int treeBase = chunkTreeBases[(x - startX) * CHUNK + (z - startZ)] & 255;
+                    int treeHeight = chunkTreeHeights[(x - startX) * CHUNK + (z - startZ)] & 255;
                     int treeY;
                     for (treeY = 0; treeY < treeHeight; treeY++) {
                         if (terrain.isTreeTrunkAt(x, treeBase + treeY, z)) {
@@ -3550,7 +3580,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                 h = terrain.getHeight(x, z);
                 int sy;
                 for (sy = 0; sy < h; sy++) {
-                    if (terrain.isBlockRemoved(x, sy, z)) continue;
+                    if (isRemovedDuringChunkBuild(x, sy, z)) continue;
                     int layerType = terrain.getBlockTypeAt(x, sy, z);
                     if (isTerrainFaceExposed(x, sy, z, x - 1, z)) {
                         vertex = addQuad(positions, texCoords, colors, stripLengths,
@@ -3572,13 +3602,13 @@ final class WorldCanvas extends Canvas implements Runnable {
                             vertex, strip++, x + 1, sy, z + 1, x + 1, sy + 1, z + 1,
                             x, sy, z + 1, x, sy + 1, z + 1, sideTile(terrain.getTopType(x, z), layerType, sy, h), sideTileY(terrain.getTopType(x, z), layerType, sy, h));
                     }
-                    if (sy + 1 < h && terrain.isBlockRemoved(x, sy + 1, z)) {
+                    if (sy + 1 < h && isRemovedDuringChunkBuild(x, sy + 1, z)) {
                         int topX = BLOCK_TILE_X[layerType], topY = BLOCK_TILE_Y[layerType];
                         vertex = addQuad(positions, texCoords, colors, stripLengths,
                             vertex, strip++, x, sy + 1, z, x, sy + 1, z + 1,
                             x + 1, sy + 1, z, x + 1, sy + 1, z + 1, topX, topY);
                     }
-                    if (sy > 0 && terrain.isBlockRemoved(x, sy - 1, z)) {
+                    if (sy > 0 && isRemovedDuringChunkBuild(x, sy - 1, z)) {
                         int bottomType = layerType == TerrainGenerator.BLOCK_GRASS
                             ? TerrainGenerator.BLOCK_DIRT : layerType;
                         int bottomX = BLOCK_TILE_X[bottomType], bottomY = BLOCK_TILE_Y[bottomType];
@@ -3587,7 +3617,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                             x, sy, z + 1, x + 1, sy, z + 1, bottomX, bottomY);
                     }
                 }
-                int flowerType = terrain.getFlowerType(x, z);
+                int flowerType = chunkFlowerTypes[(x - startX) * CHUNK + (z - startZ)];
                 if (flowerType >= 0) {
                     int fx = BLOCK_TILE_X[flowerType], fy = BLOCK_TILE_Y[flowerType];
                     // Keep crossed plant planes out of opaque terrain geometry:
@@ -3600,8 +3630,9 @@ final class WorldCanvas extends Canvas implements Runnable {
                         flowerStripLengths, flowerVertex, flowerStrip++, x + 1, h, z,
                         x, h, z + 1, x + 1, h + 1, z, x, h + 1, z + 1, fx, fy);
                 }
-                if (terrain.isTreeAt(x, z)) {
-                    int base = terrain.getTreeBaseHeight(x, z), th = terrain.getTreeHeight(x, z), y;
+                if (chunkTreeFlags[(x - startX) * CHUNK + (z - startZ)] != 0) {
+                    int ci = (x - startX) * CHUNK + (z - startZ);
+                    int base = chunkTreeBases[ci] & 255, th = chunkTreeHeights[ci] & 255, y;
                     for (y = 0; y < th; y++) {
                         if (terrain.isTreeTrunkAt(x, base + y, z)) {
                             int exposed = countExposedTreeFaces(x, base + y, z);
@@ -3729,10 +3760,20 @@ final class WorldCanvas extends Canvas implements Runnable {
 
     /** True if a solid terrain voxel has an exposed horizontal face toward its neighbor. */
     private boolean isTerrainFaceExposed(int x, int y, int z, int nx, int nz) {
-        if (terrain.isBlockRemoved(x, y, z)) return false;
+        if (isRemovedDuringChunkBuild(x, y, z)) return false;
         int neighborHeight = terrain.getHeight(nx, nz);
         if (y >= neighborHeight) return true;
-        return terrain.isBlockRemoved(nx, y, nz);
+        return isRemovedDuringChunkBuild(nx, y, nz);
+    }
+
+    private boolean isRemovedDuringChunkBuild(int x, int y, int z) {
+        if (y < 0 || y >= TerrainGenerator.HEIGHT) return false;
+        int localX = x - meshingChunkStartX, localZ = z - meshingChunkStartZ;
+        if (localX >= 0 && localX < CHUNK && localZ >= 0 && localZ < CHUNK) {
+            int bit = (y * CHUNK + localX) * CHUNK + localZ;
+            return (chunkRemovedMask[bit >> 3] & (1 << (bit & 7))) != 0;
+        }
+        return terrain.isBlockRemoved(x, y, z);
     }
 
     /** Merge compatible adjacent top faces while repeating their own 16x16 tile. */
