@@ -148,6 +148,12 @@ final class WorldCanvas extends Canvas implements Runnable {
     private final int[] greedyRectBase = new int[CHUNK * CHUNK];
     private final int[] greedyRectGlow = new int[CHUNK * CHUNK];
     private final int[] greedyPerTile = new int[256];
+    // Cache expensive deterministic surface queries once per chunk build; the
+    // counting and emission passes otherwise repeat flower/tree lookups.
+    private final byte[] chunkFlowerTypes = new byte[CHUNK * CHUNK];
+    private final byte[] chunkTreeFlags = new byte[CHUNK * CHUNK];
+    private final byte[] chunkTreeBases = new byte[CHUNK * CHUNK];
+    private final byte[] chunkTreeHeights = new byte[CHUNK * CHUNK];
     private Thread thread;
     private boolean running;
     private int frameSkipCounter = 0;
@@ -3470,6 +3476,24 @@ final class WorldCanvas extends Canvas implements Runnable {
         for (int i = 0; i < shadeCacheKeys.length; i++) shadeCacheKeys[i] = -1;
         int startX = chunkX * CHUNK;
         int startZ = chunkZ * CHUNK;
+        // Surface decorations are deterministic for an unchanged world. Cache
+        // their per-column decisions so both mesh passes share one result.
+        for (int cx = 0; cx < CHUNK; cx++) {
+            for (int cz = 0; cz < CHUNK; cz++) {
+                int wx = startX + cx, wz = startZ + cz;
+                int ci = cx * CHUNK + cz;
+                chunkFlowerTypes[ci] = (byte) terrain.getFlowerType(wx, wz);
+                boolean tree = terrain.isTreeAt(wx, wz);
+                chunkTreeFlags[ci] = tree ? (byte) 1 : (byte) 0;
+                if (tree) {
+                    chunkTreeBases[ci] = (byte) terrain.getTreeBaseHeight(wx, wz);
+                    chunkTreeHeights[ci] = (byte) terrain.getTreeHeight(wx, wz);
+                } else {
+                    chunkTreeBases[ci] = 0;
+                    chunkTreeHeights[ci] = 0;
+                }
+            }
+        }
         int quads = 0;
         int flowerQuads = 0;
         int x, z, h;
@@ -3489,11 +3513,11 @@ final class WorldCanvas extends Canvas implements Runnable {
                     if (yy + 1 < h && terrain.isBlockRemoved(x, yy + 1, z)) quads++;
                     if (yy > 0 && terrain.isBlockRemoved(x, yy - 1, z)) quads++;
                 }
-                int flowerType = terrain.getFlowerType(x, z);
+                int flowerType = chunkFlowerTypes[(x - startX) * CHUNK + (z - startZ)];
                 if (flowerType >= 0) flowerQuads += 2;
-                if (terrain.isTreeAt(x, z)) {
-                    int treeBase = terrain.getTreeBaseHeight(x, z);
-                    int treeHeight = terrain.getTreeHeight(x, z);
+                if (chunkTreeFlags[(x - startX) * CHUNK + (z - startZ)] != 0) {
+                    int treeBase = chunkTreeBases[(x - startX) * CHUNK + (z - startZ)] & 255;
+                    int treeHeight = chunkTreeHeights[(x - startX) * CHUNK + (z - startZ)] & 255;
                     int treeY;
                     for (treeY = 0; treeY < treeHeight; treeY++) {
                         if (terrain.isTreeTrunkAt(x, treeBase + treeY, z)) {
@@ -3587,7 +3611,7 @@ final class WorldCanvas extends Canvas implements Runnable {
                             x, sy, z + 1, x + 1, sy, z + 1, bottomX, bottomY);
                     }
                 }
-                int flowerType = terrain.getFlowerType(x, z);
+                int flowerType = chunkFlowerTypes[(x - startX) * CHUNK + (z - startZ)];
                 if (flowerType >= 0) {
                     int fx = BLOCK_TILE_X[flowerType], fy = BLOCK_TILE_Y[flowerType];
                     // Keep crossed plant planes out of opaque terrain geometry:
@@ -3600,8 +3624,9 @@ final class WorldCanvas extends Canvas implements Runnable {
                         flowerStripLengths, flowerVertex, flowerStrip++, x + 1, h, z,
                         x, h, z + 1, x + 1, h + 1, z, x, h + 1, z + 1, fx, fy);
                 }
-                if (terrain.isTreeAt(x, z)) {
-                    int base = terrain.getTreeBaseHeight(x, z), th = terrain.getTreeHeight(x, z), y;
+                if (chunkTreeFlags[(x - startX) * CHUNK + (z - startZ)] != 0) {
+                    int ci = (x - startX) * CHUNK + (z - startZ);
+                    int base = chunkTreeBases[ci] & 255, th = chunkTreeHeights[ci] & 255, y;
                     for (y = 0; y < th; y++) {
                         if (terrain.isTreeTrunkAt(x, base + y, z)) {
                             int exposed = countExposedTreeFaces(x, base + y, z);
