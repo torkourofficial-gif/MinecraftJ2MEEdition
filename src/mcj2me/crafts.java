@@ -117,6 +117,7 @@ public final class crafts {
         r(3, 3, new int[] { OAK_PLANKS, OAK_PLANKS, OAK_PLANKS,
                             OAK_PLANKS, EMPTY, OAK_PLANKS,
                             OAK_PLANKS, OAK_PLANKS, OAK_PLANKS }, CHEST, 1, false),
+        r(3, 3, new int[] { EMPTY, EMPTY, EMPTY, OAK_PLANKS, EMPTY, OAK_PLANKS, OAK_PLANKS, OAK_PLANKS, OAK_PLANKS }, BOAT, 1, false),
         r(3, 3, new int[] { OAK_PLANKS, OAK_PLANKS, OAK_PLANKS, EMPTY, STICK, EMPTY, EMPTY, STICK, EMPTY }, WOODEN_PICKAXE, 1, false),
         r(3, 3, new int[] { STONE, STONE, STONE, EMPTY, STICK, EMPTY, EMPTY, STICK, EMPTY }, STONE_PICKAXE, 1, false),
         r(3, 3, new int[] { IRON_INGOT, IRON_INGOT, IRON_INGOT, EMPTY, STICK, EMPTY, EMPTY, STICK, EMPTY }, IRON_PICKAXE, 1, false),
