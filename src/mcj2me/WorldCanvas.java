@@ -681,6 +681,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         // keeping the axes straight is essential or the icon becomes another item.
         // Crafting ingredients/results use original items.png sprites wherever available.
         mapCraftItemIcon(itemsImage, crafts.STICK, 5, 3);
+        mapCraftItemIcon(itemsImage, crafts.BOAT, 8, 4); // Alpha-era boat inventory sprite
         // These are blocks, not item sprites: Beta 1.6 stores their block
         // faces in terrain.png (loaded as "atlas"). Using items.png here
         // sampled unrelated item sprites and made the recipe icons incorrect.
