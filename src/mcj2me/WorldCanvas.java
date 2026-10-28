@@ -302,6 +302,9 @@ final class WorldCanvas extends Canvas implements Runnable {
     private final int[] droppedAge = new int[MAX_DROPPED_ITEMS];
     private Group droppedItemGroup;
     private Group heldItemGroup;
+    private Appearance boatAppearance;
+    private BoatEntity boat;
+    private boolean ridingBoat;
     private Mesh heldItemMesh;
     private Mesh heldFoodMesh;
     // All flat 3D item models share the same immutable box geometry.
@@ -611,6 +614,30 @@ final class WorldCanvas extends Canvas implements Runnable {
         containerImage = ResourceImages.load("/mcj2me/container.png");
         setupStage = "loading /mcj2me/items.png";
         Image itemsImage = ResourceImages.load("/mcj2me/items.png");
+        setupStage = "loading /mcj2me/boat.png";
+        Image boatImage;
+        try {
+            boatImage = ResourceImages.load("/mcj2me/boat.png");
+        } catch (Exception missingBoatTexture) {
+            // Keep development builds playable if boat.png has not been copied
+            // into the resources folder yet. A bundled boat.png always wins.
+            int[] woodPixels = new int[16 * 16];
+            for (int py = 0; py < 16; py++) for (int px = 0; px < 16; px++) {
+                int shade = ((py % 4 == 0) || (px % 7 == 0)) ? 0x70431F : 0xA36A35;
+                woodPixels[py * 16 + px] = 0xFF000000 | shade;
+            }
+            boatImage = Image.createRGBImage(woodPixels, 16, 16, false);
+        }
+        Texture2D boatTexture = new Texture2D(new Image2D(Image2D.RGBA, boatImage));
+        boatTexture.setFiltering(Texture2D.FILTER_BASE_LEVEL, Texture2D.FILTER_NEAREST);
+        boatTexture.setWrapping(Texture2D.WRAP_CLAMP, Texture2D.WRAP_CLAMP);
+        boatAppearance = new Appearance();
+        boatAppearance.setTexture(0, boatTexture);
+        PolygonMode boatPolygonMode = new PolygonMode();
+        boatPolygonMode.setCulling(PolygonMode.CULL_NONE);
+        boatPolygonMode.setShading(PolygonMode.SHADE_FLAT);
+        boatAppearance.setPolygonMode(boatPolygonMode);
+        boatImage = null;
         setupStage = "loading /mcj2me/char.png";
         Image charImage = ResourceImages.load("/mcj2me/char.png");
         heldArmAppearance = createHeldTextureAppearance(charImage);
@@ -880,6 +907,8 @@ final class WorldCanvas extends Canvas implements Runnable {
         while (running) {
             if (!paused) {
                 updateMovement();
+                if (!ridingBoat && boat != null && boat.isAlive())
+                    boat.tick(terrain, false, false, false, false, boat.getYaw());
                 tickEating();
                 if (handSwingTicks > 0) handSwingTicks--;
                 updateHeldItem();
@@ -1547,6 +1576,18 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
 
         if (IndevViewerMIDlet.controlPressed(CONTROL_JUMP,keyCode,action) && !jumpHeld) {
+            if (ridingBoat && boat != null) {
+                ridingBoat = false;
+                cameraX = boat.getX() + (float)Math.cos(yaw * 0.0174532925f) * 0.8f;
+                cameraZ = boat.getZ() + (float)Math.sin(yaw * 0.0174532925f) * 0.8f;
+                cameraY = boat.getY() + PLAYER_EYE_HEIGHT + 0.25f;
+                verticalVelocity = 0.0f;
+                airborne = false;
+                jumpHeld = true;
+                updateCamera();
+                repaint();
+                return;
+            }
             jumpHeld = true;
             if (worldMode == IndevViewerMIDlet.MODE_SURVIVAL) {
                 if (isSwimming()) {
@@ -2018,6 +2059,18 @@ final class WorldCanvas extends Canvas implements Runnable {
     }
 
     private void updateMovement() {
+        if (ridingBoat && boat != null && boat.isAlive()) {
+            boat.tick(terrain, forward, backward, turnLeft, turnRight, yaw);
+            cameraX = boat.getX();
+            cameraZ = boat.getZ();
+            cameraY = boat.getY() + PLAYER_EYE_HEIGHT;
+            yaw = boat.getYaw();
+            airborne = false;
+            verticalVelocity = 0.0f;
+            updateCamera();
+            return;
+        }
+        ridingBoat = false;
         boolean changed = false;
 
         if (turnLeft) { yaw -= IndevViewerMIDlet.sensitivity; changed = true; }
@@ -4750,6 +4803,7 @@ final class WorldCanvas extends Canvas implements Runnable {
         }
         int itemType = selectedItemType();
         if (itemType < 0 || itemType >= inventory.length || inventory[itemType] <= 0) return;
+        if (itemType == crafts.BOAT) { placeBoat(); return; }
         if (itemType == ITEM_EMPTY_BUCKET) { collectWaterBucket(); return; }
         int[] hit = raycastSurface();
         if (hit == null) return;
@@ -4789,6 +4843,26 @@ final class WorldCanvas extends Canvas implements Runnable {
             removeEmptyItemFromSlots(itemType);
             invalidateEditedArea(x, x, z, z);
         }
+    }
+
+    /** Place a boat on a nearby water surface, matching Alpha's five-block reach. */
+    private void placeBoat() {
+        if (boat != null && boat.isAlive()) return;
+        float radians = yaw * 0.0174532925f;
+        float x = cameraX + (float)Math.sin(radians) * 2.0f;
+        float z = cameraZ - (float)Math.cos(radians) * 2.0f;
+        int bx = (int)x, bz = (int)z;
+        if (bx < 1 || bz < 1 || bx >= TerrainGenerator.SIZE - 1 || bz >= TerrainGenerator.SIZE - 1) return;
+        int surface = terrain.getWaterSurfaceLevel(bx, bz);
+        if (surface <= terrain.getHeight(bx, bz)) return;
+        boat = new BoatEntity(world, boatAppearance, x, surface - 0.22f, z, yaw);
+        inventory[crafts.BOAT]--;
+        removeEmptyItemFromSlots(crafts.BOAT);
+        ridingBoat = true;
+        cameraX = x;
+        cameraZ = z;
+        cameraY = boat.getY() + PLAYER_EYE_HEIGHT;
+        updateCamera();
     }
 
     /**
